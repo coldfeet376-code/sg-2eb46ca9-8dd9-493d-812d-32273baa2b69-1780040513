@@ -1,0 +1,46 @@
+{
+  "name": "Warehouse Work Rota System",
+  "short_name": "Warehouse Rota",
+  "description": "Fair distribution work rotation system for warehouse operations",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F5F7",
+  "theme_color": "#3B82F6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Current Week Rota",
+      "short_name": "Rota",
+      "description": "View and manage current week schedule",
+      "url": "/",
+      "icons": []
+    },
+    {
+      "name": "Manage Staff",
+      "short_name": "Staff",
+      "description": "Add and manage warehouse staff",
+      "url": "/staff",
+      "icons": []
+    },
+    {
+      "name": "Configure Tasks",
+      "short_name": "Config",
+      "description": "Set daily task requirements",
+      "url": "/config",
+      "icons": []
+    }
+  ],
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr"
+}
