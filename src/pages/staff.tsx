@@ -64,8 +64,8 @@ export default function StaffPage() {
       id: Date.now().toString(),
       name: name.trim(),
       trainedTasks: selectedTasks,
+      shiftStart,
       availability: [],
-      certifications: [],
     };
 
     setStaff([...staff, newStaff]);
@@ -120,6 +120,7 @@ export default function StaffPage() {
           id: Date.now().toString() + Math.random(),
           name: staffName,
           trainedTasks: tasks,
+          shiftStart: shift,
           availability: [],
         });
       }

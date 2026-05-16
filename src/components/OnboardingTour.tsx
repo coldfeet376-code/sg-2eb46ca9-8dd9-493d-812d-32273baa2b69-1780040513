@@ -138,7 +138,7 @@ export function OnboardingTour() {
         id: "staff-page",
         text: `
           <h3>Staff Management</h3>
-          <p>Navigate to the <strong>Staff</strong> page to add team members, set their trained tasks, manage availability, and track certifications.</p>
+          <p>Navigate to the <strong>Staff</strong> page to add team members, set their trained tasks, and manage their availability.</p>
         `,
         buttons: [
           {
