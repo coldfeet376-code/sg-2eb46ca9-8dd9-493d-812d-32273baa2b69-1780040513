@@ -14,9 +14,9 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SEO } from "@/components/SEO";
 import { useAudit } from "@/contexts/AuditContext";
-import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, Certification } from "@/types";
+import type { StaffMember, Task, AvailabilityEntry, AvailabilityType } from "@/types";
 import { Badge } from "@/components/ui/badge";
-import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, AlertCircle, Repeat, Award, AlertTriangle } from "lucide-react";
+import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, AlertCircle, Repeat } from "lucide-react";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -46,40 +46,10 @@ export default function StaffPage() {
   });
   const [patternNotes, setPatternNotes] = useState("");
 
-  // Certification state
-  const [certTask, setCertTask] = useState<Task>("Frozen");
-  const [certIssuedDate, setCertIssuedDate] = useState<string>(new Date().toISOString().split("T")[0]);
-  const [certExpiryDate, setCertExpiryDate] = useState<string>(() => {
-    const expiry = new Date();
-    expiry.setFullYear(expiry.getFullYear() + 1);
-    return expiry.toISOString().split("T")[0];
-  });
-  const [certNotes, setCertNotes] = useState("");
-
   useEffect(() => {
     const savedStaff = localStorage.getItem("warehouse-staff");
     if (savedStaff) {
-      const loaded = JSON.parse(savedStaff);
-      // Check and auto-remove expired certifications
-      const updated = loaded.map((s: StaffMember) => {
-        if (s.certifications) {
-          const today = new Date().toISOString().split("T")[0];
-          const validCerts = s.certifications.filter(c => c.expiryDate >= today);
-          const expiredCerts = s.certifications.filter(c => c.expiryDate < today);
-          
-          // Remove tasks with expired certs from trainedTasks
-          const expiredTasks = expiredCerts.map(c => c.task);
-          const updatedTasks = s.trainedTasks.filter(t => !expiredTasks.includes(t));
-          
-          return {
-            ...s,
-            trainedTasks: updatedTasks,
-            certifications: validCerts,
-          };
-        }
-        return s;
-      });
-      setStaff(updated);
+      setStaff(JSON.parse(savedStaff));
     }
   }, []);
 
@@ -290,98 +260,6 @@ export default function StaffPage() {
     setStaff(updatedStaff);
     setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
     setPatternNotes("");
-  };
-
-  const handleAddCertification = () => {
-    if (!selectedStaff) return;
-
-    const newCert: Certification = {
-      task: certTask,
-      issuedDate: certIssuedDate,
-      expiryDate: certExpiryDate,
-      notes: certNotes,
-    };
-
-    const updatedStaff = staff.map(s => {
-      if (s.id === selectedStaff.id) {
-        // Add cert and ensure task is in trainedTasks
-        const updatedCerts = [...(s.certifications || []), newCert];
-        const updatedTasks = s.trainedTasks.includes(certTask)
-          ? s.trainedTasks
-          : [...s.trainedTasks, certTask];
-        
-        return {
-          ...s,
-          certifications: updatedCerts,
-          trainedTasks: updatedTasks,
-        };
-      }
-      return s;
-    });
-
-    setStaff(updatedStaff);
-    setSelectedStaff(updatedStaff.find(s => s.id === selectedStaff.id) || null);
-    addAuditEntry({
-      user: "System",
-      action: "created",
-      entity: "certification",
-      entityId: selectedStaff.id,
-      details: `Added ${certTask} certification for ${selectedStaff.name}, expires ${certExpiryDate}`,
-    });
-    setCertNotes("");
-  };
-
-  const handleDeleteCertification = (staffId: string, task: Task, issuedDate: string) => {
-    const updatedStaff = staff.map(s => {
-      if (s.id === staffId) {
-        const updatedCerts = (s.certifications || []).filter(
-          c => !(c.task === task && c.issuedDate === issuedDate)
-        );
-        return {
-          ...s,
-          certifications: updatedCerts,
-        };
-      }
-      return s;
-    });
-    setStaff(updatedStaff);
-    setSelectedStaff(updatedStaff.find(s => s.id === staffId) || null);
-    
-    const staffMember = staff.find(s => s.id === staffId);
-    if (staffMember) {
-      addAuditEntry({
-        user: "System",
-        action: "deleted",
-        entity: "certification",
-        entityId: staffId,
-        details: `Removed ${task} certification for ${staffMember.name}`,
-      });
-    }
-  };
-
-  const getCertificationStatus = (cert: Certification) => {
-    const today = new Date();
-    const expiry = new Date(cert.expiryDate);
-    const daysUntilExpiry = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (daysUntilExpiry < 0) return { status: "expired", color: "text-destructive", days: daysUntilExpiry };
-    if (daysUntilExpiry <= 30) return { status: "expiring-soon", color: "text-warning", days: daysUntilExpiry };
-    return { status: "valid", color: "text-success", days: daysUntilExpiry };
-  };
-
-  const getExpiringCertifications = () => {
-    const expiring: { staff: StaffMember; cert: Certification; days: number }[] = [];
-    
-    staff.forEach(s => {
-      (s.certifications || []).forEach(cert => {
-        const status = getCertificationStatus(cert);
-        if (status.status === "expiring-soon" || status.status === "expired") {
-          expiring.push({ staff: s, cert, days: status.days });
-        }
-      });
-    });
-
-    return expiring.sort((a, b) => a.days - b.days);
   };
 
   const getAvailabilityColor = (type: AvailabilityType) => {

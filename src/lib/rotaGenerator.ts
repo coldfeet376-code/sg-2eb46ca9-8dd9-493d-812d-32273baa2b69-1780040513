@@ -1,99 +1,7 @@
-import type { StaffMember, Task, Assignment } from "@/types";
+import type { StaffMember, Assignment, Task, ShiftStart } from "@/types";
 
 interface TaskConfig {
   [task: string]: number[]; // 7 numbers for Sun-Sat
-}
-
-interface LockedAssignment {
-  task: string;
-  date: string;
-  staffName: string;
-}
-
-interface RotaGenerationParams {
-  staff: StaffMember[];
-  taskConfig: TaskConfig;
-  weekStart: Date;
-  lockedAssignments?: LockedAssignment[];
-}
-
-// Check if staff member is available on a specific date
-function isStaffAvailable(staffMember: StaffMember, date: Date): boolean {
-  const dateStr = date.toISOString().split("T")[0];
-  
-  // Check date-specific availability
-  if (staffMember.availability) {
-    const entry = staffMember.availability.find((a) => a.date === dateStr);
-    if (entry) {
-      // Only "available" type means they're available; rest/holiday/sick means unavailable
-      return entry.type === "available";
-    }
-  }
-  
-  // Check regular rest days (day of week)
-  const dayOfWeek = date.getDay();
-  if (staffMember.restDays?.some(d => Number(d) === dayOfWeek)) {
-    return false;
-  }
-  
-  // Default: available
-  return true;
-}
-
-// Check if staff member has consecutive same task
-function hasConsecutiveTask(
-  staffName: string,
-  task: string,
-  date: Date,
-  existingAssignments: Assignment[]
-): boolean {
-  const yesterday = new Date(date);
-  yesterday.setDate(date.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().split("T")[0];
-
-  const tomorrow = new Date(date);
-  tomorrow.setDate(date.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split("T")[0];
-
-  return existingAssignments.some(
-    (a) =>
-      a.staffName === staffName &&
-      a.task === task &&
-      (a.date === yesterdayStr || a.date === tomorrowStr)
-  );
-}
-
-// Calculate fairness score (lower is more fair)
-// Now includes preferences as tiebreaker
-function calculateFairnessScore(
-  staffMember: StaffMember,
-  task: string,
-  existingAssignments: Assignment[]
-): number {
-  // Count current task assignments for this staff member
-  const taskCount = existingAssignments.filter(
-    (a) => a.staffName === staffMember.name && a.task === task
-  ).length;
-
-  // Count total assignments for this staff member
-  const totalCount = existingAssignments.filter(
-    (a) => a.staffName === staffMember.name
-  ).length;
-
-  // Base fairness score (lower = less frequently assigned)
-  let score = taskCount * 10 + totalCount;
-
-  // Apply preference bonus/penalty (only as tiebreaker when fairness is equal)
-  if (staffMember.preferences) {
-    if (staffMember.preferences.preferredTasks?.includes(task as Task)) {
-      score -= 0.5; // Slight preference for preferred tasks
-    }
-    if (staffMember.preferences.avoidTasks?.includes(task as Task)) {
-      score += 0.5; // Slight penalty for avoided tasks
-    }
-  }
-
-  return score;
 }
 
 export function generateWeeklyRota({
@@ -101,20 +9,51 @@ export function generateWeeklyRota({
   taskConfig,
   weekStart,
   lockedAssignments = [],
-}: RotaGenerationParams): Assignment[] {
-  const assignments: Assignment[] = [];
-  const tasks = Object.keys(taskConfig);
-
-  // First, add all locked assignments
-  lockedAssignments.forEach((locked) => {
-    const staffMember = staff.find((s) => s.name === locked.staffName);
-    assignments.push({
-      staffId: staffMember?.id || `locked-${locked.staffName}-${locked.date}`,
-      staffName: locked.staffName,
-      task: locked.task as Task,
-      date: locked.date,
-    });
+}: {
+  staff: StaffMember[];
+  taskConfig: TaskConfig;
+  weekStart: Date;
+  lockedAssignments?: Assignment[];
+}): Assignment[] {
+  console.log("generateWeeklyRota called with:", {
+    staffCount: staff.length,
+    staffNames: staff.map(s => s.name),
+    taskConfig: Object.keys(taskConfig),
+    weekStart: weekStart.toISOString(),
+    lockedCount: lockedAssignments.length
   });
+
+  const assignments: Assignment[] = [...lockedAssignments];
+
+  // Track assignments per staff member for fairness
+  const staffAssignmentCounts: Record<string, number> = {};
+  const staffLastTask: Record<string, Task | null> = {};
+  
+  staff.forEach((s) => {
+    staffAssignmentCounts[s.id] = 0;
+    staffLastTask[s.id] = null;
+  });
+
+  // Count existing locked assignments
+  lockedAssignments.forEach((a) => {
+    // Fallback to finding staffId by name for backward compatibility with older locked assignments
+    const staffMember = staff.find((s) => s.name === a.staffName);
+    const staffId = a.staffId || staffMember?.id;
+    if (staffId) {
+      staffAssignmentCounts[staffId] = (staffAssignmentCounts[staffId] || 0) + 1;
+    }
+  });
+
+  // Group staff by shift start time
+  const staffByShift = staff.reduce((acc, s) => {
+    const shift = s.shiftStart || "06:00";
+    if (!acc[shift]) acc[shift] = [];
+    acc[shift].push(s);
+    return acc;
+  }, {} as Record<string, StaffMember[]>);
+
+  // Define shift priorities (earlier shifts get priority for task assignment)
+  const shiftOrder: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
 
   // Process each day
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
@@ -138,40 +77,67 @@ export function generateWeeklyRota({
       ).length;
 
       const needed = required - existingCount;
+      if (needed <= 0) continue;
 
-      if (needed <= 0) continue; // Already filled by locked assignments
+      // Try to assign from each shift in order, distributing fairly
+      const availableByShift: Record<string, StaffMember[]> = {};
 
-      // Filter staff: trained on this task AND not already assigned this day AND available on this date
-      const availableStaff = staff.filter((s) => {
-        // Must be trained
-        if (!s.trainedTasks.includes(task as Task)) return false;
+      // First, collect available staff from each shift
+      for (const shift of shiftOrder) {
+        const shiftStaff = staffByShift[shift] || [];
+        
+        const available = shiftStaff.filter((s) => {
+          // Must be trained for the task
+          if (!s.trainedTasks.includes(task)) return false;
 
-        // Can't already be assigned this day
-        if (
-          assignments.some((a) => a.staffName === s.name && a.date === dateStr)
-        )
-          return false;
+          // Check if already assigned on this day
+          const alreadyAssigned = assignments.some(
+            (a) => a.staffId === s.id && a.date === dateStr
+          );
+          if (alreadyAssigned) return false;
 
-        // Check date-specific availability
-        if (!isStaffAvailable(s, currentDate)) return false;
+          // Check availability
+          const availability = s.availability?.find((a) => a.date === dateStr);
+          if (availability && availability.type !== "available") return false;
 
-        return true;
+          return true;
+        });
+
+        if (available.length > 0) {
+          availableByShift[shift] = available;
+        }
+      }
+
+      // Distribute assignments across shifts proportionally
+      const allAvailable = Object.entries(availableByShift).flatMap(([shift, staffList]) =>
+        staffList.map(s => ({ ...s, shift: shift as ShiftStart }))
+      );
+
+      if (allAvailable.length === 0) continue;
+
+      // Randomize within each shift group, then sort by fairness
+      const shuffled = allAvailable.sort(() => Math.random() - 0.5);
+
+      // Sort by:
+      // 1. Fewest assignments (fairness)
+      // 2. Different from last task (variety)
+      // 3. Shift start time (earlier shifts get slight priority)
+      const sorted = shuffled.sort((a, b) => {
+        const aCount = staffAssignmentCounts[a.id] || 0;
+        const bCount = staffAssignmentCounts[b.id] || 0;
+        if (aCount !== bCount) return aCount - bCount;
+
+        // Prefer staff who didn't do this task yesterday
+        const aLastTask = staffLastTask[a.id];
+        const bLastTask = staffLastTask[b.id];
+        if (aLastTask === task && bLastTask !== task) return 1;
+        if (aLastTask !== task && bLastTask === task) return -1;
+
+        // Slight preference for earlier shifts (but fairness is primary)
+        const aShiftIndex = shiftOrder.indexOf(a.shift);
+        const bShiftIndex = shiftOrder.indexOf(b.shift);
+        return aShiftIndex - bShiftIndex;
       });
-
-      // Assign staff based on fairness + preferences
-      const candidates = availableStaff
-        .map((s) => ({
-          staff: s,
-          fairnessScore: calculateFairnessScore(s, task, assignments),
-          hasConsecutive: hasConsecutiveTask(
-            s.name,
-            task,
-            currentDate,
-            assignments
-          ),
-        }))
-        .filter((c) => !c.hasConsecutive) // Remove candidates with consecutive same task
-        .sort((a, b) => a.fairnessScore - b.fairnessScore); // Sort by fairness (lowest first)
 
       // Assign the needed staff
       for (let i = 0; i < Math.min(needed, sorted.length); i++) {
@@ -187,6 +153,14 @@ export function generateWeeklyRota({
       }
     }
   }
+
+  console.log("generateWeeklyRota completed:", {
+    totalAssignments: assignments.length,
+    assignmentsByStaff: assignments.reduce((acc, a) => {
+      acc[a.staffName] = (acc[a.staffName] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>)
+  });
 
   return assignments;
 }
@@ -211,20 +185,19 @@ export function navigateWeek(
 
 export function getYearWeeks(year: number): Date[] {
   const weeks: Date[] = [];
-  const firstDay = new Date(year, 0, 1);
-  const firstSunday = getWeekStart(firstDay);
-
-  // Generate 53 weeks to ensure we cover the entire year
-  for (let i = 0; i < 53; i++) {
-    const weekStart = new Date(firstSunday);
-    weekStart.setDate(firstSunday.getDate() + i * 7);
-    weeks.push(weekStart);
+  const d = new Date(year, 0, 1);
+  d.setHours(0, 0, 0, 0);
+  
+  // Find first Sunday
+  while (d.getDay() !== 0) {
+    d.setDate(d.getDate() + 1);
   }
-
-  // Filter to only include weeks that overlap with the target year
-  return weeks.filter((weekStart) => {
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    return weekStart.getFullYear() === year || weekEnd.getFullYear() === year;
-  });
+  
+  // Generate weeks for the year
+  while (d.getFullYear() === year || (d.getFullYear() === year + 1 && d.getMonth() === 0 && d.getDate() < 7)) {
+    weeks.push(new Date(d));
+    d.setDate(d.getDate() + 7);
+  }
+  
+  return weeks.filter(w => w.getFullYear() === year || (w.getFullYear() === year - 1 && w.getMonth() === 11) || (w.getFullYear() === year + 1 && w.getMonth() === 0 && w.getDate() < 7));
 }
