@@ -1,6 +1,6 @@
 ---
 title: Password Protection
-status: todo
+status: done
 priority: high
 type: feature
 tags: [auth, security, password]
@@ -13,11 +13,11 @@ position: 13
 Add simple password/passcode protection to prevent unauthorized access. Use generic password stored in environment or hardcoded for simplicity.
 
 ## Checklist
-- [ ] Create login page with password input
-- [ ] Implement session management with localStorage
-- [ ] Add logout functionality
-- [ ] Protect all routes with auth check
-- [ ] Create password verification logic
+- [x] Create login page with password input
+- [x] Implement session management with localStorage
+- [x] Add logout functionality
+- [x] Protect all routes with auth check
+- [x] Create password verification logic
 
 ## Acceptance
 - Can't access app without correct password

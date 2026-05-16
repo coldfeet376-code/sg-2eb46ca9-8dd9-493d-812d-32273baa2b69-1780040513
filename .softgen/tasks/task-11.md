@@ -1,6 +1,6 @@
 ---
 title: Staff Availability Management & Excel Import
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [availability, import, excel, rest-days]
@@ -18,8 +18,8 @@ Complete staff availability system showing rest days, holidays, and sickness. Su
 - [x] Build manual date picker for individual entries
 - [x] Store availability data per staff member
 - [x] Integrate availability into rota generation algorithm
-- [ ] Show availability conflicts/alerts
-- [ ] Add availability overview dashboard
+- [x] Show availability conflicts/alerts
+- [x] Add availability overview dashboard
 
 ## Acceptance
 - Can import Excel spreadsheet with year-long availability
