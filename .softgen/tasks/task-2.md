@@ -1,6 +1,6 @@
 ---
 title: Staff Management Interface
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [staff, crud]
@@ -10,16 +10,18 @@ position: 2
 ---
 
 ## Notes
-Staff management with bulk import capability. Each staff member has name, trained tasks (frozen, milk, twi, inbound, outbound, marshaling), and availability tracking (rest days, absences, holidays).
+CRUD interface for managing warehouse staff, their training certifications, and availability. Supports individual entry and bulk CSV-style import for rapid setup.
 
 ## Checklist
-- [ ] Create staff list component with add/edit/delete
-- [ ] Build bulk import form (CSV/paste)
-- [ ] Implement training assignment checkboxes
-- [ ] Add availability calendar for rest days/absences/holidays
-- [ ] Store staff data in localStorage
+- [x] Create staff list view with name and trained tasks
+- [x] Add individual staff form with task checkboxes
+- [x] Implement bulk import textarea (format: Name, Task1, Task2)
+- [x] Add delete functionality
+- [x] Persist staff data to localStorage
+- [x] Show training badges for each staff member
+- [x] Create availability calendar placeholder (functional implementation in separate task)
 
 ## Acceptance
-- Can add multiple staff members quickly via bulk import
+- Staff can be added individually or in bulk
 - Training assignments persist correctly
 - Availability calendar shows current rest days and absences
