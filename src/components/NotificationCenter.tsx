@@ -6,12 +6,12 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { useNotifications } from "@/contexts/NotificationContext";
 
 // Optimized icon imports
-import Bell from "lucide-react/dist/esm/icons/bell";
-import Trash2 from "lucide-react/dist/esm/icons/trash-2";
-import CheckCircle from "lucide-react/dist/esm/icons/check-circle";
-import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
-import Info from "lucide-react/dist/esm/icons/info";
-import UserPlus from "lucide-react/dist/esm/icons/user-plus";
+import Bell from "lucide-react";
+import Trash2 from "lucide-react";
+import CheckCircle from "lucide-react";
+import AlertCircle from "lucide-react";
+import Info from "lucide-react";
+import UserPlus from "lucide-react";
 
 export function NotificationCenter() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();

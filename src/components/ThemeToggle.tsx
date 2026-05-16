@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 // Optimized icon imports
-import Moon from "lucide-react/dist/esm/icons/moon";
-import Sun from "lucide-react/dist/esm/icons/sun";
+import Moon from "lucide-react";
+import Sun from "lucide-react";
 
 export function ThemeToggle() {
   const [theme, setTheme] = useState<"light" | "dark">("light");

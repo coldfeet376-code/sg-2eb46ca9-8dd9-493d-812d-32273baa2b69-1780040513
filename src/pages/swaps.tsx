@@ -14,13 +14,13 @@ import { useAudit } from "@/contexts/AuditContext";
 import type { ShiftSwap, StaffMember, Task, Assignment } from "@/types";
 
 // Optimized icon imports
-import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
-import Check from "lucide-react/dist/esm/icons/check";
-import X from "lucide-react/dist/esm/icons/x";
-import Plus from "lucide-react/dist/esm/icons/plus";
-import Clock from "lucide-react/dist/esm/icons/clock";
-import CheckCircle from "lucide-react/dist/esm/icons/check-circle";
-import XCircle from "lucide-react/dist/esm/icons/x-circle";
+import RefreshCw from "lucide-react";
+import Check from "lucide-react";
+import X from "lucide-react";
+import Plus from "lucide-react";
+import Clock from "lucide-react";
+import CheckCircle from "lucide-react";
+import XCircle from "lucide-react";
 
 export default function SwapsPage() {
   const [swaps, setSwaps] = useState<ShiftSwap[]>([]);
