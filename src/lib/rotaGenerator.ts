@@ -71,7 +71,9 @@ export function generateWeeklyRota({
 
   // First, add all locked assignments
   lockedAssignments.forEach((locked) => {
+    const staffMember = staff.find((s) => s.name === locked.staffName);
     assignments.push({
+      staffId: staffMember?.id || `locked-${locked.staffName}-${locked.date}`,
       staffName: locked.staffName,
       task: locked.task as Task,
       date: locked.date,
@@ -110,7 +112,7 @@ export function generateWeeklyRota({
 
         // Check availability (rest days)
         const dayOfWeek = currentDate.getDay();
-        if (s.restDays?.includes(dayOfWeek)) return false;
+        if (s.restDays?.some(d => Number(d) === dayOfWeek)) return false;
 
         return true;
       });
@@ -133,6 +135,7 @@ export function generateWeeklyRota({
       // Assign the required number of staff
       for (let i = 0; i < Math.min(remainingNeeded, candidates.length); i++) {
         assignments.push({
+          staffId: candidates[i].staff.id,
           staffName: candidates[i].staff.name,
           task: task as Task,
           date: dateStr,
