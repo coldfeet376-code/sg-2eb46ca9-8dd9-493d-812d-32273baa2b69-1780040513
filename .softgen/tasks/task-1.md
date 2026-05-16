@@ -15,8 +15,8 @@ Set up industrial-utility design system with graphite + steel blue + amber palet
 ## Checklist
 - [x] Configure globals.css with industrial color tokens
 - [x] Register IBM Plex fonts in tailwind.config.ts
-- [ ] Create main layout with header and navigation
-- [ ] Build dashboard overview showing weekly rota grid
+- [x] Create main layout with header and navigation
+- [x] Build dashboard overview showing weekly rota grid
 
 ## Acceptance
 - Clean industrial aesthetic with proper contrast
