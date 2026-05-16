@@ -37,6 +37,7 @@ export default function StaffPage() {
   const [availabilityType, setAvailabilityType] = useState<AvailabilityType>("rest");
   const [availabilityNotes, setAvailabilityNotes] = useState("");
   const [excelImport, setExcelImport] = useState("");
+  const [csvFileName, setCsvFileName] = useState("");
   const { addAuditEntry } = useAudit();
   
   // Edit staff state
@@ -196,6 +197,20 @@ export default function StaffPage() {
       setBulkSuccess(true);
       setTimeout(() => setBulkSuccess(false), 3000);
     }
+  };
+
+  const handleCsvFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setCsvFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setExcelImport(text);
+    };
+    reader.readAsText(file);
   };
 
   const handleAvailabilityImport = () => {
@@ -865,30 +880,87 @@ export default function StaffPage() {
                                         <CardHeader className="pb-3">
                                           <CardTitle className="font-condensed text-sm flex items-center gap-2">
                                             <FileSpreadsheet className="h-4 w-4" />
-                                            Excel Import
+                                            CSV/Excel Import
                                           </CardTitle>
+                                          <CardDescription className="font-mono text-xs">
+                                            Upload a CSV file or paste data directly
+                                          </CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-3">
                                           <div className="text-xs font-mono text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                                            <p className="font-semibold mb-2">Format:</p>
+                                            <p className="font-semibold mb-2">Required Format:</p>
                                             <p>Date,Type,Notes</p>
                                             <p className="mt-1">2026-01-15,holiday,Christmas</p>
                                             <p>2026-02-20,rest,Regular rest</p>
                                             <p>2026-03-10,sick,Flu</p>
+                                            <p className="mt-2 text-muted-foreground/70">
+                                              Types: rest, holiday, sick, available
+                                            </p>
                                           </div>
-                                          <Textarea
-                                            value={excelImport}
-                                            onChange={(e) => setExcelImport(e.target.value)}
-                                            placeholder="Paste Excel data here..."
-                                            className="font-mono text-xs h-32 rounded-lg"
-                                          />
+
+                                          {/* File Upload Option */}
+                                          <div className="space-y-2">
+                                            <Label className="font-mono text-xs font-semibold">
+                                              Option 1: Upload CSV File
+                                            </Label>
+                                            <div className="flex gap-2">
+                                              <Button
+                                                variant="outline"
+                                                className="w-full rounded-lg relative"
+                                                onClick={() => document.getElementById('csv-upload')?.click()}
+                                              >
+                                                <Upload className="h-4 w-4 mr-2" />
+                                                <span className="font-mono text-xs">
+                                                  {csvFileName || "Choose CSV File"}
+                                                </span>
+                                              </Button>
+                                              <input
+                                                id="csv-upload"
+                                                type="file"
+                                                accept=".csv,.txt"
+                                                onChange={handleCsvFileUpload}
+                                                className="hidden"
+                                              />
+                                              {csvFileName && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  onClick={() => {
+                                                    setCsvFileName("");
+                                                    setExcelImport("");
+                                                    const input = document.getElementById('csv-upload') as HTMLInputElement;
+                                                    if (input) input.value = "";
+                                                  }}
+                                                  className="text-destructive hover:text-destructive"
+                                                >
+                                                  <X className="h-4 w-4" />
+                                                </Button>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {/* Paste Option */}
+                                          <div className="space-y-2">
+                                            <Label className="font-mono text-xs font-semibold">
+                                              Option 2: Paste Data
+                                            </Label>
+                                            <Textarea
+                                              value={excelImport}
+                                              onChange={(e) => setExcelImport(e.target.value)}
+                                              placeholder="Date,Type,Notes&#10;2026-01-15,holiday,Christmas&#10;2026-02-20,rest,Regular rest"
+                                              className="font-mono text-xs h-32 rounded-lg"
+                                            />
+                                          </div>
+
                                           <Button
                                             onClick={handleAvailabilityImport}
                                             className="w-full rounded-lg"
                                             disabled={!excelImport.trim()}
                                           >
                                             <Upload className="h-4 w-4 mr-2" />
-                                            <span className="font-mono text-xs">Import Data</span>
+                                            <span className="font-mono text-xs">
+                                              Import {excelImport.trim().split('\n').filter(l => l.trim()).length} Entries
+                                            </span>
                                           </Button>
                                         </CardContent>
                                       </Card>
