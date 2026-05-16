@@ -14,17 +14,20 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SEO } from "@/components/SEO";
 import { useAudit } from "@/contexts/AuditContext";
-import type { StaffMember, Task, AvailabilityEntry, AvailabilityType } from "@/types";
+import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart } from "@/types";
 import { Badge } from "@/components/ui/badge";
-import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, AlertCircle, Repeat } from "lucide-react";
+import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, AlertCircle, Repeat, Clock } from "lucide-react";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const SHIFT_STARTS: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
 
 export default function StaffPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [name, setName] = useState("");
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
+  const [shiftStart, setShiftStart] = useState<ShiftStart>("06:00");
+  const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
   const [bulkInput, setBulkInput] = useState("");
   const [bulkSuccess, setBulkSuccess] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
@@ -111,8 +114,18 @@ export default function StaffPage() {
       if (parts.length < 2) return;
 
       const staffName = parts[0];
+      
+      const lastPart = parts[parts.length - 1];
+      let shift: ShiftStart = "06:00";
+      let tasksEndIndex = parts.length;
+      
+      if (SHIFT_STARTS.includes(lastPart as ShiftStart)) {
+        shift = lastPart as ShiftStart;
+        tasksEndIndex = parts.length - 1;
+      }
+      
       const tasks = parts
-        .slice(1)
+        .slice(1, tasksEndIndex)
         .filter((t) => TASKS.includes(t as Task)) as Task[];
 
       if (staffName && tasks.length > 0) {
@@ -349,6 +362,25 @@ export default function StaffPage() {
                   </div>
                 </div>
 
+                <div className="space-y-2">
+                  <Label htmlFor="shift" className="font-mono text-xs flex items-center gap-2">
+                    <Clock className="h-3.5 w-3.5" />
+                    Shift Start Time
+                  </Label>
+                  <Select value={shiftStart} onValueChange={(v) => setShiftStart(v as ShiftStart)}>
+                    <SelectTrigger id="shift" className="rounded-lg font-mono text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SHIFT_STARTS.map((shift) => (
+                        <SelectItem key={shift} value={shift} className="font-mono text-xs">
+                          {shift}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <Button onClick={handleAddStaff} className="rounded-lg shadow-sm hover:shadow-md transition-smooth">
                   <Plus className="h-4 w-4 mr-2" />
                   <span className="font-mono text-xs">Add Staff</span>
@@ -358,10 +390,31 @@ export default function StaffPage() {
 
             <Card className="shadow-sm hover:shadow-md transition-smooth">
               <CardHeader>
-                <CardTitle className="font-condensed text-xl">Staff List ({staff.length})</CardTitle>
-                <CardDescription className="font-mono text-xs">
-                  View and manage all warehouse staff
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="font-condensed text-xl">
+                      Staff List ({filterShift === "all" ? staff.length : staff.filter(s => s.shiftStart === filterShift).length})
+                    </CardTitle>
+                    <CardDescription className="font-mono text-xs">
+                      View and manage all warehouse staff
+                    </CardDescription>
+                  </div>
+                  <div className="w-48">
+                    <Select value={filterShift} onValueChange={(v) => setFilterShift(v as ShiftStart | "all")}>
+                      <SelectTrigger className="rounded-lg font-mono text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all" className="font-mono text-xs">All Shifts</SelectItem>
+                        {SHIFT_STARTS.map((shift) => (
+                          <SelectItem key={shift} value={shift} className="font-mono text-xs">
+                            {shift} Shift
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {staff.length === 0 ? (
@@ -372,7 +425,9 @@ export default function StaffPage() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {staff.map((member) => {
+                    {staff
+                      .filter((member) => filterShift === "all" || member.shiftStart === filterShift)
+                      .map((member) => {
                       const stats = getAvailabilityStats(member);
                       return (
                         <div
@@ -380,7 +435,15 @@ export default function StaffPage() {
                           className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-smooth"
                         >
                           <div className="flex-1">
-                            <h3 className="font-condensed font-semibold text-sm">{member.name}</h3>
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-condensed font-semibold text-sm">{member.name}</h3>
+                              {member.shiftStart && (
+                                <Badge variant="secondary" className="font-mono text-[10px] flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {member.shiftStart}
+                                </Badge>
+                              )}
+                            </div>
                             <div className="flex flex-wrap gap-1.5 mt-2">
                               {member.trainedTasks.map((task) => (
                                 <Badge key={task} variant="outline" className="font-mono text-[10px]">
