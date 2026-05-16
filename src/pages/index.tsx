@@ -76,10 +76,38 @@ export default function Home() {
       setTaskConfig(JSON.parse(savedConfig));
     }
     if (savedLocked) {
-      setLockedAssignments(JSON.parse(savedLocked));
+      const parsed = JSON.parse(savedLocked);
+      // Backward compatibility: ensure all locked assignments have staffId
+      const compatible = parsed.map((lock: any) => {
+        if (!lock.staffId && lock.staffName) {
+          // Find staff by name and add staffId
+          const staffMember = staff.find(s => s.name === lock.staffName);
+          return {
+            ...lock,
+            staffId: staffMember?.id || `temp-${Date.now()}`
+          };
+        }
+        return lock;
+      });
+      setLockedAssignments(compatible);
     }
     if (savedHistory) {
-      setHistory(JSON.parse(savedHistory));
+      const parsed = JSON.parse(savedHistory);
+      // Backward compatibility for history snapshots
+      const compatible = parsed.map((snapshot: any) => ({
+        ...snapshot,
+        lockedAssignments: (snapshot.lockedAssignments || []).map((lock: any) => {
+          if (!lock.staffId && lock.staffName) {
+            const staffMember = staff.find(s => s.name === lock.staffName);
+            return {
+              ...lock,
+              staffId: staffMember?.id || `temp-${Date.now()}`
+            };
+          }
+          return lock;
+        })
+      }));
+      setHistory(compatible);
     }
   }, []);
 
