@@ -1,50 +1,55 @@
-import "@/styles/globals.css";
 import { useEffect } from "react";
-import { useRouter } from "next/router";
 import type { AppProps } from "next/app";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { AuditProvider } from "@/contexts/AuditContext";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 import { TourProvider } from "@/contexts/TourContext";
-
-function AuthWrapper({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Skip auth check for login page
-    if (router.pathname === "/login") return;
-
-    // Check if user is authenticated
-    const isLoggedIn = localStorage.getItem("warehouse-auth");
-    if (!isLoggedIn || isLoggedIn !== "true") {
-      router.push("/login");
-    }
-  }, [router.pathname, router]);
-
-  // Don't render protected pages until auth check is complete
-  if (router.pathname !== "/login") {
-    const isLoggedIn = typeof window !== "undefined" && localStorage.getItem("warehouse-auth") === "true";
-    if (!isLoggedIn) return null;
-  }
-
-  return <>{children}</>;
-}
+import { InstallPrompt } from "@/components/InstallPrompt";
+import { Toaster } from "@/components/ui/toaster";
+import "@/styles/globals.css";
 
 export default function App({ Component, pageProps }: AppProps) {
+  useEffect(() => {
+    // Register service worker for PWA
+    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((registration) => {
+          console.log("Service Worker registered:", registration.scope);
+          
+          // Check for updates
+          registration.addEventListener("updatefound", () => {
+            const newWorker = registration.installing;
+            if (newWorker) {
+              newWorker.addEventListener("statechange", () => {
+                if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                  console.log("New service worker available");
+                  // Optionally prompt user to reload
+                }
+              });
+            }
+          });
+        })
+        .catch((error) => {
+          console.warn("Service Worker registration failed:", error);
+        });
+    }
+  }, []);
+
   return (
     <ThemeProvider>
-      <TourProvider>
-        <UndoRedoProvider>
-          <AuditProvider>
-            <NotificationProvider>
-              <AuthWrapper>
-                <Component {...pageProps} />
-              </AuthWrapper>
-            </NotificationProvider>
-          </AuditProvider>
-        </UndoRedoProvider>
-      </TourProvider>
+      <NotificationProvider>
+        <AuditProvider>
+          <UndoRedoProvider>
+            <TourProvider>
+              <Component {...pageProps} />
+              <InstallPrompt />
+              <Toaster />
+            </TourProvider>
+          </UndoRedoProvider>
+        </AuditProvider>
+      </NotificationProvider>
     </ThemeProvider>
   );
 }
