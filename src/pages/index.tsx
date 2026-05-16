@@ -9,11 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History } from "lucide-react";
+import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { useNotifications } from "@/contexts/NotificationContext";
 import type { StaffMember, Assignment, Task } from "@/types";
+import Link from "next/link";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
