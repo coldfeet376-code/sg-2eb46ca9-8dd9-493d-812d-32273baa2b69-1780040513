@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Download, RefreshCw, Calendar as CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, RefreshCw, Lock, Unlock } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { StaffMember, Assignment } from "@/types";
@@ -13,6 +13,12 @@ import { useNotifications } from "@/contexts/NotificationContext";
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 
+interface LockedAssignment {
+  task: string;
+  date: string;
+  staffName: string;
+}
+
 export default function Home() {
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -21,12 +27,14 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"week" | "year">("week");
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [yearRotas, setYearRotas] = useState<Map<string, Assignment[]>>(new Map());
+  const [lockedAssignments, setLockedAssignments] = useState<LockedAssignment[]>([]);
   const { addNotification } = useNotifications();
 
   useEffect(() => {
     // Load staff and config
     const savedStaff = localStorage.getItem("warehouse-staff");
     const savedConfig = localStorage.getItem("warehouse-task-config");
+    const savedLocked = localStorage.getItem("warehouse-locked-assignments");
     
     if (savedStaff) {
       setStaff(JSON.parse(savedStaff));
@@ -34,7 +42,15 @@ export default function Home() {
     if (savedConfig) {
       setTaskConfig(JSON.parse(savedConfig));
     }
+    if (savedLocked) {
+      setLockedAssignments(JSON.parse(savedLocked));
+    }
   }, []);
+
+  useEffect(() => {
+    // Save locked assignments
+    localStorage.setItem("warehouse-locked-assignments", JSON.stringify(lockedAssignments));
+  }, [lockedAssignments]);
 
   useEffect(() => {
     // Generate rota when data is available
@@ -54,6 +70,7 @@ export default function Home() {
       staff,
       taskConfig,
       weekStart,
+      lockedAssignments,
     });
     setAssignments(newAssignments);
 
@@ -98,6 +115,42 @@ export default function Home() {
     addNotification({
       staffName: "System",
       message: `Year ${selectedYear} rota generated for all staff`,
+      type: "info",
+    });
+  };
+
+  const toggleLockAssignment = (task: string, dateIndex: number, staffName: string) => {
+    const date = weekDates[dateIndex];
+    const dateStr = date.toISOString().split("T")[0];
+    
+    const lockKey = `${task}-${dateStr}-${staffName}`;
+    const existingLockIndex = lockedAssignments.findIndex(
+      lock => lock.task === task && lock.date === dateStr && lock.staffName === staffName
+    );
+
+    if (existingLockIndex >= 0) {
+      // Unlock
+      setLockedAssignments(lockedAssignments.filter((_, i) => i !== existingLockIndex));
+    } else {
+      // Lock
+      setLockedAssignments([...lockedAssignments, { task, date: dateStr, staffName }]);
+    }
+  };
+
+  const isAssignmentLocked = (task: string, dateIndex: number, staffName: string): boolean => {
+    const date = weekDates[dateIndex];
+    const dateStr = date.toISOString().split("T")[0];
+    
+    return lockedAssignments.some(
+      lock => lock.task === task && lock.date === dateStr && lock.staffName === staffName
+    );
+  };
+
+  const unlockAll = () => {
+    setLockedAssignments([]);
+    addNotification({
+      staffName: "System",
+      message: "All assignments unlocked",
       type: "info",
     });
   };
@@ -163,9 +216,14 @@ export default function Home() {
             color: #2563a5;
             padding: 4px 6px;
             margin: 2px 0;
-            border-radius: 2px;
+            border-radius: 4px;
             display: block;
             font-size: 10px;
+          }
+          .staff-name.locked {
+            background-color: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fbbf24;
           }
           .empty-cell { 
             color: #999; 
@@ -212,7 +270,10 @@ export default function Home() {
                   
                   return `
                     <td>
-                      ${dayAssignments.map(a => `<span class="staff-name">${a.staffName}</span>`).join("")}
+                      ${dayAssignments.map(a => {
+                        const locked = isAssignmentLocked(task, dayIdx, a.staffName);
+                        return `<span class="staff-name ${locked ? 'locked' : ''}">${a.staffName}${locked ? ' 🔒' : ''}</span>`;
+                      }).join("")}
                     </td>
                   `;
                 }).join("")}
@@ -404,6 +465,10 @@ export default function Home() {
     return Math.round((assignments.length / requiredTotal) * 100);
   };
 
+  const getLockedCount = (): number => {
+    return lockedAssignments.length;
+  };
+
   const handlePrevWeek = () => {
     setWeekStart(navigateWeek(weekStart, "prev"));
   };
@@ -431,7 +496,7 @@ export default function Home() {
           });
 
           return (
-            <Card key={weekKey}>
+            <Card key={weekKey} className="shadow-sm hover:shadow-md transition-smooth">
               <CardHeader>
                 <CardTitle className="font-condensed text-lg">
                   Week: {weekDatesLocal[0].toLocaleDateString("en-GB", { 
@@ -449,13 +514,13 @@ export default function Home() {
                   <table className="w-full border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="text-left p-2 font-condensed text-xs font-semibold bg-muted/50 w-24">
+                        <th className="text-left p-2 font-condensed text-xs font-semibold bg-muted/50 w-24 rounded-tl-md">
                           Task
                         </th>
                         {weekDatesLocal.map((date, i) => (
                           <th 
                             key={i} 
-                            className="text-center p-2 font-mono text-[10px] font-medium bg-muted/50"
+                            className={`text-center p-2 font-mono text-[10px] font-medium bg-muted/50 ${i === 6 ? 'rounded-tr-md' : ''}`}
                           >
                             <div>{DAYS[i]}</div>
                             <div className="text-muted-foreground mt-0.5">
@@ -467,7 +532,7 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {TASKS.map((task) => (
-                        <tr key={task} className="border-b border-border hover:bg-muted/30">
+                        <tr key={task} className="border-b border-border hover:bg-muted/30 transition-smooth">
                           <td className="p-2 font-condensed text-xs font-semibold">
                             {task}
                           </td>
@@ -487,7 +552,7 @@ export default function Home() {
                                     {dayAssignments.map((assignment, idx) => (
                                       <div 
                                         key={idx}
-                                        className="text-[10px] font-mono bg-primary/10 text-primary px-1.5 py-0.5 rounded"
+                                        className="text-[10px] font-mono bg-primary/10 text-primary px-2 py-1 rounded-md"
                                       >
                                         {assignment.staffName}
                                       </div>
@@ -547,7 +612,7 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-2">
             <Select value={viewMode} onValueChange={(v) => setViewMode(v as "week" | "year")}>
-              <SelectTrigger className="w-32 font-mono text-xs">
+              <SelectTrigger className="w-32 font-mono text-xs rounded-lg">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -558,7 +623,7 @@ export default function Home() {
 
             {viewMode === "year" && (
               <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
-                <SelectTrigger className="w-24 font-mono text-xs">
+                <SelectTrigger className="w-24 font-mono text-xs rounded-lg">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -573,28 +638,39 @@ export default function Home() {
 
             {viewMode === "week" && (
               <>
-                <Button variant="outline" size="sm" onClick={handlePrevWeek}>
+                <Button variant="outline" size="sm" onClick={handlePrevWeek} className="rounded-lg">
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleNextWeek}>
+                <Button variant="outline" size="sm" onClick={handleNextWeek} className="rounded-lg">
                   <ChevronRight className="h-4 w-4" />
                 </Button>
                 <Button 
                   variant="outline" 
                   size="sm" 
                   onClick={generateRota}
-                  className="gap-2 ml-2"
+                  className="gap-2 ml-2 rounded-lg"
                 >
                   <RefreshCw className="h-4 w-4" />
                   <span className="font-mono text-xs">Regenerate</span>
                 </Button>
+                {lockedAssignments.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={unlockAll}
+                    className="gap-2 rounded-lg text-warning hover:text-warning"
+                  >
+                    <Unlock className="h-4 w-4" />
+                    <span className="font-mono text-xs">Unlock All ({getLockedCount()})</span>
+                  </Button>
+                )}
               </>
             )}
             
             <Button 
               variant="default" 
               size="sm" 
-              className="gap-2"
+              className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-smooth"
               onClick={exportPDF}
               disabled={staff.length === 0 || !taskConfig}
             >
@@ -606,11 +682,11 @@ export default function Home() {
 
         {viewMode === "week" ? (
           <>
-            <Card>
+            <Card className="shadow-sm hover:shadow-md transition-smooth">
               <CardHeader>
                 <CardTitle className="font-condensed text-xl">Current Week Schedule</CardTitle>
                 <CardDescription className="font-mono text-xs">
-                  Staff assignments by task and day
+                  Click assignments to lock/unlock them during regeneration
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -618,13 +694,13 @@ export default function Home() {
                   <table className="w-full border-collapse">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50">
+                        <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50 rounded-tl-lg">
                           Task
                         </th>
                         {weekDates.map((date, i) => (
                           <th 
                             key={i} 
-                            className="text-center p-3 font-mono text-xs font-medium bg-muted/50"
+                            className={`text-center p-3 font-mono text-xs font-medium bg-muted/50 ${i === 6 ? 'rounded-tr-lg' : ''}`}
                           >
                             <div>{DAYS[i]}</div>
                             <div className="text-muted-foreground mt-1">
@@ -636,7 +712,7 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {TASKS.map((task) => (
-                        <tr key={task} className="border-b border-border hover:bg-muted/30">
+                        <tr key={task} className="border-b border-border hover:bg-muted/30 transition-smooth">
                           <td className="p-3 font-condensed text-sm font-semibold">
                             {task}
                           </td>
@@ -648,15 +724,30 @@ export default function Home() {
                                 className="p-3 text-center align-top"
                               >
                                 {dayAssignments.length > 0 ? (
-                                  <div className="space-y-1">
-                                    {dayAssignments.map((assignment, idx) => (
-                                      <div 
-                                        key={idx}
-                                        className="text-xs font-mono bg-primary/10 text-primary px-2 py-1 rounded"
-                                      >
-                                        {assignment.staffName}
-                                      </div>
-                                    ))}
+                                  <div className="space-y-1.5">
+                                    {dayAssignments.map((assignment, idx) => {
+                                      const locked = isAssignmentLocked(task, dayIdx, assignment.staffName);
+                                      return (
+                                        <button
+                                          key={idx}
+                                          onClick={() => toggleLockAssignment(task, dayIdx, assignment.staffName)}
+                                          className={`text-xs font-mono px-3 py-1.5 rounded-lg transition-smooth cursor-pointer group relative ${
+                                            locked 
+                                              ? 'bg-warning/20 text-warning-foreground border-2 border-warning hover:bg-warning/30' 
+                                              : 'bg-primary/10 text-primary hover:bg-primary/20 border-2 border-transparent hover:border-primary/30'
+                                          }`}
+                                        >
+                                          <span className="flex items-center gap-1.5">
+                                            {locked ? (
+                                              <Lock className="h-3 w-3" />
+                                            ) : (
+                                              <Unlock className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                                            )}
+                                            {assignment.staffName}
+                                          </span>
+                                        </button>
+                                      );
+                                    })}
                                   </div>
                                 ) : (
                                   <div className="text-xs font-mono text-muted-foreground">
@@ -674,13 +765,13 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card>
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card className="shadow-sm card-hover">
                 <CardHeader>
                   <CardTitle className="font-condensed text-base">Total Staff</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="font-mono text-3xl font-bold tabular-nums">
+                  <div className="font-mono text-3xl font-bold tabular-nums text-primary">
                     {getTotalStaff()}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -689,31 +780,45 @@ export default function Home() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="shadow-sm card-hover">
                 <CardHeader>
                   <CardTitle className="font-condensed text-base">Tasks Configured</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="font-mono text-3xl font-bold tabular-nums">6</div>
+                  <div className="font-mono text-3xl font-bold tabular-nums text-accent">6</div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Warehouse tasks
                   </p>
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="shadow-sm card-hover">
                 <CardHeader>
                   <CardTitle className="font-condensed text-base">Week Coverage</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className={`font-mono text-3xl font-bold tabular-nums ${
-                    getCoveragePercentage() === 100 ? "text-accent" : 
+                    getCoveragePercentage() === 100 ? "text-success" : 
                     getCoveragePercentage() >= 80 ? "text-primary" : "text-warning"
                   }`}>
                     {getCoveragePercentage()}%
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     Assignments complete
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="shadow-sm card-hover">
+                <CardHeader>
+                  <CardTitle className="font-condensed text-base">Locked Assignments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="font-mono text-3xl font-bold tabular-nums text-warning">
+                    {getLockedCount()}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Protected from changes
                   </p>
                 </CardContent>
               </Card>
@@ -724,9 +829,9 @@ export default function Home() {
         )}
 
         {staff.length === 0 && (
-          <div className="bg-warning/10 border border-warning rounded-md p-4">
+          <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm">
             <p className="text-sm font-mono text-warning-foreground">
-              No staff members configured. Visit the <Link href="/staff" className="underline font-semibold">Staff page</Link> to add employees.
+              No staff members configured. Visit the <Link href="/staff" className="underline font-semibold hover:text-warning transition-smooth">Staff page</Link> to add employees.
             </p>
           </div>
         )}
