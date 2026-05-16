@@ -18,6 +18,7 @@ import { useAudit } from "@/contexts/AuditContext";
 import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, AlertCircle, Repeat, Clock, Edit, X } from "lucide-react";
+import * as XLSX from "xlsx";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -207,10 +208,27 @@ export default function StaffPage() {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target?.result as string;
-      setExcelImport(text);
+      const data = e.target?.result;
+      
+      // Check if it's an Excel file
+      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        const workbook = XLSX.read(data, { type: 'binary' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const csvText = XLSX.utils.sheet_to_csv(firstSheet);
+        setExcelImport(csvText);
+      } else {
+        // Plain text CSV
+        const text = data as string;
+        setExcelImport(text);
+      }
     };
-    reader.readAsText(file);
+
+    // Read as binary for Excel files, text for CSV
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+      reader.readAsBinaryString(file);
+    } else {
+      reader.readAsText(file);
+    }
   };
 
   const handleAvailabilityImport = () => {
@@ -901,7 +919,7 @@ export default function StaffPage() {
                                           {/* File Upload Option */}
                                           <div className="space-y-2">
                                             <Label className="font-mono text-xs font-semibold">
-                                              Option 1: Upload CSV File
+                                              Option 1: Upload File
                                             </Label>
                                             <div className="flex gap-2">
                                               <Button
@@ -911,13 +929,13 @@ export default function StaffPage() {
                                               >
                                                 <Upload className="h-4 w-4 mr-2" />
                                                 <span className="font-mono text-xs">
-                                                  {csvFileName || "Choose CSV File"}
+                                                  {csvFileName || "Choose CSV or Excel File"}
                                                 </span>
                                               </Button>
                                               <input
                                                 id="csv-upload"
                                                 type="file"
-                                                accept=".csv,.txt"
+                                                accept=".csv,.txt,.xlsx,.xls"
                                                 onChange={handleCsvFileUpload}
                                                 className="hidden"
                                               />
@@ -937,6 +955,9 @@ export default function StaffPage() {
                                                 </Button>
                                               )}
                                             </div>
+                                            <p className="text-[10px] font-mono text-muted-foreground">
+                                              Supports: .csv, .xlsx, .xls files
+                                            </p>
                                           </div>
 
                                           {/* Paste Option */}
