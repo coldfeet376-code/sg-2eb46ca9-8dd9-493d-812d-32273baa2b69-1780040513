@@ -7,7 +7,8 @@ let ShepherdImport: any = null;
 
 const loadShepherd = async () => {
   if (!ShepherdImport) {
-    ShepherdImport = await import("shepherd.js");
+    const mod = await import("shepherd.js");
+    ShepherdImport = mod.default || mod;
   }
   return ShepherdImport;
 };
