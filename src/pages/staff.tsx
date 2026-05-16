@@ -16,8 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { SEO } from "@/components/SEO";
 import { useAudit } from "@/contexts/AuditContext";
 import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart } from "@/types";
-import { Badge } from "@/components/ui/badge";
-import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, AlertCircle, Repeat, Clock, Edit, X } from "lucide-react";
+import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, AlertCircle, Repeat, Clock, Edit, X, Monitor, Smartphone } from "lucide-react";
 import * as XLSX from "xlsx";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
@@ -45,6 +44,23 @@ export default function StaffPage() {
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  
+  // Mobile view state
+  const [mobileView, setMobileView] = useState(false);
+  
+  // Annual rota state
+  const [showAnnualRota, setShowAnnualRota] = useState(false);
+  const [annualRestDay, setAnnualRestDay] = useState<number>(0); // 0 = Sunday
+  const [annualStartDate, setAnnualStartDate] = useState<Date>(() => {
+    const start = new Date();
+    start.setMonth(0, 1); // January 1st of current year
+    return start;
+  });
+  const [annualEndDate, setAnnualEndDate] = useState<Date>(() => {
+    const end = new Date();
+    end.setMonth(11, 31); // December 31st of current year
+    return end;
+  });
   
   const { addAuditEntry } = useAudit();
   
@@ -248,6 +264,54 @@ export default function StaffPage() {
     setSelectedStaffIds((prev) =>
       prev.includes(staffId) ? prev.filter((id) => id !== staffId) : [...prev, staffId]
     );
+  };
+
+  // Annual rota handler
+  const handleSetupAnnualRota = () => {
+    if (!editingStaffId) return;
+
+    const dates: Date[] = [];
+    const current = new Date(annualStartDate);
+    const end = new Date(annualEndDate);
+
+    // Generate all dates matching the selected day of week
+    while (current <= end) {
+      if (current.getDay() === annualRestDay) {
+        dates.push(new Date(current));
+      }
+      current.setDate(current.getDate() + 1);
+    }
+
+    const updatedStaff = staff.map((s) => {
+      if (s.id === editingStaffId) {
+        const newEntries: AvailabilityEntry[] = dates.map((date) => ({
+          date: date.toISOString().split("T")[0],
+          type: "rest",
+          notes: `Annual rest day (${DAYS_OF_WEEK[annualRestDay]})`,
+        }));
+        
+        // Merge with existing availability, avoid duplicates
+        const existingDates = new Set(s.availability?.map(a => a.date) || []);
+        const uniqueNewEntries = newEntries.filter(e => !existingDates.has(e.date));
+        
+        return {
+          ...s,
+          availability: [...(s.availability || []), ...uniqueNewEntries],
+        };
+      }
+      return s;
+    });
+
+    setStaff(updatedStaff);
+    addAuditEntry({
+      user: "System",
+      action: "created",
+      entity: "availability",
+      entityId: editingStaffId,
+      details: `Set up annual rota: ${dates.length} ${DAYS_OF_WEEK[annualRestDay]}s`,
+    });
+
+    setShowAnnualRota(false);
   };
 
   const handleEditTaskToggle = (task: Task) => {
@@ -606,7 +670,25 @@ export default function StaffPage() {
                     {filterShift !== "all" && ` (${filterShift} shift)`}
                   </CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setMobileView(!mobileView)}
+                    className="rounded-lg"
+                  >
+                    {mobileView ? (
+                      <>
+                        <Monitor className="h-4 w-4 mr-2" />
+                        <span className="font-mono text-xs hidden sm:inline">Desktop</span>
+                      </>
+                    ) : (
+                      <>
+                        <Smartphone className="h-4 w-4 mr-2" />
+                        <span className="font-mono text-xs hidden sm:inline">Mobile</span>
+                      </>
+                    )}
+                  </Button>
                   <Select value={filterShift} onValueChange={(v) => setFilterShift(v as ShiftStart | "all")}>
                     <SelectTrigger className="w-32 rounded-lg font-mono text-xs">
                       <SelectValue />
@@ -632,7 +714,7 @@ export default function StaffPage() {
                     className="rounded-lg"
                   >
                     <Calendar2 className="h-4 w-4 mr-2" />
-                    <span className="font-mono text-xs">Batch Add</span>
+                    <span className="font-mono text-xs hidden sm:inline">Batch Add</span>
                   </Button>
                 </div>
               </CardHeader>
@@ -728,536 +810,879 @@ export default function StaffPage() {
                     <p className="text-xs font-mono mt-1">Add staff above to get started</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className={mobileView ? "space-y-2" : "space-y-3"}>
                     {staff
                       .filter((member) => filterShift === "all" || member.shiftStart === filterShift)
                       .map((member) => {
                       const stats = getAvailabilityStats(member);
                       const isEditing = editingStaffId === member.id;
                       
-                      return (
-                        <div
-                          key={member.id}
-                          className="border border-border rounded-lg hover:shadow-sm transition-smooth"
-                        >
-                          {isEditing ? (
-                            // Inline Edit Mode
-                            <div className="p-4 space-y-4 bg-muted/30">
-                              <div className="flex items-center justify-between mb-2">
-                                <h3 className="font-condensed font-semibold text-sm">Editing: {member.name}</h3>
+                      if (mobileView && !isEditing) {
+                        // Mobile-Optimized Card
+                        return (
+                          <div
+                            key={member.id}
+                            className="border border-border rounded-lg p-3 active:bg-muted/50 transition-smooth"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {batchMode && (
+                                    <Checkbox
+                                      checked={selectedStaffIds.includes(member.id)}
+                                      onCheckedChange={() => toggleStaffSelection(member.id)}
+                                    />
+                                  )}
+                                  <h3 className="font-condensed font-semibold text-base">{member.name}</h3>
+                                </div>
+                                {member.shiftStart && (
+                                  <Badge variant="secondary" className="font-mono text-xs mb-2">
+                                    <Clock className="h-3 w-3 mr-1" />
+                                    {member.shiftStart}
+                                  </Badge>
+                                )}
+                              </div>
+                              {!batchMode && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={handleCancelEdit}
-                                  className="text-muted-foreground"
+                                  onClick={() => handleDeleteStaff(member.id)}
+                                  className="text-destructive h-8 w-8 p-0"
                                 >
-                                  <X className="h-4 w-4" />
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
-                              </div>
+                              )}
+                            </div>
 
-                              <div className="space-y-2">
-                                <Label htmlFor={`edit-name-${member.id}`} className="font-mono text-xs">
-                                  Name
-                                </Label>
-                                <Input
-                                  id={`edit-name-${member.id}`}
-                                  value={editName}
-                                  onChange={(e) => setEditName(e.target.value)}
-                                  className="rounded-lg"
-                                />
-                              </div>
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                              {member.trainedTasks.map((task) => (
+                                <Badge key={task} variant="outline" className="font-mono text-xs">
+                                  {task}
+                                </Badge>
+                              ))}
+                            </div>
 
-                              <div className="space-y-2">
-                                <Label className="font-mono text-xs">Trained Tasks</Label>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                  {TASKS.map((task) => (
-                                    <div key={task} className="flex items-center space-x-2">
-                                      <Checkbox
-                                        id={`edit-${member.id}-${task}`}
-                                        checked={editTasks.includes(task)}
-                                        onCheckedChange={() => handleEditTaskToggle(task)}
-                                      />
-                                      <Label htmlFor={`edit-${member.id}-${task}`} className="font-mono text-xs cursor-pointer">
-                                        {task}
-                                      </Label>
-                                    </div>
-                                  ))}
-                                </div>
+                            {(stats.rest > 0 || stats.holiday > 0 || stats.sick > 0) && (
+                              <div className="flex gap-3 mb-3 text-sm font-mono">
+                                {stats.rest > 0 && <span className="text-blue-600">Rest: {stats.rest}</span>}
+                                {stats.holiday > 0 && <span className="text-purple-600">Holiday: {stats.holiday}</span>}
+                                {stats.sick > 0 && <span className="text-red-600">Sick: {stats.sick}</span>}
                               </div>
+                            )}
 
-                              <div className="space-y-2">
-                                <Label htmlFor={`edit-shift-${member.id}`} className="font-mono text-xs flex items-center gap-2">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  Shift Start Time
-                                </Label>
-                                <Select value={editShift} onValueChange={(v) => setEditShift(v as ShiftStart)}>
-                                  <SelectTrigger id={`edit-shift-${member.id}`} className="rounded-lg font-mono text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {SHIFT_STARTS.map((shift) => (
-                                      <SelectItem key={shift} value={shift} className="font-mono text-xs">
-                                        {shift}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="flex gap-2 pt-2">
+                            {!batchMode && (
+                              <div className="grid grid-cols-2 gap-2">
                                 <Button
-                                  onClick={handleSaveEdit}
-                                  className="flex-1 rounded-lg"
-                                  disabled={!editName.trim() || editTasks.length === 0}
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleQuickSickToday(member.id)}
+                                  className="rounded-lg h-9"
                                 >
-                                  <span className="font-mono text-xs">Save Changes</span>
+                                  <AlertCircle className="h-3.5 w-3.5 mr-1.5 text-destructive" />
+                                  <span className="font-mono text-xs">Sick Today</span>
                                 </Button>
                                 <Button
                                   variant="outline"
-                                  onClick={handleCancelEdit}
-                                  className="rounded-lg"
+                                  size="sm"
+                                  onClick={() => handleQuickRestTomorrow(member.id)}
+                                  className="rounded-lg h-9"
                                 >
-                                  <span className="font-mono text-xs">Cancel</span>
+                                  <Calendar2 className="h-3.5 w-3.5 mr-1.5 text-blue-600" />
+                                  <span className="font-mono text-xs">Rest Tomorrow</span>
                                 </Button>
-                              </div>
-                            </div>
-                          ) : (
-                            // Display Mode
-                            <div className="flex items-start gap-3 p-4 hover:bg-muted/50 transition-smooth">
-                              {/* Batch Selection Checkbox */}
-                              {batchMode && (
-                                <Checkbox
-                                  checked={selectedStaffIds.includes(member.id)}
-                                  onCheckedChange={() => toggleStaffSelection(member.id)}
-                                  className="mt-1"
-                                />
-                              )}
-                              
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h3 className="font-condensed font-semibold text-sm">{member.name}</h3>
-                                  {member.shiftStart && (
-                                    <Badge variant="secondary" className="font-mono text-[10px] flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      {member.shiftStart}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex flex-wrap gap-1.5 mt-2">
-                                  {member.trainedTasks.map((task) => (
-                                    <Badge key={task} variant="outline" className="font-mono text-[10px]">
-                                      {task}
-                                    </Badge>
-                                  ))}
-                                </div>
-                                {(stats.rest > 0 || stats.holiday > 0 || stats.sick > 0) && (
-                                  <div className="flex gap-2 mt-2 text-xs font-mono">
-                                    {stats.rest > 0 && (
-                                      <span className="text-blue-600">Rest: {stats.rest}</span>
-                                    )}
-                                    {stats.holiday > 0 && (
-                                      <span className="text-purple-600">Holiday: {stats.holiday}</span>
-                                    )}
-                                    {stats.sick > 0 && (
-                                      <span className="text-red-600">Sick: {stats.sick}</span>
-                                    )}
-                                  </div>
-                                )}
-
-                                {/* Quick Actions */}
-                                {!batchMode && (
-                                  <div className="flex gap-2 mt-3">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditStaff(member)}
+                                  className="rounded-lg h-9"
+                                >
+                                  <Edit className="h-3.5 w-3.5 mr-1.5" />
+                                  <span className="font-mono text-xs">Edit Skills</span>
+                                </Button>
+                                <Sheet>
+                                  <SheetTrigger asChild>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => handleQuickSickToday(member.id)}
-                                      className="rounded-lg h-7"
+                                      onClick={() => setSelectedStaff(member)}
+                                      className="rounded-lg h-9"
                                     >
-                                      <AlertCircle className="h-3 w-3 mr-1.5 text-destructive" />
-                                      <span className="font-mono text-[10px]">Sick Today</span>
+                                      <Calendar2 className="h-3.5 w-3.5 mr-1.5" />
+                                      <span className="font-mono text-xs">Availability</span>
                                     </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleQuickRestTomorrow(member.id)}
-                                      className="rounded-lg h-7"
-                                    >
-                                      <Calendar2 className="h-3 w-3 mr-1.5 text-blue-600" />
-                                      <span className="font-mono text-[10px]">Rest Tomorrow</span>
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                              
-                              {!batchMode && (
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEditStaff(member)}
-                                    className="rounded-lg"
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    <span className="font-mono text-xs">Edit</span>
-                                  </Button>
-                                  <Sheet>
-                                    <SheetTrigger asChild>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setSelectedStaff(member)}
-                                        className="rounded-lg"
-                                      >
-                                        <Calendar2 className="h-4 w-4 mr-2" />
-                                        <span className="font-mono text-xs">Availability</span>
-                                      </Button>
-                                    </SheetTrigger>
-                                    <SheetContent className="w-full sm:max-w-2xl">
-                                      <SheetHeader>
-                                        <SheetTitle className="font-condensed">
-                                          {member.name} - Availability
-                                        </SheetTitle>
-                                        <SheetDescription className="font-mono text-xs">
-                                          Manage rest days, holidays, and sickness
-                                        </SheetDescription>
-                                      </SheetHeader>
+                                  </SheetTrigger>
+                                  <SheetContent className="w-full sm:max-w-2xl">
+                                    <SheetHeader>
+                                      <SheetTitle className="font-condensed">
+                                        {member.name} - Availability
+                                      </SheetTitle>
+                                      <SheetDescription className="font-mono text-xs">
+                                        Manage rest days, holidays, and sickness
+                                      </SheetDescription>
+                                    </SheetHeader>
 
-                                      <ScrollArea className="h-[calc(100vh-120px)] mt-6">
-                                        <Tabs defaultValue="calendar" className="space-y-4">
-                                          <TabsList className="grid w-full grid-cols-3 rounded-lg">
-                                            <TabsTrigger value="calendar" className="font-mono text-xs">
-                                              Calendar
-                                            </TabsTrigger>
-                                            <TabsTrigger value="pattern" className="font-mono text-xs">
-                                              <Repeat className="h-3.5 w-3.5 mr-1.5" />
-                                              Pattern
-                                            </TabsTrigger>
-                                            <TabsTrigger value="import" className="font-mono text-xs">
-                                              Excel Import
-                                            </TabsTrigger>
-                                          </TabsList>
+                                    <ScrollArea className="h-[calc(100vh-120px)] mt-6">
+                                      <Tabs defaultValue="calendar" className="space-y-4">
+                                        <TabsList className="grid w-full grid-cols-3 rounded-lg">
+                                          <TabsTrigger value="calendar" className="font-mono text-xs">
+                                            Calendar
+                                          </TabsTrigger>
+                                          <TabsTrigger value="pattern" className="font-mono text-xs">
+                                            <Repeat className="h-3.5 w-3.5 mr-1.5" />
+                                            Pattern
+                                          </TabsTrigger>
+                                          <TabsTrigger value="import" className="font-mono text-xs">
+                                            Excel Import
+                                          </TabsTrigger>
+                                        </TabsList>
 
-                                          <TabsContent value="calendar" className="space-y-4">
-                                            {/* Current Entries Card */}
-                                            {selectedStaff && selectedStaff.availability && selectedStaff.availability.length > 0 && (
-                                              <Card className="shadow-sm">
-                                                <CardHeader className="pb-3">
-                                                  <CardTitle className="font-condensed text-sm">Current Entries</CardTitle>
-                                                  <CardDescription className="font-mono text-xs">
-                                                    Click X to remove an entry
-                                                  </CardDescription>
-                                                </CardHeader>
-                                                <CardContent>
-                                                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                                                    {selectedStaff.availability
-                                                      .sort((a, b) => a.date.localeCompare(b.date))
-                                                      .map((entry, idx) => (
-                                                        <div
-                                                          key={idx}
-                                                          className={`flex items-center justify-between p-2 rounded-lg border ${getAvailabilityColor(entry.type)}`}
-                                                        >
-                                                          <div className="flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                              <span className="font-mono text-xs font-semibold">
-                                                                {new Date(entry.date + "T00:00:00").toLocaleDateString("en-GB", {
-                                                                  day: "2-digit",
-                                                                  month: "short",
-                                                                  year: "numeric",
-                                                                })}
-                                                              </span>
-                                                              <Badge variant="secondary" className="font-mono text-[10px]">
-                                                                {entry.type}
-                                                              </Badge>
-                                                            </div>
-                                                            {entry.notes && (
-                                                              <p className="text-[10px] font-mono mt-1 opacity-75">
-                                                                {entry.notes}
-                                                              </p>
-                                                            )}
-                                                          </div>
-                                                          <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            onClick={() => handleDeleteAvailability(selectedStaff.id, entry.date)}
-                                                            className="h-6 w-6 p-0 hover:bg-destructive/20"
-                                                          >
-                                                            <X className="h-3.5 w-3.5" />
-                                                          </Button>
-                                                        </div>
-                                                      ))}
-                                                  </div>
-                                                </CardContent>
-                                              </Card>
-                                            )}
-
+                                        <TabsContent value="calendar" className="space-y-4">
+                                          {/* Current Entries Card */}
+                                          {selectedStaff && selectedStaff.availability && selectedStaff.availability.length > 0 && (
                                             <Card className="shadow-sm">
                                               <CardHeader className="pb-3">
-                                                <CardTitle className="font-condensed text-sm">Add Dates</CardTitle>
+                                                <CardTitle className="font-condensed text-sm">Current Entries</CardTitle>
+                                                <CardDescription className="font-mono text-xs">
+                                                  Click X to remove an entry
+                                                </CardDescription>
                                               </CardHeader>
-                                              <CardContent className="space-y-4">
-                                                <div className="space-y-2">
-                                                  <Label className="font-mono text-xs">Type</Label>
-                                                  <Select
-                                                    value={availabilityType}
-                                                    onValueChange={(v) => setAvailabilityType(v as AvailabilityType)}
-                                                  >
-                                                    <SelectTrigger className="rounded-lg font-mono text-xs">
-                                                      <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="rest" className="font-mono text-xs">
-                                                        Rest Day
-                                                      </SelectItem>
-                                                      <SelectItem value="holiday" className="font-mono text-xs">
-                                                        Holiday
-                                                      </SelectItem>
-                                                      <SelectItem value="sick" className="font-mono text-xs">
-                                                        Sick Leave
-                                                      </SelectItem>
-                                                      <SelectItem value="available" className="font-mono text-xs">
-                                                        Available
-                                                      </SelectItem>
-                                                    </SelectContent>
-                                                  </Select>
+                                              <CardContent>
+                                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                  {selectedStaff.availability
+                                                    .sort((a, b) => a.date.localeCompare(b.date))
+                                                    .map((entry, idx) => (
+                                                      <div
+                                                        key={idx}
+                                                        className={`flex items-center justify-between p-2 rounded-lg border ${getAvailabilityColor(entry.type)}`}
+                                                      >
+                                                        <div className="flex-1">
+                                                          <div className="flex items-center gap-2">
+                                                            <span className="font-mono text-xs font-semibold">
+                                                              {new Date(entry.date + "T00:00:00").toLocaleDateString("en-GB", {
+                                                                day: "2-digit",
+                                                                month: "short",
+                                                                year: "numeric",
+                                                              })}
+                                                            </span>
+                                                            <Badge variant="secondary" className="font-mono text-[10px]">
+                                                              {entry.type}
+                                                            </Badge>
+                                                          </div>
+                                                          {entry.notes && (
+                                                            <p className="text-[10px] font-mono mt-1 opacity-75">
+                                                              {entry.notes}
+                                                            </p>
+                                                          )}
+                                                        </div>
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="sm"
+                                                          onClick={() => handleDeleteAvailability(selectedStaff.id, entry.date)}
+                                                          className="h-6 w-6 p-0 hover:bg-destructive/20"
+                                                        >
+                                                          <X className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                      </div>
+                                                    ))}
                                                 </div>
+                                              </CardContent>
+                                            </Card>
+                                          )}
 
+                                          <Card className="shadow-sm">
+                                            <CardHeader className="pb-3">
+                                              <CardTitle className="font-condensed text-sm">Add Dates</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-4">
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Type</Label>
+                                                <Select
+                                                  value={availabilityType}
+                                                  onValueChange={(v) => setAvailabilityType(v as AvailabilityType)}
+                                                >
+                                                  <SelectTrigger className="rounded-lg font-mono text-xs">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="rest" className="font-mono text-xs">
+                                                      Rest Day
+                                                    </SelectItem>
+                                                    <SelectItem value="holiday" className="font-mono text-xs">
+                                                      Holiday
+                                                    </SelectItem>
+                                                    <SelectItem value="sick" className="font-mono text-xs">
+                                                      Sick Leave
+                                                    </SelectItem>
+                                                    <SelectItem value="available" className="font-mono text-xs">
+                                                      Available
+                                                    </SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Select Dates</Label>
+                                                <Calendar
+                                                  mode="multiple"
+                                                  selected={selectedDates}
+                                                  onSelect={(dates) => setSelectedDates(dates || [])}
+                                                  className="rounded-lg border"
+                                                />
+                                              </div>
+
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Notes (Optional)</Label>
+                                                <Input
+                                                  value={availabilityNotes}
+                                                  onChange={(e) => setAvailabilityNotes(e.target.value)}
+                                                  placeholder="e.g., Annual leave"
+                                                  className="rounded-lg font-mono text-xs"
+                                                />
+                                              </div>
+
+                                              <Button
+                                                onClick={handleAddAvailability}
+                                                disabled={selectedDates.length === 0}
+                                                className="w-full rounded-lg"
+                                              >
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                <span className="font-mono text-xs">
+                                                  Add {selectedDates.length} Date{selectedDates.length !== 1 ? "s" : ""}
+                                                </span>
+                                              </Button>
+                                            </CardContent>
+                                          </Card>
+                                        </TabsContent>
+
+                                        <TabsContent value="pattern" className="space-y-4">
+                                          <Card className="shadow-sm">
+                                            <CardHeader className="pb-3">
+                                              <CardTitle className="font-condensed text-sm flex items-center gap-2">
+                                                <Repeat className="h-4 w-4" />
+                                                Recurring Pattern
+                                              </CardTitle>
+                                              <CardDescription className="font-mono text-xs">
+                                                Set up repeating availability (e.g., every Monday)
+                                              </CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-4">
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Day of Week</Label>
+                                                <Select
+                                                  value={patternDayOfWeek.toString()}
+                                                  onValueChange={(v) => setPatternDayOfWeek(parseInt(v))}
+                                                >
+                                                  <SelectTrigger className="rounded-lg font-mono text-xs">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    {DAYS_OF_WEEK.map((day, idx) => (
+                                                      <SelectItem key={idx} value={idx.toString()} className="font-mono text-xs">
+                                                        {day}
+                                                      </SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Type</Label>
+                                                <Select
+                                                  value={patternType}
+                                                  onValueChange={(v) => setPatternType(v as AvailabilityType)}
+                                                >
+                                                  <SelectTrigger className="rounded-lg font-mono text-xs">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="rest" className="font-mono text-xs">
+                                                      Rest Day
+                                                    </SelectItem>
+                                                    <SelectItem value="holiday" className="font-mono text-xs">
+                                                      Holiday
+                                                    </SelectItem>
+                                                    <SelectItem value="sick" className="font-mono text-xs">
+                                                      Sick Leave
+                                                    </SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+
+                                              <div className="grid grid-cols-2 gap-4">
                                                 <div className="space-y-2">
-                                                  <Label className="font-mono text-xs">Select Dates</Label>
+                                                  <Label className="font-mono text-xs">Start Date</Label>
                                                   <Calendar
-                                                    mode="multiple"
-                                                    selected={selectedDates}
-                                                    onSelect={(dates) => setSelectedDates(dates || [])}
+                                                    mode="single"
+                                                    selected={patternStartDate}
+                                                    onSelect={(date) => date && setPatternStartDate(date)}
                                                     className="rounded-lg border"
                                                   />
                                                 </div>
-
                                                 <div className="space-y-2">
-                                                  <Label className="font-mono text-xs">Notes (Optional)</Label>
-                                                  <Input
-                                                    value={availabilityNotes}
-                                                    onChange={(e) => setAvailabilityNotes(e.target.value)}
-                                                    placeholder="e.g., Annual leave"
-                                                    className="rounded-lg font-mono text-xs"
+                                                  <Label className="font-mono text-xs">End Date</Label>
+                                                  <Calendar
+                                                    mode="single"
+                                                    selected={patternEndDate}
+                                                    onSelect={(date) => date && setPatternEndDate(date)}
+                                                    className="rounded-lg border"
                                                   />
                                                 </div>
+                                              </div>
 
-                                                <Button
-                                                  onClick={handleAddAvailability}
-                                                  disabled={selectedDates.length === 0}
-                                                  className="w-full rounded-lg"
-                                                >
-                                                  <Plus className="h-4 w-4 mr-2" />
-                                                  <span className="font-mono text-xs">
-                                                    Add {selectedDates.length} Date{selectedDates.length !== 1 ? "s" : ""}
-                                                  </span>
-                                                </Button>
-                                              </CardContent>
-                                            </Card>
-                                          </TabsContent>
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Notes (Optional)</Label>
+                                                <Input
+                                                  value={patternNotes}
+                                                  onChange={(e) => setPatternNotes(e.target.value)}
+                                                  placeholder="e.g., Regular rest day"
+                                                  className="rounded-lg font-mono text-xs"
+                                                />
+                                              </div>
 
-                                          <TabsContent value="pattern" className="space-y-4">
-                                            <Card className="shadow-sm">
-                                              <CardHeader className="pb-3">
-                                                <CardTitle className="font-condensed text-sm flex items-center gap-2">
-                                                  <Repeat className="h-4 w-4" />
-                                                  Recurring Pattern
-                                                </CardTitle>
-                                                <CardDescription className="font-mono text-xs">
-                                                  Set up repeating availability (e.g., every Monday)
-                                                </CardDescription>
-                                              </CardHeader>
-                                              <CardContent className="space-y-4">
-                                                <div className="space-y-2">
-                                                  <Label className="font-mono text-xs">Day of Week</Label>
-                                                  <Select
-                                                    value={patternDayOfWeek.toString()}
-                                                    onValueChange={(v) => setPatternDayOfWeek(parseInt(v))}
+                                              <Button onClick={handleApplyPattern} className="w-full rounded-lg">
+                                                <Repeat className="h-4 w-4 mr-2" />
+                                                <span className="font-mono text-xs">Apply Pattern</span>
+                                              </Button>
+                                            </CardContent>
+                                          </Card>
+                                        </TabsContent>
+
+                                        <TabsContent value="import" className="space-y-4">
+                                          <Card className="shadow-sm">
+                                            <CardHeader className="pb-3">
+                                              <CardTitle className="font-condensed text-sm flex items-center gap-2">
+                                                <FileSpreadsheet className="h-4 w-4" />
+                                                CSV/Excel Import
+                                              </CardTitle>
+                                              <CardDescription className="font-mono text-xs">
+                                                Upload a CSV file or paste data directly
+                                              </CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3">
+                                              <div className="text-xs font-mono text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                                                <p className="font-semibold mb-2">Required Format:</p>
+                                                <p>Date,Type,Notes</p>
+                                                <p className="mt-1">2026-01-15,holiday,Christmas</p>
+                                                <p>2026-02-20,rest,Regular rest</p>
+                                                <p>2026-03-10,sick,Flu</p>
+                                                <p className="mt-2 text-muted-foreground/70">
+                                                  Types: rest, holiday, sick, available
+                                                </p>
+                                              </div>
+
+                                              {/* File Upload Option */}
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs font-semibold">
+                                                  Option 1: Upload File
+                                                </Label>
+                                                <div className="flex gap-2">
+                                                  <Button
+                                                    variant="outline"
+                                                    className="w-full rounded-lg relative"
+                                                    onClick={() => document.getElementById('csv-upload')?.click()}
                                                   >
-                                                    <SelectTrigger className="rounded-lg font-mono text-xs">
-                                                      <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      {DAYS_OF_WEEK.map((day, idx) => (
-                                                        <SelectItem key={idx} value={idx.toString()} className="font-mono text-xs">
-                                                          {day}
-                                                        </SelectItem>
-                                                      ))}
-                                                    </SelectContent>
-                                                  </Select>
-                                                </div>
-
-                                                <div className="space-y-2">
-                                                  <Label className="font-mono text-xs">Type</Label>
-                                                  <Select
-                                                    value={patternType}
-                                                    onValueChange={(v) => setPatternType(v as AvailabilityType)}
-                                                  >
-                                                    <SelectTrigger className="rounded-lg font-mono text-xs">
-                                                      <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="rest" className="font-mono text-xs">
-                                                        Rest Day
-                                                      </SelectItem>
-                                                      <SelectItem value="holiday" className="font-mono text-xs">
-                                                        Holiday
-                                                      </SelectItem>
-                                                      <SelectItem value="sick" className="font-mono text-xs">
-                                                        Sick Leave
-                                                      </SelectItem>
-                                                    </SelectContent>
-                                                  </Select>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-4">
-                                                  <div className="space-y-2">
-                                                    <Label className="font-mono text-xs">Start Date</Label>
-                                                    <Calendar
-                                                      mode="single"
-                                                      selected={patternStartDate}
-                                                      onSelect={(date) => date && setPatternStartDate(date)}
-                                                      className="rounded-lg border"
-                                                    />
-                                                  </div>
-                                                  <div className="space-y-2">
-                                                    <Label className="font-mono text-xs">End Date</Label>
-                                                    <Calendar
-                                                      mode="single"
-                                                      selected={patternEndDate}
-                                                      onSelect={(date) => date && setPatternEndDate(date)}
-                                                      className="rounded-lg border"
-                                                    />
-                                                  </div>
-                                                </div>
-
-                                                <div className="space-y-2">
-                                                  <Label className="font-mono text-xs">Notes (Optional)</Label>
-                                                  <Input
-                                                    value={patternNotes}
-                                                    onChange={(e) => setPatternNotes(e.target.value)}
-                                                    placeholder="e.g., Regular rest day"
-                                                    className="rounded-lg font-mono text-xs"
+                                                    <Upload className="h-4 w-4 mr-2" />
+                                                    <span className="font-mono text-xs">
+                                                      {csvFileName || "Choose CSV or Excel File"}
+                                                    </span>
+                                                  </Button>
+                                                  <input
+                                                    id="csv-upload"
+                                                    type="file"
+                                                    accept=".csv,.txt,.xlsx,.xls"
+                                                    onChange={handleCsvFileUpload}
+                                                    className="hidden"
                                                   />
-                                                </div>
-
-                                                <Button onClick={handleApplyPattern} className="w-full rounded-lg">
-                                                  <Repeat className="h-4 w-4 mr-2" />
-                                                  <span className="font-mono text-xs">Apply Pattern</span>
-                                                </Button>
-                                              </CardContent>
-                                            </Card>
-                                          </TabsContent>
-
-                                          <TabsContent value="import" className="space-y-4">
-                                            <Card className="shadow-sm">
-                                              <CardHeader className="pb-3">
-                                                <CardTitle className="font-condensed text-sm flex items-center gap-2">
-                                                  <FileSpreadsheet className="h-4 w-4" />
-                                                  CSV/Excel Import
-                                                </CardTitle>
-                                                <CardDescription className="font-mono text-xs">
-                                                  Upload a CSV file or paste data directly
-                                                </CardDescription>
-                                              </CardHeader>
-                                              <CardContent className="space-y-3">
-                                                <div className="text-xs font-mono text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                                                  <p className="font-semibold mb-2">Required Format:</p>
-                                                  <p>Date,Type,Notes</p>
-                                                  <p className="mt-1">2026-01-15,holiday,Christmas</p>
-                                                  <p>2026-02-20,rest,Regular rest</p>
-                                                  <p>2026-03-10,sick,Flu</p>
-                                                  <p className="mt-2 text-muted-foreground/70">
-                                                    Types: rest, holiday, sick, available
-                                                  </p>
-                                                </div>
-
-                                                {/* File Upload Option */}
-                                                <div className="space-y-2">
-                                                  <Label className="font-mono text-xs font-semibold">
-                                                    Option 1: Upload File
-                                                  </Label>
-                                                  <div className="flex gap-2">
+                                                  {csvFileName && (
                                                     <Button
-                                                      variant="outline"
-                                                      className="w-full rounded-lg relative"
-                                                      onClick={() => document.getElementById('csv-upload')?.click()}
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => {
+                                                        setCsvFileName("");
+                                                        setExcelImport("");
+                                                        const input = document.getElementById('csv-upload') as HTMLInputElement;
+                                                        if (input) input.value = "";
+                                                      }}
+                                                      className="text-destructive hover:text-destructive"
                                                     >
-                                                      <Upload className="h-4 w-4 mr-2" />
-                                                      <span className="font-mono text-xs">
-                                                        {csvFileName || "Choose CSV or Excel File"}
-                                                      </span>
+                                                      <X className="h-4 w-4" />
                                                     </Button>
-                                                    <input
-                                                      id="csv-upload"
-                                                      type="file"
-                                                      accept=".csv,.txt,.xlsx,.xls"
-                                                      onChange={handleCsvFileUpload}
-                                                      className="hidden"
-                                                    />
-                                                    {csvFileName && (
-                                                      <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => {
-                                                          setCsvFileName("");
-                                                          setExcelImport("");
-                                                          const input = document.getElementById('csv-upload') as HTMLInputElement;
-                                                          if (input) input.value = "";
-                                                        }}
-                                                        className="text-destructive hover:text-destructive"
-                                                      >
-                                                        <X className="h-4 w-4" />
-                                                      </Button>
-                                                    )}
-                                                  </div>
-                                                  <p className="text-[10px] font-mono text-muted-foreground">
-                                                    Supports: .csv, .xlsx, .xls files
-                                                  </p>
+                                                  )}
                                                 </div>
+                                                <p className="text-[10px] font-mono text-muted-foreground">
+                                                  Supports: .csv, .xlsx, .xls files
+                                                </p>
+                                              </div>
 
-                                                {/* Paste Option */}
-                                                <div className="space-y-2">
-                                                  <Label className="font-mono text-xs font-semibold">
-                                                    Option 2: Paste Data
-                                                  </Label>
-                                                  <Textarea
-                                                    value={excelImport}
-                                                    onChange={(e) => setExcelImport(e.target.value)}
-                                                    placeholder="Date,Type,Notes&#10;2026-01-15,holiday,Christmas&#10;2026-02-20,rest,Regular rest"
-                                                    className="font-mono text-xs h-32 rounded-lg"
-                                                  />
-                                                </div>
+                                              {/* Paste Option */}
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs font-semibold">
+                                                  Option 2: Paste Data
+                                                </Label>
+                                                <Textarea
+                                                  value={excelImport}
+                                                  onChange={(e) => setExcelImport(e.target.value)}
+                                                  placeholder="Date,Type,Notes&#10;2026-01-15,holiday,Christmas&#10;2026-02-20,rest,Regular rest"
+                                                  className="font-mono text-xs h-32 rounded-lg"
+                                                />
+                                              </div>
 
-                                                <Button
-                                                  onClick={handleAvailabilityImport}
-                                                  className="w-full rounded-lg"
-                                                  disabled={!excelImport.trim()}
-                                                >
-                                                  <Upload className="h-4 w-4 mr-2" />
-                                                  <span className="font-mono text-xs">
-                                                    Import {excelImport.trim().split('\n').filter(l => l.trim()).length} Entries
-                                                  </span>
-                                                </Button>
-                                              </CardContent>
-                                            </Card>
-                                          </TabsContent>
-                                        </Tabs>
-                                      </ScrollArea>
-                                    </SheetContent>
-                                  </Sheet>
+                                              <Button
+                                                onClick={handleAvailabilityImport}
+                                                className="w-full rounded-lg"
+                                                disabled={!excelImport.trim()}
+                                              >
+                                                <Upload className="h-4 w-4 mr-2" />
+                                                <span className="font-mono text-xs">
+                                                  Import {excelImport.trim().split('\n').filter(l => l.trim()).length} Entries
+                                                </span>
+                                              </Button>
+                                            </CardContent>
+                                          </Card>
+                                        </TabsContent>
+                                      </Tabs>
+                                    </ScrollArea>
+                                  </SheetContent>
+                                </Sheet>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          // Display Mode
+                          <div className="flex items-start gap-3 p-4 hover:bg-muted/50 transition-smooth">
+                            {/* Batch Selection Checkbox */}
+                            {batchMode && (
+                              <Checkbox
+                                checked={selectedStaffIds.includes(member.id)}
+                                onCheckedChange={() => toggleStaffSelection(member.id)}
+                                className="mt-1"
+                              />
+                            )}
+                            
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="font-condensed font-semibold text-sm">{member.name}</h3>
+                                {member.shiftStart && (
+                                  <Badge variant="secondary" className="font-mono text-[10px] flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    {member.shiftStart}
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="flex flex-wrap gap-1.5 mt-2">
+                                {member.trainedTasks.map((task) => (
+                                  <Badge key={task} variant="outline" className="font-mono text-[10px]">
+                                    {task}
+                                  </Badge>
+                                ))}
+                              </div>
+                              {(stats.rest > 0 || stats.holiday > 0 || stats.sick > 0) && (
+                                <div className="flex gap-2 mt-2 text-xs font-mono">
+                                  {stats.rest > 0 && (
+                                    <span className="text-blue-600">Rest: {stats.rest}</span>
+                                  )}
+                                  {stats.holiday > 0 && (
+                                    <span className="text-purple-600">Holiday: {stats.holiday}</span>
+                                  )}
+                                  {stats.sick > 0 && (
+                                    <span className="text-red-600">Sick: {stats.sick}</span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Quick Actions */}
+                              {!batchMode && (
+                                <div className="flex gap-2 mt-3">
                                   <Button
-                                    variant="ghost"
+                                    variant="outline"
                                     size="sm"
-                                    onClick={() => handleDeleteStaff(member.id)}
-                                    className="text-destructive hover:text-destructive rounded-lg"
+                                    onClick={() => handleQuickSickToday(member.id)}
+                                    className="rounded-lg h-7"
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <AlertCircle className="h-3 w-3 mr-1.5 text-destructive" />
+                                    <span className="font-mono text-[10px]">Sick Today</span>
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleQuickRestTomorrow(member.id)}
+                                    className="rounded-lg h-7"
+                                  >
+                                    <Calendar2 className="h-3 w-3 mr-1.5 text-blue-600" />
+                                    <span className="font-mono text-[10px]">Rest Tomorrow</span>
                                   </Button>
                                 </div>
                               )}
                             </div>
-                          )}
-                        </div>
+                            
+                            {!batchMode && (
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleEditStaff(member)}
+                                  className="rounded-lg"
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  <span className="font-mono text-xs">Edit</span>
+                                </Button>
+                                <Sheet>
+                                  <SheetTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setSelectedStaff(member)}
+                                      className="rounded-lg"
+                                    >
+                                      <Calendar2 className="h-4 w-4 mr-2" />
+                                      <span className="font-mono text-xs">Availability</span>
+                                    </Button>
+                                  </SheetTrigger>
+                                  <SheetContent className="w-full sm:max-w-2xl">
+                                    <SheetHeader>
+                                      <SheetTitle className="font-condensed">
+                                        {member.name} - Availability
+                                      </SheetTitle>
+                                      <SheetDescription className="font-mono text-xs">
+                                        Manage rest days, holidays, and sickness
+                                      </SheetDescription>
+                                    </SheetHeader>
+
+                                    <ScrollArea className="h-[calc(100vh-120px)] mt-6">
+                                      <Tabs defaultValue="calendar" className="space-y-4">
+                                        <TabsList className="grid w-full grid-cols-3 rounded-lg">
+                                          <TabsTrigger value="calendar" className="font-mono text-xs">
+                                            Calendar
+                                          </TabsTrigger>
+                                          <TabsTrigger value="pattern" className="font-mono text-xs">
+                                            <Repeat className="h-3.5 w-3.5 mr-1.5" />
+                                            Pattern
+                                          </TabsTrigger>
+                                          <TabsTrigger value="import" className="font-mono text-xs">
+                                            Excel Import
+                                          </TabsTrigger>
+                                        </TabsList>
+
+                                        <TabsContent value="calendar" className="space-y-4">
+                                          {/* Current Entries Card */}
+                                          {selectedStaff && selectedStaff.availability && selectedStaff.availability.length > 0 && (
+                                            <Card className="shadow-sm">
+                                              <CardHeader className="pb-3">
+                                                <CardTitle className="font-condensed text-sm">Current Entries</CardTitle>
+                                                <CardDescription className="font-mono text-xs">
+                                                  Click X to remove an entry
+                                                </CardDescription>
+                                              </CardHeader>
+                                              <CardContent>
+                                                <div className="space-y-2 max-h-48 overflow-y-auto">
+                                                  {selectedStaff.availability
+                                                    .sort((a, b) => a.date.localeCompare(b.date))
+                                                    .map((entry, idx) => (
+                                                      <div
+                                                        key={idx}
+                                                        className={`flex items-center justify-between p-2 rounded-lg border ${getAvailabilityColor(entry.type)}`}
+                                                      >
+                                                        <div className="flex-1">
+                                                          <div className="flex items-center gap-2">
+                                                            <span className="font-mono text-xs font-semibold">
+                                                              {new Date(entry.date + "T00:00:00").toLocaleDateString("en-GB", {
+                                                                day: "2-digit",
+                                                                month: "short",
+                                                                year: "numeric",
+                                                              })}
+                                                            </span>
+                                                            <Badge variant="secondary" className="font-mono text-[10px]">
+                                                              {entry.type}
+                                                            </Badge>
+                                                          </div>
+                                                          {entry.notes && (
+                                                            <p className="text-[10px] font-mono mt-1 opacity-75">
+                                                              {entry.notes}
+                                                            </p>
+                                                          )}
+                                                        </div>
+                                                        <Button
+                                                          variant="ghost"
+                                                          size="sm"
+                                                          onClick={() => handleDeleteAvailability(selectedStaff.id, entry.date)}
+                                                          className="h-6 w-6 p-0 hover:bg-destructive/20"
+                                                        >
+                                                          <X className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                      </div>
+                                                    ))}
+                                                </div>
+                                              </CardContent>
+                                            </Card>
+                                          )}
+
+                                          <Card className="shadow-sm">
+                                            <CardHeader className="pb-3">
+                                              <CardTitle className="font-condensed text-sm">Add Dates</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-4">
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Type</Label>
+                                                <Select
+                                                  value={availabilityType}
+                                                  onValueChange={(v) => setAvailabilityType(v as AvailabilityType)}
+                                                >
+                                                  <SelectTrigger className="rounded-lg font-mono text-xs">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="rest" className="font-mono text-xs">
+                                                      Rest Day
+                                                    </SelectItem>
+                                                    <SelectItem value="holiday" className="font-mono text-xs">
+                                                      Holiday
+                                                    </SelectItem>
+                                                    <SelectItem value="sick" className="font-mono text-xs">
+                                                      Sick Leave
+                                                    </SelectItem>
+                                                    <SelectItem value="available" className="font-mono text-xs">
+                                                      Available
+                                                    </SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Select Dates</Label>
+                                                <Calendar
+                                                  mode="multiple"
+                                                  selected={selectedDates}
+                                                  onSelect={(dates) => setSelectedDates(dates || [])}
+                                                  className="rounded-lg border"
+                                                />
+                                              </div>
+
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Notes (Optional)</Label>
+                                                <Input
+                                                  value={availabilityNotes}
+                                                  onChange={(e) => setAvailabilityNotes(e.target.value)}
+                                                  placeholder="e.g., Annual leave"
+                                                  className="rounded-lg font-mono text-xs"
+                                                />
+                                              </div>
+
+                                              <Button
+                                                onClick={handleAddAvailability}
+                                                disabled={selectedDates.length === 0}
+                                                className="w-full rounded-lg"
+                                              >
+                                                <Plus className="h-4 w-4 mr-2" />
+                                                <span className="font-mono text-xs">
+                                                  Add {selectedDates.length} Date{selectedDates.length !== 1 ? "s" : ""}
+                                                </span>
+                                              </Button>
+                                            </CardContent>
+                                          </Card>
+                                        </TabsContent>
+
+                                        <TabsContent value="pattern" className="space-y-4">
+                                          <Card className="shadow-sm">
+                                            <CardHeader className="pb-3">
+                                              <CardTitle className="font-condensed text-sm flex items-center gap-2">
+                                                <Repeat className="h-4 w-4" />
+                                                Recurring Pattern
+                                              </CardTitle>
+                                              <CardDescription className="font-mono text-xs">
+                                                Set up repeating availability (e.g., every Monday)
+                                              </CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-4">
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Day of Week</Label>
+                                                <Select
+                                                  value={patternDayOfWeek.toString()}
+                                                  onValueChange={(v) => setPatternDayOfWeek(parseInt(v))}
+                                                >
+                                                  <SelectTrigger className="rounded-lg font-mono text-xs">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    {DAYS_OF_WEEK.map((day, idx) => (
+                                                      <SelectItem key={idx} value={idx.toString()} className="font-mono text-xs">
+                                                        {day}
+                                                      </SelectItem>
+                                                    ))}
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Type</Label>
+                                                <Select
+                                                  value={patternType}
+                                                  onValueChange={(v) => setPatternType(v as AvailabilityType)}
+                                                >
+                                                  <SelectTrigger className="rounded-lg font-mono text-xs">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="rest" className="font-mono text-xs">
+                                                      Rest Day
+                                                    </SelectItem>
+                                                    <SelectItem value="holiday" className="font-mono text-xs">
+                                                      Holiday
+                                                    </SelectItem>
+                                                    <SelectItem value="sick" className="font-mono text-xs">
+                                                      Sick Leave
+                                                    </SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+
+                                              <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                  <Label className="font-mono text-xs">Start Date</Label>
+                                                  <Calendar
+                                                    mode="single"
+                                                    selected={patternStartDate}
+                                                    onSelect={(date) => date && setPatternStartDate(date)}
+                                                    className="rounded-lg border"
+                                                  />
+                                                </div>
+                                                <div className="space-y-2">
+                                                  <Label className="font-mono text-xs">End Date</Label>
+                                                  <Calendar
+                                                    mode="single"
+                                                    selected={patternEndDate}
+                                                    onSelect={(date) => date && setPatternEndDate(date)}
+                                                    className="rounded-lg border"
+                                                  />
+                                                </div>
+                                              </div>
+
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs">Notes (Optional)</Label>
+                                                <Input
+                                                  value={patternNotes}
+                                                  onChange={(e) => setPatternNotes(e.target.value)}
+                                                  placeholder="e.g., Regular rest day"
+                                                  className="rounded-lg font-mono text-xs"
+                                                />
+                                              </div>
+
+                                              <Button onClick={handleApplyPattern} className="w-full rounded-lg">
+                                                <Repeat className="h-4 w-4 mr-2" />
+                                                <span className="font-mono text-xs">Apply Pattern</span>
+                                              </Button>
+                                            </CardContent>
+                                          </Card>
+                                        </TabsContent>
+
+                                        <TabsContent value="import" className="space-y-4">
+                                          <Card className="shadow-sm">
+                                            <CardHeader className="pb-3">
+                                              <CardTitle className="font-condensed text-sm flex items-center gap-2">
+                                                <FileSpreadsheet className="h-4 w-4" />
+                                                CSV/Excel Import
+                                              </CardTitle>
+                                              <CardDescription className="font-mono text-xs">
+                                                Upload a CSV file or paste data directly
+                                              </CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3">
+                                              <div className="text-xs font-mono text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                                                <p className="font-semibold mb-2">Required Format:</p>
+                                                <p>Date,Type,Notes</p>
+                                                <p className="mt-1">2026-01-15,holiday,Christmas</p>
+                                                <p>2026-02-20,rest,Regular rest</p>
+                                                <p>2026-03-10,sick,Flu</p>
+                                                <p className="mt-2 text-muted-foreground/70">
+                                                  Types: rest, holiday, sick, available
+                                                </p>
+                                              </div>
+
+                                              {/* File Upload Option */}
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs font-semibold">
+                                                  Option 1: Upload File
+                                                </Label>
+                                                <div className="flex gap-2">
+                                                  <Button
+                                                    variant="outline"
+                                                    className="w-full rounded-lg relative"
+                                                    onClick={() => document.getElementById('csv-upload')?.click()}
+                                                  >
+                                                    <Upload className="h-4 w-4 mr-2" />
+                                                    <span className="font-mono text-xs">
+                                                      {csvFileName || "Choose CSV or Excel File"}
+                                                    </span>
+                                                  </Button>
+                                                  <input
+                                                    id="csv-upload"
+                                                    type="file"
+                                                    accept=".csv,.txt,.xlsx,.xls"
+                                                    onChange={handleCsvFileUpload}
+                                                    className="hidden"
+                                                  />
+                                                  {csvFileName && (
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => {
+                                                        setCsvFileName("");
+                                                        setExcelImport("");
+                                                        const input = document.getElementById('csv-upload') as HTMLInputElement;
+                                                        if (input) input.value = "";
+                                                      }}
+                                                      className="text-destructive hover:text-destructive"
+                                                    >
+                                                      <X className="h-4 w-4" />
+                                                    </Button>
+                                                  )}
+                                                </div>
+                                                <p className="text-[10px] font-mono text-muted-foreground">
+                                                  Supports: .csv, .xlsx, .xls files
+                                                </p>
+                                              </div>
+
+                                              {/* Paste Option */}
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs font-semibold">
+                                                  Option 2: Paste Data
+                                                </Label>
+                                                <Textarea
+                                                  value={excelImport}
+                                                  onChange={(e) => setExcelImport(e.target.value)}
+                                                  placeholder="Date,Type,Notes&#10;2026-01-15,holiday,Christmas&#10;2026-02-20,rest,Regular rest"
+                                                  className="font-mono text-xs h-32 rounded-lg"
+                                                />
+                                              </div>
+
+                                              <Button
+                                                onClick={handleAvailabilityImport}
+                                                className="w-full rounded-lg"
+                                                disabled={!excelImport.trim()}
+                                              >
+                                                <Upload className="h-4 w-4 mr-2" />
+                                                <span className="font-mono text-xs">
+                                                  Import {excelImport.trim().split('\n').filter(l => l.trim()).length} Entries
+                                                </span>
+                                              </Button>
+                                            </CardContent>
+                                          </Card>
+                                        </TabsContent>
+                                      </Tabs>
+                                    </ScrollArea>
+                                  </SheetContent>
+                                </Sheet>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteStaff(member.id)}
+                                  className="text-destructive hover:text-destructive rounded-lg"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       );
                     })}
                   </div>
