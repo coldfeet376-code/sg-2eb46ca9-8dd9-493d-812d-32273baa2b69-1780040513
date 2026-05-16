@@ -14,17 +14,7 @@ import { SEO } from "@/components/SEO";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { useNotifications } from "@/contexts/NotificationContext";
 import type { StaffMember, Assignment, Task } from "@/types";
-
-// Optimized icon imports - tree-shakeable
-import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
-import Download from "lucide-react/dist/esm/icons/download";
-import Lock from "lucide-react/dist/esm/icons/lock";
-import Unlock from "lucide-react/dist/esm/icons/unlock";
-import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
-import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
-import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
-import History from "lucide-react/dist/esm/icons/history";
-import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
+import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw } from "lucide-react";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(

@@ -6,14 +6,7 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useTour } from "@/contexts/TourContext";
-
-// Optimized icon imports
-import LayoutGrid from "lucide-react/dist/esm/icons/layout-grid";
-import BarChart3 from "lucide-react/dist/esm/icons/bar-chart-3";
-import LogOut from "lucide-react/dist/esm/icons/log-out";
-import Menu from "lucide-react/dist/esm/icons/menu";
-import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
-import HelpCircle from "lucide-react/dist/esm/icons/help-circle";
+import { LayoutGrid, BarChart3, LogOut, Menu, RefreshCw, HelpCircle } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();

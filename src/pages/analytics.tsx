@@ -4,14 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SEO } from "@/components/SEO";
 import type { StaffMember, Assignment, Task } from "@/types";
-
-// Optimized icon imports
-import BarChart3 from "lucide-react/dist/esm/icons/bar-chart-3";
-import TrendingUp from "lucide-react/dist/esm/icons/trending-up";
-import Users from "lucide-react/dist/esm/icons/users";
-import Calendar2 from "lucide-react/dist/esm/icons/calendar";
-import Award from "lucide-react/dist/esm/icons/award";
-import Heart from "lucide-react/dist/esm/icons/heart";
+import { BarChart3, TrendingUp, Users, Calendar as Calendar2, Award, Heart } from "lucide-react";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

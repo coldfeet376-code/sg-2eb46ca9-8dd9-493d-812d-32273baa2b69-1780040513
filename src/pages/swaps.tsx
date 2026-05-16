@@ -12,15 +12,7 @@ import { SEO } from "@/components/SEO";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useAudit } from "@/contexts/AuditContext";
 import type { ShiftSwap, StaffMember, Task, Assignment } from "@/types";
-
-// Optimized icon imports
-import RefreshCw from "lucide-react";
-import Check from "lucide-react";
-import X from "lucide-react";
-import Plus from "lucide-react";
-import Clock from "lucide-react";
-import CheckCircle from "lucide-react";
-import XCircle from "lucide-react";
+import { RefreshCw, Check, X, Plus, Clock, CheckCircle, XCircle } from "lucide-react";
 
 export default function SwapsPage() {
   const [swaps, setSwaps] = useState<ShiftSwap[]>([]);

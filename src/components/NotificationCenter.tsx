@@ -4,14 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useNotifications } from "@/contexts/NotificationContext";
-
-// Optimized icon imports
-import Bell from "lucide-react";
-import Trash2 from "lucide-react";
-import CheckCircle from "lucide-react";
-import AlertCircle from "lucide-react";
-import Info from "lucide-react";
-import UserPlus from "lucide-react";
+import { Bell, Trash2, CheckCircle, AlertCircle, Info, UserPlus } from "lucide-react";
 
 export function NotificationCenter() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();

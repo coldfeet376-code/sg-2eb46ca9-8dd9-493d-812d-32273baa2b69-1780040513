@@ -7,13 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SEO } from "@/components/SEO";
-
-// Optimized icon imports
-import Save from "lucide-react/dist/esm/icons/save";
-import Upload from "lucide-react/dist/esm/icons/upload";
-import Trash2 from "lucide-react/dist/esm/icons/trash-2";
-import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
-import FileText from "lucide-react/dist/esm/icons/file-text";
+import { Save, Upload, Trash2, AlertCircle, FileText } from "lucide-react";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
