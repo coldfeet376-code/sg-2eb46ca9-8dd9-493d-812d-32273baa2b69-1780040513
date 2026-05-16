@@ -72,7 +72,7 @@ export default function SwapsPage() {
     addNotification({
       staffName: swap.fromStaffName,
       message: `Swap approved: ${swap.task} on ${new Date(swap.date).toLocaleDateString()}`,
-      type: "swap_approved",
+      type: "update",
     });
 
     addNotification({
