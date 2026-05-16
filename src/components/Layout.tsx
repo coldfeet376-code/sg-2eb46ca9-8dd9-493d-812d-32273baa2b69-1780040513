@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { Calendar, Users, Settings, LayoutGrid } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Calendar, Users, Settings, LayoutGrid, BarChart3 } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,23 +14,30 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </span>
             </Link>
             <nav className="flex items-center gap-1">
-              <Link href="/">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Calendar className="h-4 w-4" />
-                  <span className="font-mono text-xs">Rota</span>
-                </Button>
+              <Link
+                href="/"
+                className="px-3 py-1.5 text-sm font-mono rounded-md hover:bg-muted transition-colors"
+              >
+                Rota
               </Link>
-              <Link href="/staff">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Users className="h-4 w-4" />
-                  <span className="font-mono text-xs">Staff</span>
-                </Button>
+              <Link
+                href="/staff"
+                className="px-3 py-1.5 text-sm font-mono rounded-md hover:bg-muted transition-colors"
+              >
+                Staff
               </Link>
-              <Link href="/config">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Settings className="h-4 w-4" />
-                  <span className="font-mono text-xs">Config</span>
-                </Button>
+              <Link
+                href="/config"
+                className="px-3 py-1.5 text-sm font-mono rounded-md hover:bg-muted transition-colors"
+              >
+                Config
+              </Link>
+              <Link
+                href="/analytics"
+                className="px-3 py-1.5 text-sm font-mono rounded-md hover:bg-muted transition-colors flex items-center gap-1.5"
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                Analytics
               </Link>
             </nav>
           </div>
