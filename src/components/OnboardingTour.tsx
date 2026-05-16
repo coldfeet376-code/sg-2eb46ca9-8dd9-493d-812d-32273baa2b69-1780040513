@@ -4,7 +4,7 @@ import Shepherd from "shepherd.js";
 import "shepherd.js/dist/css/shepherd.css";
 import { useTour } from "@/contexts/TourContext";
 
-const tourSteps = {
+const tourSteps: { main: any[] } = {
   main: [
     {
       id: "welcome",
@@ -16,14 +16,14 @@ const tourSteps = {
       buttons: [
         {
           text: "Skip Tour",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.complete();
           },
           classes: "shepherd-button-secondary",
         },
         {
           text: "Start Tour",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.next();
           },
         },
@@ -42,14 +42,14 @@ const tourSteps = {
       buttons: [
         {
           text: "Back",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.back();
           },
           classes: "shepherd-button-secondary",
         },
         {
           text: "Next",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.next();
           },
         },
@@ -68,14 +68,14 @@ const tourSteps = {
       buttons: [
         {
           text: "Back",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.back();
           },
           classes: "shepherd-button-secondary",
         },
         {
           text: "Next",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.next();
           },
         },
@@ -95,14 +95,14 @@ const tourSteps = {
       buttons: [
         {
           text: "Back",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.back();
           },
           classes: "shepherd-button-secondary",
         },
         {
           text: "Next",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.next();
           },
         },
@@ -121,14 +121,14 @@ const tourSteps = {
       buttons: [
         {
           text: "Back",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.back();
           },
           classes: "shepherd-button-secondary",
         },
         {
           text: "Next",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.next();
           },
         },
@@ -147,14 +147,14 @@ const tourSteps = {
       buttons: [
         {
           text: "Back",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.back();
           },
           classes: "shepherd-button-secondary",
         },
         {
           text: "Next",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.next();
           },
         },
@@ -173,14 +173,14 @@ const tourSteps = {
       buttons: [
         {
           text: "Back",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.back();
           },
           classes: "shepherd-button-secondary",
         },
         {
           text: "Next",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.next();
           },
         },
@@ -199,14 +199,14 @@ const tourSteps = {
       buttons: [
         {
           text: "Back",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.back();
           },
           classes: "shepherd-button-secondary",
         },
         {
           text: "Next",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.next();
           },
         },
@@ -228,7 +228,7 @@ const tourSteps = {
       buttons: [
         {
           text: "Finish Tour",
-          action: function(this: Shepherd.Tour) {
+          action: function(this: any) {
             this.complete();
           },
         },
@@ -240,7 +240,7 @@ const tourSteps = {
 export function OnboardingTour() {
   const { hasSeenTour, markTourAsSeen } = useTour();
   const router = useRouter();
-  const tourRef = useRef<Shepherd.Tour | null>(null);
+  const tourRef = useRef<any>(null);
 
   useEffect(() => {
     // Only run tour on main page
