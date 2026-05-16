@@ -2,6 +2,8 @@ export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Outbound" | "Marshal
 
 export type AvailabilityType = "available" | "rest" | "holiday" | "sick";
 
+export type ShiftStart = "06:00" | "08:30" | "09:00" | "09:30" | "10:00" | "11:00";
+
 export interface AvailabilityEntry {
   date: string; // ISO date string
   type: AvailabilityType;
@@ -13,21 +15,14 @@ export interface StaffPreferences {
   avoidTasks?: Task[]; // Tasks they prefer to avoid
 }
 
-export interface Certification {
-  task: Task;
-  expiryDate: string; // ISO date string
-  issuedDate: string; // ISO date string
-  notes?: string;
-}
-
 export interface StaffMember {
   id: string;
   name: string;
   trainedTasks: Task[];
+  shiftStart?: ShiftStart;
   restDays?: number[]; // Day of week (0-6)
   availability?: AvailabilityEntry[]; // Date-specific availability
   preferences?: StaffPreferences; // Task preferences
-  certifications?: Certification[]; // Training certifications with expiry
   role?: "manager" | "supervisor" | "staff"; // User role
 }
 
