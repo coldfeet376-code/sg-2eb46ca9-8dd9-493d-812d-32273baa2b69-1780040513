@@ -1,6 +1,6 @@
 ---
 title: Design System & Core Layout
-status: in_progress
+status: done
 priority: urgent
 type: feature
 tags: [design-system, ui]

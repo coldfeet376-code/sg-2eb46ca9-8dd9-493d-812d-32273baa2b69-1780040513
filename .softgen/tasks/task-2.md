@@ -1,6 +1,6 @@
 ---
 title: Staff Management Interface
-status: todo
+status: in_progress
 priority: high
 type: feature
 tags: [staff, crud]
