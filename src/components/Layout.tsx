@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Calendar, Users, Settings, LayoutGrid, BarChart3 } from "lucide-react";
+import { NotificationCenter } from "@/components/NotificationCenter";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -40,6 +41,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 Analytics
               </Link>
             </nav>
+          </div>
+          <div className="flex items-center gap-2">
+            <NotificationCenter />
           </div>
         </div>
       </header>

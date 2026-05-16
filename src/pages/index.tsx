@@ -8,6 +8,7 @@ import { SEO } from "@/components/SEO";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { StaffMember, Assignment } from "@/types";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
+import { useNotifications } from "@/contexts/NotificationContext";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
@@ -20,6 +21,7 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"week" | "year">("week");
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [yearRotas, setYearRotas] = useState<Map<string, Assignment[]>>(new Map());
+  const { addNotification } = useNotifications();
 
   useEffect(() => {
     // Load staff and config
@@ -54,6 +56,25 @@ export default function Home() {
       weekStart,
     });
     setAssignments(newAssignments);
+
+    // Generate notifications for each staff member
+    const staffAssignments = new Map<string, Assignment[]>();
+    newAssignments.forEach(assignment => {
+      if (!staffAssignments.has(assignment.staffName)) {
+        staffAssignments.set(assignment.staffName, []);
+      }
+      staffAssignments.get(assignment.staffName)?.push(assignment);
+    });
+
+    staffAssignments.forEach((assignments, staffName) => {
+      const taskList = [...new Set(assignments.map(a => a.task))].join(", ");
+      addNotification({
+        staffName,
+        message: `New assignments: ${taskList}`,
+        type: "assignment",
+        weekStart: weekStart.toISOString(),
+      });
+    });
   };
 
   const generateYearRota = () => {
@@ -72,6 +93,13 @@ export default function Home() {
     });
 
     setYearRotas(newYearRotas);
+
+    // Notify about year-long rota generation
+    addNotification({
+      staffName: "System",
+      message: `Year ${selectedYear} rota generated for all staff`,
+      type: "info",
+    });
   };
 
   const exportPDF = () => {
