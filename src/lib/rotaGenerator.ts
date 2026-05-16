@@ -64,23 +64,36 @@ function hasConsecutiveTask(
 }
 
 // Calculate fairness score (lower is more fair)
+// Now includes preferences as tiebreaker
 function calculateFairnessScore(
-  staffName: string,
+  staffMember: StaffMember,
   task: string,
   existingAssignments: Assignment[]
 ): number {
   // Count current task assignments for this staff member
   const taskCount = existingAssignments.filter(
-    (a) => a.staffName === staffName && a.task === task
+    (a) => a.staffName === staffMember.name && a.task === task
   ).length;
 
   // Count total assignments for this staff member
   const totalCount = existingAssignments.filter(
-    (a) => a.staffName === staffName
+    (a) => a.staffName === staffMember.name
   ).length;
 
-  // Lower score = less frequently assigned this task
-  return taskCount * 10 + totalCount;
+  // Base fairness score (lower = less frequently assigned)
+  let score = taskCount * 10 + totalCount;
+
+  // Apply preference bonus/penalty (only as tiebreaker when fairness is equal)
+  if (staffMember.preferences) {
+    if (staffMember.preferences.preferredTasks?.includes(task as Task)) {
+      score -= 0.5; // Slight preference for preferred tasks
+    }
+    if (staffMember.preferences.avoidTasks?.includes(task as Task)) {
+      score += 0.5; // Slight penalty for avoided tasks
+    }
+  }
+
+  return score;
 }
 
 export function generateWeeklyRota({
@@ -139,11 +152,11 @@ export function generateWeeklyRota({
         return true;
       });
 
-      // Assign staff based on fairness
+      // Assign staff based on fairness + preferences
       const candidates = availableStaff
         .map((s) => ({
           staff: s,
-          fairnessScore: calculateFairnessScore(s.name, task, assignments),
+          fairnessScore: calculateFairnessScore(s, task, assignments),
           hasConsecutive: hasConsecutiveTask(
             s.name,
             task,

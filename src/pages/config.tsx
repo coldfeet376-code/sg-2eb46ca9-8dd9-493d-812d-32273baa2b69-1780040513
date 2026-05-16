@@ -4,231 +4,270 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Save, RotateCcw } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Save, Upload, Trash2, AlertCircle, FileText } from "lucide-react";
 import { SEO } from "@/components/SEO";
-import type { Task } from "@/types";
 
-const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 
 interface TaskConfig {
-  [task: string]: number[]; // 7 numbers for Sun-Sat
+  [task: string]: number[];
 }
 
-const DEFAULT_CONFIG: TaskConfig = {
-  Frozen: [1, 2, 2, 2, 2, 2, 1],
-  Milk: [1, 2, 2, 2, 2, 2, 1],
-  TWI: [0, 1, 1, 1, 1, 1, 0],
-  Inbound: [1, 3, 3, 3, 3, 3, 1],
-  Outbound: [1, 3, 3, 3, 3, 3, 1],
-  Marshaling: [1, 2, 2, 2, 2, 2, 1],
-};
+interface ConfigTemplate {
+  id: string;
+  name: string;
+  config: TaskConfig;
+  createdAt: number;
+}
 
 export default function ConfigPage() {
-  const [config, setConfig] = useState<TaskConfig>(DEFAULT_CONFIG);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [taskConfig, setTaskConfig] = useState<TaskConfig>({
+    Frozen: [0, 0, 0, 0, 0, 0, 0],
+    Milk: [0, 0, 0, 0, 0, 0, 0],
+    TWI: [0, 0, 0, 0, 0, 0, 0],
+    Inbound: [0, 0, 0, 0, 0, 0, 0],
+    Outbound: [0, 0, 0, 0, 0, 0, 0],
+    Marshaling: [0, 0, 0, 0, 0, 0, 0],
+  });
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [templates, setTemplates] = useState<ConfigTemplate[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
 
   useEffect(() => {
-    const saved = localStorage.getItem("warehouse-task-config");
-    if (saved) {
-      setConfig(JSON.parse(saved));
+    const savedConfig = localStorage.getItem("warehouse-task-config");
+    const savedTemplates = localStorage.getItem("warehouse-config-templates");
+    
+    if (savedConfig) {
+      setTaskConfig(JSON.parse(savedConfig));
+    }
+    if (savedTemplates) {
+      setTemplates(JSON.parse(savedTemplates));
     }
   }, []);
 
-  const handleChange = (task: Task, dayIndex: number, value: string) => {
-    const numValue = parseInt(value) || 0;
-    const newConfig = {
-      ...config,
-      [task]: config[task].map((v, i) => (i === dayIndex ? numValue : v)),
+  const handleConfigChange = (task: string, dayIndex: number, value: string) => {
+    const newConfig = { ...taskConfig };
+    newConfig[task][dayIndex] = parseInt(value) || 0;
+    setTaskConfig(newConfig);
+  };
+
+  const handleSaveConfig = () => {
+    localStorage.setItem("warehouse-task-config", JSON.stringify(taskConfig));
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  const handleSaveTemplate = () => {
+    if (!templateName.trim()) return;
+
+    const newTemplate: ConfigTemplate = {
+      id: Date.now().toString(),
+      name: templateName.trim(),
+      config: { ...taskConfig },
+      createdAt: Date.now(),
     };
-    setConfig(newConfig);
-    setHasChanges(true);
+
+    const updatedTemplates = [...templates, newTemplate];
+    setTemplates(updatedTemplates);
+    localStorage.setItem("warehouse-config-templates", JSON.stringify(updatedTemplates));
+    setTemplateName("");
   };
 
-  const handleSave = () => {
-    localStorage.setItem("warehouse-task-config", JSON.stringify(config));
-    setHasChanges(false);
+  const handleLoadTemplate = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      setTaskConfig(template.config);
+      setSelectedTemplate(templateId);
+    }
   };
 
-  const handleReset = () => {
-    setConfig(DEFAULT_CONFIG);
-    setHasChanges(true);
-  };
-
-  const getTotalForDay = (dayIndex: number): number => {
-    return TASKS.reduce((sum, task) => sum + config[task][dayIndex], 0);
-  };
-
-  const getTotalForTask = (task: Task): number => {
-    return config[task].reduce((sum, count) => sum + count, 0);
+  const handleDeleteTemplate = (templateId: string) => {
+    const updatedTemplates = templates.filter(t => t.id !== templateId);
+    setTemplates(updatedTemplates);
+    localStorage.setItem("warehouse-config-templates", JSON.stringify(updatedTemplates));
+    if (selectedTemplate === templateId) {
+      setSelectedTemplate("");
+    }
   };
 
   return (
     <Layout>
-      <SEO
-        title="Task Configuration - Warehouse Rota"
-        description="Configure daily staff requirements for each warehouse task"
-      />
+      <SEO title="Task Configuration - Warehouse Rota" description="Configure daily task requirements" />
 
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-condensed text-3xl font-bold tracking-tight">
-              Task Configuration
-            </h1>
-            <p className="text-sm text-muted-foreground font-mono mt-1">
-              Set daily staff requirements for each task
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-              className="gap-2"
-            >
-              <RotateCcw className="h-4 w-4" />
-              <span className="font-mono text-xs">Reset to Default</span>
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSave}
-              disabled={!hasChanges}
-              className="gap-2"
-            >
-              <Save className="h-4 w-4" />
-              <span className="font-mono text-xs">Save Changes</span>
-            </Button>
-          </div>
+        <div>
+          <h1 className="font-condensed text-3xl font-bold tracking-tight">Task Configuration</h1>
+          <p className="text-sm text-muted-foreground font-mono mt-1">
+            Set staff requirements for each task per day
+          </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-condensed text-xl">Daily Requirements Grid</CardTitle>
-            <CardDescription className="font-mono text-xs">
-              Number of staff needed per task per day
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50">
-                      Task
-                    </th>
-                    {DAYS.map((day) => (
-                      <th
-                        key={day}
-                        className="text-center p-3 font-mono text-xs font-medium bg-muted/50"
-                      >
-                        {day.slice(0, 3)}
-                      </th>
-                    ))}
-                    <th className="text-center p-3 font-mono text-xs font-medium bg-muted/50">
-                      Week
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {TASKS.map((task) => (
-                    <tr key={task} className="border-b border-border hover:bg-muted/30">
-                      <td className="p-3 font-condensed text-sm font-semibold">
-                        {task}
-                      </td>
-                      {config[task].map((count, dayIndex) => (
-                        <td key={dayIndex} className="p-2">
-                          <Input
-                            type="number"
-                            min="0"
-                            max="20"
-                            value={count}
-                            onChange={(e) => handleChange(task, dayIndex, e.target.value)}
-                            className="w-16 text-center font-mono text-sm tabular-nums"
-                          />
-                        </td>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-6">
+            <Card className="shadow-sm hover:shadow-md transition-smooth">
+              <CardHeader>
+                <CardTitle className="font-condensed text-xl">Daily Requirements</CardTitle>
+                <CardDescription className="font-mono text-xs">
+                  Enter the number of staff needed for each task on each day
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50 rounded-tl-lg">
+                          Task
+                        </th>
+                        {DAYS.map((day, i) => (
+                          <th 
+                            key={i} 
+                            className={`text-center p-3 font-mono text-xs font-medium bg-muted/50 ${i === 6 ? 'rounded-tr-lg' : ''}`}
+                          >
+                            {day}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {TASKS.map((task) => (
+                        <tr key={task} className="border-b border-border hover:bg-muted/30 transition-smooth">
+                          <td className="p-3 font-condensed text-sm font-semibold">
+                            {task}
+                          </td>
+                          {DAYS.map((_, dayIdx) => (
+                            <td key={dayIdx} className="p-2 text-center">
+                              <Input
+                                type="number"
+                                min="0"
+                                max="99"
+                                value={taskConfig[task][dayIdx]}
+                                onChange={(e) => handleConfigChange(task, dayIdx, e.target.value)}
+                                className="w-16 text-center font-mono text-sm rounded-lg"
+                              />
+                            </td>
+                          ))}
+                        </tr>
                       ))}
-                      <td className="p-3 text-center">
-                        <div className="font-mono text-sm font-semibold tabular-nums">
-                          {getTotalForTask(task)}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="border-t-2 border-border bg-muted/50">
-                    <td className="p-3 font-condensed text-sm font-bold">
-                      Daily Total
-                    </td>
-                    {DAYS.map((_, dayIndex) => (
-                      <td key={dayIndex} className="p-3 text-center">
-                        <div className="font-mono text-sm font-bold tabular-nums">
-                          {getTotalForDay(dayIndex)}
-                        </div>
-                      </td>
-                    ))}
-                    <td className="p-3 text-center">
-                      <div className="font-mono text-sm font-bold tabular-nums text-primary">
-                        {TASKS.reduce((sum, task) => sum + getTotalForTask(task), 0)}
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                    </tbody>
+                  </table>
+                </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-condensed text-base">Highest Day</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="font-mono text-2xl font-bold tabular-nums">
-                {Math.max(...DAYS.map((_, i) => getTotalForDay(i)))}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                staff required
-              </p>
-            </CardContent>
-          </Card>
+                <div className="mt-6 flex gap-3">
+                  <Button 
+                    onClick={handleSaveConfig} 
+                    className="rounded-lg shadow-sm hover:shadow-md transition-smooth"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    <span className="font-mono text-xs">Save Configuration</span>
+                  </Button>
+                </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-condensed text-base">Lowest Day</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="font-mono text-2xl font-bold tabular-nums">
-                {Math.min(...DAYS.map((_, i) => getTotalForDay(i)))}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                staff required
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-condensed text-base">Weekly Total</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="font-mono text-2xl font-bold tabular-nums text-primary">
-                {TASKS.reduce((sum, task) => sum + getTotalForTask(task), 0)}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                total shifts per week
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {hasChanges && (
-          <div className="bg-warning/10 border border-warning rounded-md p-4">
-            <p className="text-sm font-mono text-warning-foreground">
-              You have unsaved changes. Click &quot;Save Changes&quot; to apply your configuration.
-            </p>
+                {saveSuccess && (
+                  <Alert className="mt-4 bg-green-50 border-green-200">
+                    <AlertCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="font-mono text-xs text-green-800">
+                      Configuration saved successfully!
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        )}
+
+          <div className="space-y-6">
+            <Card className="shadow-sm hover:shadow-md transition-smooth">
+              <CardHeader>
+                <CardTitle className="font-condensed text-lg flex items-center gap-2">
+                  <FileText className="h-4 w-4" />
+                  Templates
+                </CardTitle>
+                <CardDescription className="font-mono text-xs">
+                  Save and load configuration templates
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="font-mono text-xs">Save Current as Template</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={templateName}
+                      onChange={(e) => setTemplateName(e.target.value)}
+                      placeholder="Template name..."
+                      className="rounded-lg font-mono text-xs"
+                    />
+                    <Button
+                      onClick={handleSaveTemplate}
+                      disabled={!templateName.trim()}
+                      size="sm"
+                      className="rounded-lg"
+                    >
+                      <Save className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+
+                {templates.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs">Load Template</Label>
+                    <Select value={selectedTemplate} onValueChange={handleLoadTemplate}>
+                      <SelectTrigger className="rounded-lg font-mono text-xs">
+                        <SelectValue placeholder="Select template..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templates.map(template => (
+                          <SelectItem key={template.id} value={template.id} className="font-mono text-xs">
+                            {template.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {templates.length > 0 && (
+                  <div className="space-y-2">
+                    <Label className="font-mono text-xs">Saved Templates ({templates.length})</Label>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {templates.map(template => (
+                        <div
+                          key={template.id}
+                          className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/50 transition-smooth"
+                        >
+                          <div className="flex-1">
+                            <p className="font-mono text-xs font-semibold">{template.name}</p>
+                            <p className="font-mono text-[10px] text-muted-foreground mt-1">
+                              {new Date(template.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteTemplate(template.id)}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {templates.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                    <p className="text-xs font-mono">No templates saved yet</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </Layout>
   );

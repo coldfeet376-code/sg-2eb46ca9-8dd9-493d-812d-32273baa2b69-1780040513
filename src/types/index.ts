@@ -8,12 +8,18 @@ export interface AvailabilityEntry {
   notes?: string;
 }
 
+export interface StaffPreferences {
+  preferredTasks?: Task[]; // Tasks they prefer to do
+  avoidTasks?: Task[]; // Tasks they prefer to avoid
+}
+
 export interface StaffMember {
   id: string;
   name: string;
   trainedTasks: Task[];
   restDays?: number[]; // Day of week (0-6)
   availability?: AvailabilityEntry[]; // Date-specific availability
+  preferences?: StaffPreferences; // Task preferences
 }
 
 export interface Assignment {
