@@ -927,16 +927,20 @@ export default function StaffPage() {
                 <Alert className="bg-blue-50 border-blue-200">
                   <AlertCircle className="h-4 w-4 text-blue-600" />
                   <AlertDescription className="font-mono text-xs text-blue-800">
-                    Format: <span className="font-semibold">Name, Task1, Task2, Task3</span>
+                    Format: <span className="font-semibold">Name, Task1, Task2, ShiftTime (optional)</span>
                     <br />
-                    Example: John Smith, Frozen, Milk, Inbound
+                    Example: John Smith, Frozen, Milk, Inbound, 06:00
+                    <br />
+                    If no shift time is provided, defaults to 06:00
+                    <br />
+                    Valid shift times: 06:00, 08:30, 09:00, 09:30, 10:00, 11:00
                   </AlertDescription>
                 </Alert>
 
                 <Textarea
                   value={bulkInput}
                   onChange={(e) => setBulkInput(e.target.value)}
-                  placeholder="John Smith, Frozen, Milk&#10;Jane Doe, TWI, Outbound, Marshaling&#10;Mike Brown, Frozen, Inbound"
+                  placeholder="John Smith, Frozen, Milk, 06:00&#10;Jane Doe, TWI, Outbound, Marshaling, 08:30&#10;Mike Brown, Frozen, Inbound"
                   className="font-mono text-xs h-48 rounded-lg"
                 />
 
