@@ -550,94 +550,15 @@ export default function StaffPage() {
                             )}
                           </div>
                           <div className="flex items-center gap-2">
-                            <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-                              <DialogTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleEditStaff(member)}
-                                  className="rounded-lg"
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  <span className="font-mono text-xs">Edit</span>
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-md">
-                                <DialogHeader>
-                                  <DialogTitle className="font-condensed">Edit Staff Member</DialogTitle>
-                                  <DialogDescription className="font-mono text-xs">
-                                    Update name, skills, and shift time
-                                  </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4 mt-4">
-                                  <div className="space-y-2">
-                                    <Label htmlFor="edit-name" className="font-mono text-xs">
-                                      Name
-                                    </Label>
-                                    <Input
-                                      id="edit-name"
-                                      value={editName}
-                                      onChange={(e) => setEditName(e.target.value)}
-                                      className="rounded-lg"
-                                    />
-                                  </div>
-
-                                  <div className="space-y-2">
-                                    <Label className="font-mono text-xs">Trained Tasks</Label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                      {TASKS.map((task) => (
-                                        <div key={task} className="flex items-center space-x-2">
-                                          <Checkbox
-                                            id={`edit-${task}`}
-                                            checked={editTasks.includes(task)}
-                                            onCheckedChange={() => handleEditTaskToggle(task)}
-                                          />
-                                          <Label htmlFor={`edit-${task}`} className="font-mono text-xs cursor-pointer">
-                                            {task}
-                                          </Label>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  <div className="space-y-2">
-                                    <Label htmlFor="edit-shift" className="font-mono text-xs flex items-center gap-2">
-                                      <Clock className="h-3.5 w-3.5" />
-                                      Shift Start Time
-                                    </Label>
-                                    <Select value={editShift} onValueChange={(v) => setEditShift(v as ShiftStart)}>
-                                      <SelectTrigger id="edit-shift" className="rounded-lg font-mono text-xs">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {SHIFT_STARTS.map((shift) => (
-                                          <SelectItem key={shift} value={shift} className="font-mono text-xs">
-                                            {shift}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-
-                                  <div className="flex gap-2 pt-2">
-                                    <Button
-                                      onClick={handleSaveEdit}
-                                      className="flex-1 rounded-lg"
-                                      disabled={!editName.trim() || editTasks.length === 0}
-                                    >
-                                      <span className="font-mono text-xs">Save Changes</span>
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      onClick={() => setEditDialogOpen(false)}
-                                      className="rounded-lg"
-                                    >
-                                      <span className="font-mono text-xs">Cancel</span>
-                                    </Button>
-                                  </div>
-                                </div>
-                              </DialogContent>
-                            </Dialog>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditStaff(member)}
+                              className="rounded-lg"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              <span className="font-mono text-xs">Edit</span>
+                            </Button>
                             <Sheet>
                               <SheetTrigger asChild>
                                 <Button
@@ -1004,6 +925,85 @@ export default function StaffPage() {
                     })}
                   </div>
                 )}
+
+                {/* Single Edit Dialog - outside the map loop */}
+                <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="font-condensed">Edit Staff Member</DialogTitle>
+                      <DialogDescription className="font-mono text-xs">
+                        Update name, skills, and shift time
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-name" className="font-mono text-xs">
+                          Name
+                        </Label>
+                        <Input
+                          id="edit-name"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="rounded-lg"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="font-mono text-xs">Trained Tasks</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {TASKS.map((task) => (
+                            <div key={task} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`edit-${task}`}
+                                checked={editTasks.includes(task)}
+                                onCheckedChange={() => handleEditTaskToggle(task)}
+                              />
+                              <Label htmlFor={`edit-${task}`} className="font-mono text-xs cursor-pointer">
+                                {task}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-shift" className="font-mono text-xs flex items-center gap-2">
+                          <Clock className="h-3.5 w-3.5" />
+                          Shift Start Time
+                        </Label>
+                        <Select value={editShift} onValueChange={(v) => setEditShift(v as ShiftStart)}>
+                          <SelectTrigger id="edit-shift" className="rounded-lg font-mono text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {SHIFT_STARTS.map((shift) => (
+                              <SelectItem key={shift} value={shift} className="font-mono text-xs">
+                                {shift}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          onClick={handleSaveEdit}
+                          className="flex-1 rounded-lg"
+                          disabled={!editName.trim() || editTasks.length === 0}
+                        >
+                          <span className="font-mono text-xs">Save Changes</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => setEditDialogOpen(false)}
+                          className="rounded-lg"
+                        >
+                          <span className="font-mono text-xs">Cancel</span>
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
           </TabsContent>
