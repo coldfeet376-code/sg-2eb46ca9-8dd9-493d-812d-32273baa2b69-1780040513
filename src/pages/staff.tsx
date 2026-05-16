@@ -1254,7 +1254,7 @@ export default function StaffPage() {
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </div>
-                              </div>
+                              )}
                             </div>
                           )}
                         </div>
