@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { StaffMember, Assignment, Task } from "@/types";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { OnboardingTour } from "@/components/OnboardingTour";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
@@ -816,6 +817,7 @@ export default function Home() {
 
   return (
     <Layout>
+      <OnboardingTour />
       <SEO
         title="Warehouse Rota System"
         description="Fair distribution work rotation system for warehouse operations"
@@ -870,7 +872,7 @@ export default function Home() {
           </Alert>
         )}
 
-        <div className="flex items-center justify-between no-print">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="font-condensed text-3xl font-bold tracking-tight">
               {viewMode === "week" ? "Weekly Rota" : `Year ${selectedYear} Rota`}
@@ -1018,9 +1020,10 @@ export default function Home() {
                   size="sm" 
                   onClick={generateRota}
                   className="gap-2 ml-2 rounded-lg"
+                  data-tour="generate-button"
                 >
                   <RefreshCw className="h-4 w-4" />
-                  <span className="font-mono text-xs">Regenerate</span>
+                  <span className="font-mono text-xs">Generate Rota</span>
                 </Button>
                 {lockedAssignments.length > 0 && (
                   <Button 
@@ -1095,7 +1098,7 @@ export default function Home() {
 
         {viewMode === "week" ? (
           <>
-            <Card className="shadow-sm hover:shadow-md transition-smooth page-break-inside-avoid">
+            <Card className="shadow-sm hover:shadow-md transition-smooth page-break-inside-avoid" data-tour="rota-table">
               <CardHeader className="no-print">
                 <CardTitle className="font-condensed text-xl">Current Week Schedule</CardTitle>
                 <CardDescription className="font-mono text-xs">

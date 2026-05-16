@@ -1,15 +1,17 @@
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { LayoutGrid, BarChart3, LogOut, Menu, RefreshCw } from "lucide-react";
+import { LayoutGrid, BarChart3, LogOut, Menu, RefreshCw, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useTour } from "@/contexts/TourContext";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [userRole, setUserRole] = useState<"manager" | "supervisor" | "staff">("manager");
+  const { resetAllTours } = useTour();
 
   useEffect(() => {
     const role = localStorage.getItem("warehouse-user-role") || "manager";
@@ -19,6 +21,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const handleLogout = () => {
     localStorage.removeItem("warehouse-auth");
     router.push("/login");
+  };
+
+  const handleRestartTour = () => {
+    resetAllTours();
+    if (router.pathname === "/") {
+      // Restart tour immediately if on main page
+      if ((window as any).restartTour) {
+        (window as any).restartTour();
+      }
+    } else {
+      // Navigate to main page to start tour
+      router.push("/");
+      setTimeout(() => {
+        if ((window as any).restartTour) {
+          (window as any).restartTour();
+        }
+      }, 500);
+    }
   };
 
   const canAccessPage = (page: string) => {
@@ -142,8 +162,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleRestartTour}
+              className="rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+              title="Restart Tour"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </Button>
             <ThemeToggle />
-            <NotificationCenter />
+            <div data-tour="notifications">
+              <NotificationCenter />
+            </div>
             <Button
               variant="ghost"
               size="sm"
