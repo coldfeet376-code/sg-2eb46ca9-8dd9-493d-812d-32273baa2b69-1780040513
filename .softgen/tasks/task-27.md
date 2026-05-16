@@ -1,37 +1,19 @@
 ---
-title: Bundle Size Optimization
+title: Consecutive Task Prevention & Availability Visibility
 status: done
-priority: high
-type: performance
-tags: [bundle, optimization, performance]
+priority: urgent
+type: bug
+tags: [rota-generation, algorithm, availability, ui]
 created_by: agent
-created_at: 2026-05-16T05:36:00Z
+created_at: 2026-05-16T10:45:00Z
 position: 27
 ---
-
-## Notes
-Analyze and optimize bundle size for fast production loads. Implement code splitting, lazy loading, and tree-shaking strategies.
-
-## Checklist
-- [x] Add dynamic imports for heavy components (OnboardingTour, Shepherd.js)
-- [x] Configure webpack code splitting (vendor, ui, common chunks)
-- [x] Add bundle analyzer scripts (npm run analyze)
-- [x] Enable production optimizations (console removal, compression)
-- [x] Document optimization strategy in PERFORMANCE.md
-- [x] Verify tree-shaking works for lucide-react icons
-- [x] Remove unused dependencies
-
 ## Acceptance
-- Bundle analyzer configured and working
-- Dynamic imports reduce initial load
-- Pages load faster in production
-- No duplicate code in bundles
-- Tree-shaking working properly
-
-## Results
-- OnboardingTour: lazy loaded (saves ~50KB initial)
-- Shepherd.js: loaded only when tour starts
-- Icons: tree-shaken automatically by Next.js 15
-- Code splitting: vendor/ui/common chunks
-- Production build: console logs removed, compressed
-- Documentation: PERFORMANCE.md created
+- ✅ Staff never assigned to same task on consecutive days (algorithm checks previous day's task)
+- ✅ Availability statuses visible on all assignments (badges show Rest/Sick/Holiday)
+- ✅ Unavailable staff shown grayed out in each day/task cell
+- ✅ Legend clearly explains color coding (5 status types + locked)
+- ✅ Print/PDF output includes availability information
+- ✅ Algorithm correctly filters out rest/sick/holiday staff
+- ✅ Visual confirmation possible: see who's unavailable vs who's working
+---

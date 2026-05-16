@@ -735,6 +735,55 @@ export default function Home() {
     return lockedAssignments.length;
   };
 
+  const getStaffAvailability = (staffName: string, dateIndex: number): { type: string; color: string; label: string } | null => {
+    const staffMember = staff.find(s => s.name === staffName);
+    if (!staffMember) return null;
+
+    const date = weekDates[dateIndex];
+    const dateStr = date.toISOString().split("T")[0];
+    
+    const availability = staffMember.availability?.find(a => a.date === dateStr);
+    
+    if (!availability) return { type: 'available', color: 'bg-green-50 text-green-700 border-green-200', label: 'Available' };
+    
+    switch (availability.type) {
+      case 'rest':
+        return { type: 'rest', color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Rest Day' };
+      case 'sick':
+        return { type: 'sick', color: 'bg-red-50 text-red-700 border-red-200', label: 'Sick' };
+      case 'holiday':
+        return { type: 'holiday', color: 'bg-purple-50 text-purple-700 border-purple-200', label: 'Holiday' };
+      case 'available':
+        return { type: 'available', color: 'bg-green-50 text-green-700 border-green-200', label: 'Available' };
+      default:
+        return null;
+    }
+  };
+
+  const getAllUnavailableStaff = (task: string, dateIndex: number): { name: string; reason: string; color: string }[] => {
+    const date = weekDates[dateIndex];
+    const dateStr = date.toISOString().split("T")[0];
+    
+    return staff
+      .filter(s => {
+        // Must be trained for the task
+        if (!s.trainedTasks.includes(task as Task)) return false;
+        
+        // Must have unavailability
+        const availability = s.availability?.find(a => a.date === dateStr);
+        return availability && availability.type !== 'available';
+      })
+      .map(s => {
+        const availability = s.availability?.find(a => a.date === dateStr);
+        const status = getStaffAvailability(s.name, dateIndex);
+        return {
+          name: s.name,
+          reason: status?.label || 'Unavailable',
+          color: status?.color || 'bg-gray-50 text-gray-700 border-gray-200'
+        };
+      });
+  };
+
   const handlePrevWeek = () => {
     setWeekStart(navigateWeek(weekStart, "prev"));
   };
@@ -1134,10 +1183,36 @@ export default function Home() {
           <>
             <Card className="shadow-sm hover:shadow-md transition-smooth page-break-inside-avoid" data-tour="rota-table">
               <CardHeader className="no-print">
-                <CardTitle className="font-condensed text-xl">Current Week Schedule</CardTitle>
-                <CardDescription className="font-mono text-xs">
-                  Click assignments to lock/unlock them during regeneration
-                </CardDescription>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <CardTitle className="font-condensed text-xl">Current Week Schedule</CardTitle>
+                    <CardDescription className="font-mono text-xs">
+                      Click assignments to lock/unlock them during regeneration
+                    </CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-[10px] font-mono">
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span>Available</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      <span>Rest Day</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                      <span>Holiday</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      <span>Sick</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-warning" />
+                      <span>Locked</span>
+                    </div>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -1168,25 +1243,28 @@ export default function Home() {
                           </td>
                           {DAYS.map((_, dayIdx) => {
                             const dayAssignments = getAssignmentsForTaskAndDay(task, dayIdx);
+                            const unavailableStaff = getAllUnavailableStaff(task, dayIdx);
                             return (
                               <td 
                                 key={dayIdx} 
                                 className="p-3 text-center align-top"
                               >
-                                {dayAssignments.length > 0 ? (
-                                  <div className="space-y-1.5">
-                                    {dayAssignments.map((assignment, idx) => {
-                                      const locked = isAssignmentLocked(task, dayIdx, assignment.staffName);
-                                      return (
-                                        <button
-                                          key={idx}
-                                          onClick={() => toggleLockAssignment(task, dayIdx, assignment.staffName)}
-                                          className={`text-xs font-mono px-3 py-1.5 rounded-lg transition-smooth cursor-pointer group relative no-print ${
-                                            locked 
-                                              ? 'bg-warning/20 text-warning-foreground border-2 border-warning hover:bg-warning/30 locked-assignment' 
-                                              : 'bg-primary/10 text-primary hover:bg-primary/20 border-2 border-transparent hover:border-primary/30'
-                                          }`}
-                                        >
+                                <div className="space-y-1.5">
+                                  {/* Assigned staff */}
+                                  {dayAssignments.length > 0 && dayAssignments.map((assignment, idx) => {
+                                    const locked = isAssignmentLocked(task, dayIdx, assignment.staffName);
+                                    const availability = getStaffAvailability(assignment.staffName, dayIdx);
+                                    return (
+                                      <button
+                                        key={idx}
+                                        onClick={() => toggleLockAssignment(task, dayIdx, assignment.staffName)}
+                                        className={`text-xs font-mono px-3 py-1.5 rounded-lg transition-smooth cursor-pointer group relative no-print w-full ${
+                                          locked 
+                                            ? 'bg-warning/20 text-warning-foreground border-2 border-warning hover:bg-warning/30 locked-assignment' 
+                                            : 'bg-primary/10 text-primary hover:bg-primary/20 border-2 border-transparent hover:border-primary/30'
+                                        }`}
+                                      >
+                                        <div className="flex flex-col items-center gap-0.5">
                                           <span className="flex items-center gap-1.5">
                                             {locked ? (
                                               <Lock className="h-3 w-3 no-print" />
@@ -1195,29 +1273,56 @@ export default function Home() {
                                             )}
                                             {assignment.staffName}
                                           </span>
-                                        </button>
+                                          {availability && availability.type !== 'available' && (
+                                            <span className={`text-[9px] px-1.5 py-0.5 rounded border ${availability.color}`}>
+                                              {availability.label}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                  
+                                  {/* Unavailable staff (grayed out) */}
+                                  {unavailableStaff.map((unavailable, idx) => (
+                                    <div
+                                      key={`unavail-${idx}`}
+                                      className="text-xs font-mono px-3 py-1.5 rounded-lg opacity-40 no-print"
+                                      title={`${unavailable.name} - ${unavailable.reason}`}
+                                    >
+                                      <div className="flex flex-col items-center gap-0.5">
+                                        <span className="line-through text-muted-foreground">
+                                          {unavailable.name}
+                                        </span>
+                                        <span className={`text-[9px] px-1.5 py-0.5 rounded border ${unavailable.color}`}>
+                                          {unavailable.reason}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ))}
+                                  
+                                  {/* Empty state */}
+                                  {dayAssignments.length === 0 && unavailableStaff.length === 0 && (
+                                    <div className="text-xs font-mono text-muted-foreground">
+                                      —
+                                    </div>
+                                  )}
+                                  
+                                  {/* Print-only version */}
+                                  <div className="hidden print:block space-y-1">
+                                    {dayAssignments.map((assignment, idx) => {
+                                      const locked = isAssignmentLocked(task, dayIdx, assignment.staffName);
+                                      const availability = getStaffAvailability(assignment.staffName, dayIdx);
+                                      return (
+                                        <div key={idx} className={locked ? 'locked-assignment' : ''}>
+                                          {assignment.staffName}
+                                          {availability && availability.type !== 'available' && ` (${availability.label})`}
+                                          {locked ? ' 🔒' : ''}
+                                        </div>
                                       );
                                     })}
-                                    {/* Print-only version */}
-                                    <div className="hidden print:block space-y-1">
-                                      {dayAssignments.map((assignment, idx) => {
-                                        const locked = isAssignmentLocked(task, dayIdx, assignment.staffName);
-                                        return (
-                                          <div
-                                            key={idx}
-                                            className={locked ? 'locked-assignment' : ''}
-                                          >
-                                            {assignment.staffName}{locked ? ' 🔒' : ''}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
                                   </div>
-                                ) : (
-                                  <div className="text-xs font-mono text-muted-foreground">
-                                    —
-                                  </div>
-                                )}
+                                </div>
                               </td>
                             );
                           })}
