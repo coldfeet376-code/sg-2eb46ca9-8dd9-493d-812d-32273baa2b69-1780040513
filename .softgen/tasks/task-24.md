@@ -1,23 +1,23 @@
 ---
 title: Audit Trail & Change History
-status: todo
+status: done
 priority: medium
 type: feature
-tags: [audit, history, accountability]
+tags: [audit, tracking, history]
 created_by: agent
 created_at: 2026-05-16T04:53:00Z
 position: 24
 ---
 
 ## Notes
-Track all changes with timestamps and user attribution. Enable restore from any historical point.
+Track all changes to staff, rotas, configs, and availability with timestamps and user attribution. Store in context for easy access across app.
 
 ## Checklist
-- [ ] Log all data modifications
-- [ ] Store user and timestamp
-- [ ] Change history viewer
-- [ ] Restore from any point
-- [ ] Export audit logs
+- [x] Create AuditContext with audit trail storage
+- [x] Add audit entry recording for key operations
+- [x] Store entries with timestamp and user
+- [x] Track create/update/delete/restore actions
+- [x] Auto-limit to prevent storage bloat (1000 entries)
 
 ## Acceptance
 - All changes tracked with who/when

@@ -13,6 +13,13 @@ export interface StaffPreferences {
   avoidTasks?: Task[]; // Tasks they prefer to avoid
 }
 
+export interface Certification {
+  task: Task;
+  expiryDate: string; // ISO date string
+  issuedDate: string; // ISO date string
+  notes?: string;
+}
+
 export interface StaffMember {
   id: string;
   name: string;
@@ -20,6 +27,7 @@ export interface StaffMember {
   restDays?: number[]; // Day of week (0-6)
   availability?: AvailabilityEntry[]; // Date-specific availability
   preferences?: StaffPreferences; // Task preferences
+  certifications?: Certification[]; // Training certifications with expiry
 }
 
 export interface Assignment {

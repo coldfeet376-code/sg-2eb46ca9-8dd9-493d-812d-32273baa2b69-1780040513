@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import type { AppProps } from "next/app";
 import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { AuditProvider } from "@/contexts/AuditContext";
 
 function AuthWrapper({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -31,11 +32,13 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 export default function App({ Component, pageProps }: AppProps) {
   return (
     <ThemeProvider>
-      <NotificationProvider>
-        <AuthWrapper>
-          <Component {...pageProps} />
-        </AuthWrapper>
-      </NotificationProvider>
+      <AuditProvider>
+        <NotificationProvider>
+          <AuthWrapper>
+            <Component {...pageProps} />
+          </AuthWrapper>
+        </NotificationProvider>
+      </AuditProvider>
     </ThemeProvider>
   );
 }
