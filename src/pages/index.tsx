@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Download, RefreshCw, Lock, Unlock, History, RotateCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, RefreshCw, Lock, Unlock, History, RotateCcw, Printer } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -667,6 +667,10 @@ export default function Home() {
     );
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <Layout>
       <SEO
@@ -675,7 +679,7 @@ export default function Home() {
       />
       
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between no-print">
           <div>
             <h1 className="font-condensed text-3xl font-bold tracking-tight">
               {viewMode === "week" ? "Weekly Rota" : `Year ${selectedYear} Rota`}
@@ -842,6 +846,17 @@ export default function Home() {
             )}
             
             <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-smooth"
+              onClick={handlePrint}
+              disabled={staff.length === 0 || !taskConfig}
+            >
+              <Printer className="h-4 w-4" />
+              <span className="font-mono text-xs">Print</span>
+            </Button>
+            
+            <Button 
               variant="default" 
               size="sm" 
               className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-smooth"
@@ -854,10 +869,41 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Print-only header */}
+        <div className="hidden print:block mb-4">
+          <h1 className="font-condensed text-2xl font-bold">
+            WAREHOUSE ROTA
+          </h1>
+          <p className="font-mono text-sm mt-1">
+            {viewMode === "week" ? (
+              `Week: ${weekDates[0].toLocaleDateString("en-GB", { 
+                day: "2-digit", 
+                month: "short", 
+                year: "numeric" 
+              })} - ${weekDates[6].toLocaleDateString("en-GB", { 
+                day: "2-digit", 
+                month: "short", 
+                year: "numeric" 
+              })}`
+            ) : (
+              `Year ${selectedYear} - ${getYearWeeks(selectedYear).length} weeks`
+            )}
+          </p>
+          <p className="font-mono text-xs text-gray-600 mt-1">
+            Printed: {new Date().toLocaleString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+
         {viewMode === "week" ? (
           <>
-            <Card className="shadow-sm hover:shadow-md transition-smooth">
-              <CardHeader>
+            <Card className="shadow-sm hover:shadow-md transition-smooth page-break-inside-avoid">
+              <CardHeader className="no-print">
                 <CardTitle className="font-condensed text-xl">Current Week Schedule</CardTitle>
                 <CardDescription className="font-mono text-xs">
                   Click assignments to lock/unlock them during regeneration
@@ -905,23 +951,37 @@ export default function Home() {
                                         <button
                                           key={idx}
                                           onClick={() => toggleLockAssignment(task, dayIdx, assignment.staffName)}
-                                          className={`text-xs font-mono px-3 py-1.5 rounded-lg transition-smooth cursor-pointer group relative ${
+                                          className={`text-xs font-mono px-3 py-1.5 rounded-lg transition-smooth cursor-pointer group relative no-print ${
                                             locked 
-                                              ? 'bg-warning/20 text-warning-foreground border-2 border-warning hover:bg-warning/30' 
+                                              ? 'bg-warning/20 text-warning-foreground border-2 border-warning hover:bg-warning/30 locked-assignment' 
                                               : 'bg-primary/10 text-primary hover:bg-primary/20 border-2 border-transparent hover:border-primary/30'
                                           }`}
                                         >
                                           <span className="flex items-center gap-1.5">
                                             {locked ? (
-                                              <Lock className="h-3 w-3" />
+                                              <Lock className="h-3 w-3 no-print" />
                                             ) : (
-                                              <Unlock className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity" />
+                                              <Unlock className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity no-print" />
                                             )}
                                             {assignment.staffName}
                                           </span>
                                         </button>
                                       );
                                     })}
+                                    {/* Print-only version */}
+                                    <div className="hidden print:block space-y-1">
+                                      {dayAssignments.map((assignment, idx) => {
+                                        const locked = isAssignmentLocked(task, dayIdx, assignment.staffName);
+                                        return (
+                                          <div
+                                            key={idx}
+                                            className={locked ? 'locked-assignment' : ''}
+                                          >
+                                            {assignment.staffName}{locked ? ' 🔒' : ''}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
                                 ) : (
                                   <div className="text-xs font-mono text-muted-foreground">
@@ -939,7 +999,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-4 no-print">
               <Card className="shadow-sm card-hover">
                 <CardHeader>
                   <CardTitle className="font-condensed text-base">Total Staff</CardTitle>
@@ -1003,7 +1063,7 @@ export default function Home() {
         )}
 
         {staff.length === 0 && (
-          <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm">
+          <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm no-print">
             <p className="text-sm font-mono text-warning-foreground">
               No staff members configured. Visit the <Link href="/staff" className="underline font-semibold hover:text-warning transition-smooth">Staff page</Link> to add employees.
             </p>
