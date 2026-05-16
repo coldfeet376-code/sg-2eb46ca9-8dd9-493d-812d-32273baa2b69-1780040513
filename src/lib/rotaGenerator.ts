@@ -17,6 +17,29 @@ interface RotaGenerationParams {
   lockedAssignments?: LockedAssignment[];
 }
 
+// Check if staff member is available on a specific date
+function isStaffAvailable(staffMember: StaffMember, date: Date): boolean {
+  const dateStr = date.toISOString().split("T")[0];
+  
+  // Check date-specific availability
+  if (staffMember.availability) {
+    const entry = staffMember.availability.find((a) => a.date === dateStr);
+    if (entry) {
+      // Only "available" type means they're available; rest/holiday/sick means unavailable
+      return entry.type === "available";
+    }
+  }
+  
+  // Check regular rest days (day of week)
+  const dayOfWeek = date.getDay();
+  if (staffMember.restDays?.some(d => Number(d) === dayOfWeek)) {
+    return false;
+  }
+  
+  // Default: available
+  return true;
+}
+
 // Check if staff member has consecutive same task
 function hasConsecutiveTask(
   staffName: string,
@@ -99,7 +122,7 @@ export function generateWeeklyRota({
 
       if (remainingNeeded <= 0) return; // Already filled by locked assignments
 
-      // Filter staff: trained on this task AND not already assigned this day AND not locked
+      // Filter staff: trained on this task AND not already assigned this day AND available on this date
       const availableStaff = staff.filter((s) => {
         // Must be trained
         if (!s.trainedTasks.includes(task as Task)) return false;
@@ -110,9 +133,8 @@ export function generateWeeklyRota({
         )
           return false;
 
-        // Check availability (rest days)
-        const dayOfWeek = currentDate.getDay();
-        if (s.restDays?.some(d => Number(d) === dayOfWeek)) return false;
+        // Check date-specific availability
+        if (!isStaffAvailable(s, currentDate)) return false;
 
         return true;
       });

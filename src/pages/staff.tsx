@@ -7,260 +7,567 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Upload, Calendar } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Users, Upload, Plus, Trash2, Calendar as CalendarIcon, FileSpreadsheet, AlertCircle } from "lucide-react";
 import { SEO } from "@/components/SEO";
-import type { StaffMember, Task } from "@/types";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import type { StaffMember, Task, AvailabilityEntry, AvailabilityType } from "@/types";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 
 export default function StaffPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showBulkDialog, setShowBulkDialog] = useState(false);
-  const [newStaffName, setNewStaffName] = useState("");
-  const [newStaffTasks, setNewStaffTasks] = useState<Task[]>([]);
+  const [name, setName] = useState("");
+  const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
   const [bulkInput, setBulkInput] = useState("");
+  const [bulkSuccess, setBulkSuccess] = useState(false);
+  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
+  const [availabilityType, setAvailabilityType] = useState<AvailabilityType>("rest");
+  const [availabilityNotes, setAvailabilityNotes] = useState("");
+  const [excelImport, setExcelImport] = useState("");
 
   useEffect(() => {
-    const saved = localStorage.getItem("warehouse-staff");
-    if (saved) {
-      setStaff(JSON.parse(saved));
+    const savedStaff = localStorage.getItem("warehouse-staff");
+    if (savedStaff) {
+      setStaff(JSON.parse(savedStaff));
     }
   }, []);
 
   useEffect(() => {
-    if (staff.length > 0) {
-      localStorage.setItem("warehouse-staff", JSON.stringify(staff));
-    }
+    localStorage.setItem("warehouse-staff", JSON.stringify(staff));
   }, [staff]);
 
   const handleAddStaff = () => {
-    if (!newStaffName.trim() || newStaffTasks.length === 0) return;
+    if (!name.trim() || selectedTasks.length === 0) return;
 
     const newStaff: StaffMember = {
       id: Date.now().toString(),
-      name: newStaffName.trim(),
-      trainedTasks: newStaffTasks,
-      restDays: [],
-      absences: [],
-      holidays: [],
+      name: name.trim(),
+      trainedTasks: selectedTasks,
+      availability: [],
     };
 
     setStaff([...staff, newStaff]);
-    setNewStaffName("");
-    setNewStaffTasks([]);
-    setShowAddDialog(false);
+    setName("");
+    setSelectedTasks([]);
+  };
+
+  const handleDeleteStaff = (id: string) => {
+    setStaff(staff.filter((s) => s.id !== id));
+  };
+
+  const handleTaskToggle = (task: Task) => {
+    if (selectedTasks.includes(task)) {
+      setSelectedTasks(selectedTasks.filter((t) => t !== task));
+    } else {
+      setSelectedTasks([...selectedTasks, task]);
+    }
   };
 
   const handleBulkImport = () => {
-    const lines = bulkInput.split("\n").filter(line => line.trim());
-    const newStaffMembers: StaffMember[] = [];
+    const lines = bulkInput.trim().split("\n");
+    const newStaff: StaffMember[] = [];
 
-    lines.forEach(line => {
-      const parts = line.split(",").map(p => p.trim());
+    lines.forEach((line) => {
+      const parts = line.split(",").map((p) => p.trim());
       if (parts.length < 2) return;
 
-      const name = parts[0];
-      const tasks = parts.slice(1).filter(t => 
-        TASKS.includes(t as Task)
-      ) as Task[];
+      const staffName = parts[0];
+      const tasks = parts
+        .slice(1)
+        .filter((t) => TASKS.includes(t as Task)) as Task[];
 
-      if (name && tasks.length > 0) {
-        newStaffMembers.push({
+      if (staffName && tasks.length > 0) {
+        newStaff.push({
           id: Date.now().toString() + Math.random(),
-          name,
+          name: staffName,
           trainedTasks: tasks,
-          restDays: [],
-          absences: [],
-          holidays: [],
+          availability: [],
         });
       }
     });
 
-    setStaff([...staff, ...newStaffMembers]);
-    setBulkInput("");
-    setShowBulkDialog(false);
+    if (newStaff.length > 0) {
+      setStaff([...staff, ...newStaff]);
+      setBulkInput("");
+      setBulkSuccess(true);
+      setTimeout(() => setBulkSuccess(false), 3000);
+    }
   };
 
-  const handleDeleteStaff = (id: string) => {
-    setStaff(staff.filter(s => s.id !== id));
+  const handleAvailabilityImport = () => {
+    if (!selectedStaff || !excelImport.trim()) return;
+
+    const lines = excelImport.trim().split("\n");
+    const newAvailability: AvailabilityEntry[] = [];
+
+    // Expected format: Date,Type,Notes (e.g., "2026-01-15,holiday,Christmas leave")
+    lines.forEach((line) => {
+      const parts = line.split(",").map((p) => p.trim());
+      if (parts.length < 2) return;
+
+      const dateStr = parts[0];
+      const type = parts[1].toLowerCase();
+      const notes = parts[2] || "";
+
+      // Validate date format
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return;
+
+      // Validate type
+      if (!["rest", "holiday", "sick", "available"].includes(type)) return;
+
+      newAvailability.push({
+        date: date.toISOString().split("T")[0],
+        type: type as AvailabilityType,
+        notes,
+      });
+    });
+
+    if (newAvailability.length > 0) {
+      const updatedStaff = staff.map((s) => {
+        if (s.id === selectedStaff.id) {
+          // Merge with existing availability, removing duplicates
+          const existingDates = new Set(s.availability?.map((a) => a.date) || []);
+          const filtered = newAvailability.filter((a) => !existingDates.has(a.date));
+          return {
+            ...s,
+            availability: [...(s.availability || []), ...filtered],
+          };
+        }
+        return s;
+      });
+      setStaff(updatedStaff);
+      setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
+      setExcelImport("");
+    }
   };
 
-  const toggleTask = (task: Task) => {
-    setNewStaffTasks(prev =>
-      prev.includes(task)
-        ? prev.filter(t => t !== task)
-        : [...prev, task]
-    );
+  const handleAddAvailability = () => {
+    if (!selectedStaff || selectedDates.length === 0) return;
+
+    const newEntries: AvailabilityEntry[] = selectedDates.map((date) => ({
+      date: date.toISOString().split("T")[0],
+      type: availabilityType,
+      notes: availabilityNotes,
+    }));
+
+    const updatedStaff = staff.map((s) => {
+      if (s.id === selectedStaff.id) {
+        // Remove existing entries for these dates, then add new
+        const existingDates = new Set(newEntries.map((e) => e.date));
+        const filtered = (s.availability || []).filter((a) => !existingDates.has(a.date));
+        return {
+          ...s,
+          availability: [...filtered, ...newEntries].sort((a, b) => a.date.localeCompare(b.date)),
+        };
+      }
+      return s;
+    });
+
+    setStaff(updatedStaff);
+    setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
+    setSelectedDates([]);
+    setAvailabilityNotes("");
+  };
+
+  const handleDeleteAvailability = (staffId: string, date: string) => {
+    const updatedStaff = staff.map((s) => {
+      if (s.id === staffId) {
+        return {
+          ...s,
+          availability: (s.availability || []).filter((a) => a.date !== date),
+        };
+      }
+      return s;
+    });
+    setStaff(updatedStaff);
+    setSelectedStaff(updatedStaff.find((s) => s.id === staffId) || null);
+  };
+
+  const getAvailabilityColor = (type: AvailabilityType) => {
+    switch (type) {
+      case "rest":
+        return "bg-blue-100 text-blue-800 border-blue-300";
+      case "holiday":
+        return "bg-purple-100 text-purple-800 border-purple-300";
+      case "sick":
+        return "bg-red-100 text-red-800 border-red-300";
+      default:
+        return "bg-green-100 text-green-800 border-green-300";
+    }
+  };
+
+  const getAvailabilityStats = (staffMember: StaffMember) => {
+    const availability = staffMember.availability || [];
+    return {
+      rest: availability.filter((a) => a.type === "rest").length,
+      holiday: availability.filter((a) => a.type === "holiday").length,
+      sick: availability.filter((a) => a.type === "sick").length,
+    };
   };
 
   return (
     <Layout>
-      <SEO
-        title="Staff Management - Warehouse Rota"
-        description="Manage staff members and their training assignments"
-      />
+      <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
 
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-condensed text-3xl font-bold tracking-tight">
-              Staff Management
-            </h1>
-            <p className="text-sm text-muted-foreground font-mono mt-1">
-              {staff.length} staff members configured
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Dialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Upload className="h-4 w-4" />
-                  <span className="font-mono text-xs">Bulk Import</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="font-condensed">Bulk Import Staff</DialogTitle>
-                  <DialogDescription className="font-mono text-xs">
-                    Format: Name, Task1, Task2, Task3 (one per line)
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="bulk-input" className="font-mono text-xs">
-                      Paste staff data
-                    </Label>
-                    <Textarea
-                      id="bulk-input"
-                      placeholder="John Smith, Frozen, Inbound, Outbound&#10;Jane Doe, Milk, TWI, Marshaling"
-                      value={bulkInput}
-                      onChange={(e) => setBulkInput(e.target.value)}
-                      rows={8}
-                      className="font-mono text-xs"
-                    />
-                  </div>
-                  <div className="text-xs text-muted-foreground font-mono">
-                    Valid tasks: {TASKS.join(", ")}
-                  </div>
-                  <Button onClick={handleBulkImport} className="w-full">
-                    Import {bulkInput.split("\n").filter(l => l.trim()).length} entries
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  <span className="font-mono text-xs">Add Staff</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle className="font-condensed">Add New Staff Member</DialogTitle>
-                  <DialogDescription className="font-mono text-xs">
-                    Enter staff details and training assignments
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="staff-name" className="font-mono text-xs">
-                      Name
-                    </Label>
-                    <Input
-                      id="staff-name"
-                      placeholder="John Smith"
-                      value={newStaffName}
-                      onChange={(e) => setNewStaffName(e.target.value)}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="font-mono text-xs">Trained Tasks</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {TASKS.map(task => (
-                        <div key={task} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`task-${task}`}
-                            checked={newStaffTasks.includes(task)}
-                            onCheckedChange={() => toggleTask(task)}
-                          />
-                          <label
-                            htmlFor={`task-${task}`}
-                            className="text-sm font-mono cursor-pointer"
-                          >
-                            {task}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <Button onClick={handleAddStaff} className="w-full" disabled={!newStaffName.trim() || newStaffTasks.length === 0}>
-                    Add Staff Member
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
+        <div>
+          <h1 className="font-condensed text-3xl font-bold tracking-tight">Staff Management</h1>
+          <p className="text-sm text-muted-foreground font-mono mt-1">
+            Manage employees, training, and availability
+          </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-condensed text-xl">Staff List</CardTitle>
-            <CardDescription className="font-mono text-xs">
-              All warehouse staff and their training certifications
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {staff.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground font-mono text-sm">
-                No staff members added yet. Click &quot;Add Staff&quot; or &quot;Bulk Import&quot; to get started.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {staff.map(member => (
-                  <div
-                    key={member.id}
-                    className="flex items-center justify-between p-4 border border-border rounded hover:bg-muted/30"
-                  >
-                    <div className="space-y-2">
-                      <div className="font-condensed font-semibold">{member.name}</div>
-                      <div className="flex flex-wrap gap-1">
-                        {member.trainedTasks.map(task => (
-                          <Badge key={task} variant="secondary" className="font-mono text-xs">
-                            {task}
-                          </Badge>
-                        ))}
+        <Tabs defaultValue="staff" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2 max-w-md rounded-lg">
+            <TabsTrigger value="staff" className="font-mono text-xs">
+              <Users className="h-4 w-4 mr-2" />
+              Staff List
+            </TabsTrigger>
+            <TabsTrigger value="bulk" className="font-mono text-xs">
+              <Upload className="h-4 w-4 mr-2" />
+              Bulk Import
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="staff" className="space-y-6">
+            <Card className="shadow-sm hover:shadow-md transition-smooth">
+              <CardHeader>
+                <CardTitle className="font-condensed text-xl">Add Staff Member</CardTitle>
+                <CardDescription className="font-mono text-xs">
+                  Enter staff details and select their trained tasks
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="font-mono text-xs">
+                    Name
+                  </Label>
+                  <Input
+                    id="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="John Smith"
+                    className="rounded-lg"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="font-mono text-xs">Trained Tasks</Label>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {TASKS.map((task) => (
+                      <div key={task} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={task}
+                          checked={selectedTasks.includes(task)}
+                          onCheckedChange={() => handleTaskToggle(task)}
+                        />
+                        <Label htmlFor={task} className="font-mono text-xs cursor-pointer">
+                          {task}
+                        </Label>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button variant="ghost" size="sm" className="gap-2">
-                        <Calendar className="h-4 w-4" />
-                        <span className="font-mono text-xs">Availability</span>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteStaff(member.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+
+                <Button onClick={handleAddStaff} className="rounded-lg shadow-sm hover:shadow-md transition-smooth">
+                  <Plus className="h-4 w-4 mr-2" />
+                  <span className="font-mono text-xs">Add Staff</span>
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm hover:shadow-md transition-smooth">
+              <CardHeader>
+                <CardTitle className="font-condensed text-xl">Staff List ({staff.length})</CardTitle>
+                <CardDescription className="font-mono text-xs">
+                  View and manage all warehouse staff
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {staff.length === 0 ? (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                    <p className="text-sm font-mono">No staff members yet</p>
+                    <p className="text-xs font-mono mt-1">Add staff above to get started</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {staff.map((member) => {
+                      const stats = getAvailabilityStats(member);
+                      return (
+                        <div
+                          key={member.id}
+                          className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted/50 transition-smooth"
+                        >
+                          <div className="flex-1">
+                            <h3 className="font-condensed font-semibold text-sm">{member.name}</h3>
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {member.trainedTasks.map((task) => (
+                                <Badge key={task} variant="outline" className="font-mono text-[10px]">
+                                  {task}
+                                </Badge>
+                              ))}
+                            </div>
+                            {(stats.rest > 0 || stats.holiday > 0 || stats.sick > 0) && (
+                              <div className="flex gap-2 mt-2 text-xs font-mono">
+                                {stats.rest > 0 && (
+                                  <span className="text-blue-600">Rest: {stats.rest}</span>
+                                )}
+                                {stats.holiday > 0 && (
+                                  <span className="text-purple-600">Holiday: {stats.holiday}</span>
+                                )}
+                                {stats.sick > 0 && (
+                                  <span className="text-red-600">Sick: {stats.sick}</span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Sheet>
+                              <SheetTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedStaff(member)}
+                                  className="rounded-lg"
+                                >
+                                  <CalendarIcon className="h-4 w-4 mr-2" />
+                                  <span className="font-mono text-xs">Availability</span>
+                                </Button>
+                              </SheetTrigger>
+                              <SheetContent className="w-full sm:max-w-2xl">
+                                <SheetHeader>
+                                  <SheetTitle className="font-condensed">
+                                    {member.name} - Availability
+                                  </SheetTitle>
+                                  <SheetDescription className="font-mono text-xs">
+                                    Manage rest days, holidays, and sickness
+                                  </SheetDescription>
+                                </SheetHeader>
+
+                                <div className="mt-6 space-y-6">
+                                  <Card className="shadow-sm">
+                                    <CardHeader className="pb-3">
+                                      <CardTitle className="font-condensed text-sm flex items-center gap-2">
+                                        <FileSpreadsheet className="h-4 w-4" />
+                                        Excel Import
+                                      </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                      <div className="text-xs font-mono text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                                        <p className="font-semibold mb-2">Format:</p>
+                                        <p>Date,Type,Notes</p>
+                                        <p className="mt-1">2026-01-15,holiday,Christmas</p>
+                                        <p>2026-02-20,rest,Regular rest</p>
+                                        <p>2026-03-10,sick,Flu</p>
+                                      </div>
+                                      <Textarea
+                                        value={excelImport}
+                                        onChange={(e) => setExcelImport(e.target.value)}
+                                        placeholder="Paste Excel data here..."
+                                        className="font-mono text-xs h-32 rounded-lg"
+                                      />
+                                      <Button
+                                        onClick={handleAvailabilityImport}
+                                        className="w-full rounded-lg"
+                                        disabled={!excelImport.trim()}
+                                      >
+                                        <Upload className="h-4 w-4 mr-2" />
+                                        <span className="font-mono text-xs">Import Data</span>
+                                      </Button>
+                                    </CardContent>
+                                  </Card>
+
+                                  <Card className="shadow-sm">
+                                    <CardHeader className="pb-3">
+                                      <CardTitle className="font-condensed text-sm">
+                                        Manual Entry
+                                      </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                      <div className="space-y-2">
+                                        <Label className="font-mono text-xs">Type</Label>
+                                        <Select
+                                          value={availabilityType}
+                                          onValueChange={(v) => setAvailabilityType(v as AvailabilityType)}
+                                        >
+                                          <SelectTrigger className="rounded-lg font-mono text-xs">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="rest" className="font-mono text-xs">
+                                              Rest Day
+                                            </SelectItem>
+                                            <SelectItem value="holiday" className="font-mono text-xs">
+                                              Holiday
+                                            </SelectItem>
+                                            <SelectItem value="sick" className="font-mono text-xs">
+                                              Sick Leave
+                                            </SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+
+                                      <div className="space-y-2">
+                                        <Label className="font-mono text-xs">Select Dates</Label>
+                                        <Calendar
+                                          mode="multiple"
+                                          selected={selectedDates}
+                                          onSelect={(dates) => setSelectedDates(dates || [])}
+                                          className="rounded-lg border"
+                                        />
+                                      </div>
+
+                                      <div className="space-y-2">
+                                        <Label className="font-mono text-xs">Notes (optional)</Label>
+                                        <Input
+                                          value={availabilityNotes}
+                                          onChange={(e) => setAvailabilityNotes(e.target.value)}
+                                          placeholder="Reason or notes..."
+                                          className="rounded-lg font-mono text-xs"
+                                        />
+                                      </div>
+
+                                      <Button
+                                        onClick={handleAddAvailability}
+                                        className="w-full rounded-lg"
+                                        disabled={selectedDates.length === 0}
+                                      >
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        <span className="font-mono text-xs">
+                                          Add {selectedDates.length} {selectedDates.length === 1 ? "Day" : "Days"}
+                                        </span>
+                                      </Button>
+                                    </CardContent>
+                                  </Card>
+
+                                  <Card className="shadow-sm">
+                                    <CardHeader className="pb-3">
+                                      <CardTitle className="font-condensed text-sm">
+                                        Current Availability ({(member.availability || []).length} entries)
+                                      </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                      <ScrollArea className="h-64">
+                                        <div className="space-y-2">
+                                          {(member.availability || []).length === 0 ? (
+                                            <p className="text-xs font-mono text-muted-foreground text-center py-8">
+                                              No availability entries yet
+                                            </p>
+                                          ) : (
+                                            (member.availability || [])
+                                              .sort((a, b) => b.date.localeCompare(a.date))
+                                              .map((entry, idx) => (
+                                                <div
+                                                  key={idx}
+                                                  className={`flex items-center justify-between p-3 border rounded-lg ${getAvailabilityColor(
+                                                    entry.type
+                                                  )}`}
+                                                >
+                                                  <div className="flex-1">
+                                                    <p className="font-mono text-xs font-semibold">
+                                                      {new Date(entry.date).toLocaleDateString("en-GB", {
+                                                        weekday: "short",
+                                                        day: "2-digit",
+                                                        month: "short",
+                                                        year: "numeric",
+                                                      })}
+                                                    </p>
+                                                    <p className="font-mono text-[10px] capitalize mt-1">
+                                                      {entry.type}
+                                                      {entry.notes && ` - ${entry.notes}`}
+                                                    </p>
+                                                  </div>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => handleDeleteAvailability(member.id, entry.date)}
+                                                    className="h-8 w-8 p-0"
+                                                  >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                  </Button>
+                                                </div>
+                                              ))
+                                          )}
+                                        </div>
+                                      </ScrollArea>
+                                    </CardContent>
+                                  </Card>
+                                </div>
+                              </SheetContent>
+                            </Sheet>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteStaff(member.id)}
+                              className="text-destructive hover:text-destructive rounded-lg"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="bulk" className="space-y-6">
+            <Card className="shadow-sm hover:shadow-md transition-smooth">
+              <CardHeader>
+                <CardTitle className="font-condensed text-xl">Bulk Import</CardTitle>
+                <CardDescription className="font-mono text-xs">
+                  Paste CSV-style data to import multiple staff members at once
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Alert className="bg-blue-50 border-blue-200">
+                  <AlertCircle className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="font-mono text-xs text-blue-800">
+                    Format: <span className="font-semibold">Name, Task1, Task2, Task3</span>
+                    <br />
+                    Example: John Smith, Frozen, Milk, Inbound
+                  </AlertDescription>
+                </Alert>
+
+                <Textarea
+                  value={bulkInput}
+                  onChange={(e) => setBulkInput(e.target.value)}
+                  placeholder="John Smith, Frozen, Milk&#10;Jane Doe, TWI, Outbound, Marshaling&#10;Mike Brown, Frozen, Inbound"
+                  className="font-mono text-xs h-48 rounded-lg"
+                />
+
+                <Button
+                  onClick={handleBulkImport}
+                  disabled={!bulkInput.trim()}
+                  className="w-full rounded-lg shadow-sm hover:shadow-md transition-smooth"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  <span className="font-mono text-xs">Import Staff</span>
+                </Button>
+
+                {bulkSuccess && (
+                  <Alert className="bg-green-50 border-green-200">
+                    <AlertCircle className="h-4 w-4 text-green-600" />
+                    <AlertDescription className="font-mono text-xs text-green-800">
+                      Staff members imported successfully!
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );

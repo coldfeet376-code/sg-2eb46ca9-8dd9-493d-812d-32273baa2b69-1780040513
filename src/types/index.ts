@@ -1,19 +1,19 @@
 export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Outbound" | "Marshaling";
 
+export type AvailabilityType = "available" | "rest" | "holiday" | "sick";
+
+export interface AvailabilityEntry {
+  date: string; // ISO date string
+  type: AvailabilityType;
+  notes?: string;
+}
+
 export interface StaffMember {
   id: string;
   name: string;
   trainedTasks: Task[];
-  restDays: string[]; // ISO date strings
-  absences: { start: string; end: string }[];
-  holidays: { start: string; end: string }[];
-}
-
-export interface TaskRequirement {
-  task: Task;
-  requirements: {
-    [day: string]: number; // day: 0-6 (Sun-Sat), value: number of staff needed
-  };
+  restDays?: number[]; // Day of week (0-6)
+  availability?: AvailabilityEntry[]; // Date-specific availability
 }
 
 export interface Assignment {
