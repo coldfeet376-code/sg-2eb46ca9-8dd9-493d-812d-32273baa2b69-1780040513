@@ -3,9 +3,12 @@ import Link from "next/link";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Download, RefreshCw, Lock, Unlock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, RefreshCw, Lock, Unlock, History, RotateCcw } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import type { StaffMember, Assignment } from "@/types";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -19,6 +22,14 @@ interface LockedAssignment {
   staffName: string;
 }
 
+interface RotaSnapshot {
+  id: string;
+  timestamp: number;
+  weekStart: string;
+  assignments: Assignment[];
+  lockedAssignments: LockedAssignment[];
+}
+
 export default function Home() {
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -28,6 +39,8 @@ export default function Home() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [yearRotas, setYearRotas] = useState<Map<string, Assignment[]>>(new Map());
   const [lockedAssignments, setLockedAssignments] = useState<LockedAssignment[]>([]);
+  const [history, setHistory] = useState<RotaSnapshot[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const { addNotification } = useNotifications();
 
   useEffect(() => {
@@ -35,6 +48,7 @@ export default function Home() {
     const savedStaff = localStorage.getItem("warehouse-staff");
     const savedConfig = localStorage.getItem("warehouse-task-config");
     const savedLocked = localStorage.getItem("warehouse-locked-assignments");
+    const savedHistory = localStorage.getItem("warehouse-rota-history");
     
     if (savedStaff) {
       setStaff(JSON.parse(savedStaff));
@@ -45,12 +59,20 @@ export default function Home() {
     if (savedLocked) {
       setLockedAssignments(JSON.parse(savedLocked));
     }
+    if (savedHistory) {
+      setHistory(JSON.parse(savedHistory));
+    }
   }, []);
 
   useEffect(() => {
     // Save locked assignments
     localStorage.setItem("warehouse-locked-assignments", JSON.stringify(lockedAssignments));
   }, [lockedAssignments]);
+
+  useEffect(() => {
+    // Save history
+    localStorage.setItem("warehouse-rota-history", JSON.stringify(history));
+  }, [history]);
 
   useEffect(() => {
     // Generate rota when data is available
@@ -63,6 +85,20 @@ export default function Home() {
     }
   }, [staff, taskConfig, weekStart, viewMode, selectedYear]);
 
+  const saveSnapshot = (newAssignments: Assignment[]) => {
+    const snapshot: RotaSnapshot = {
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+      weekStart: weekStart.toISOString(),
+      assignments: newAssignments,
+      lockedAssignments: [...lockedAssignments],
+    };
+
+    // Keep only last 50 snapshots to prevent storage bloat
+    const updatedHistory = [snapshot, ...history].slice(0, 50);
+    setHistory(updatedHistory);
+  };
+
   const generateRota = () => {
     if (!staff.length || !taskConfig) return;
 
@@ -73,6 +109,7 @@ export default function Home() {
       lockedAssignments,
     });
     setAssignments(newAssignments);
+    saveSnapshot(newAssignments);
 
     // Generate notifications for each staff member
     const staffAssignments = new Map<string, Assignment[]>();
@@ -92,6 +129,57 @@ export default function Home() {
         weekStart: weekStart.toISOString(),
       });
     });
+  };
+
+  const restoreSnapshot = (snapshot: RotaSnapshot) => {
+    setAssignments(snapshot.assignments);
+    setLockedAssignments(snapshot.lockedAssignments);
+    setWeekStart(new Date(snapshot.weekStart));
+    setHistoryOpen(false);
+    
+    addNotification({
+      staffName: "System",
+      message: `Restored rota from ${new Date(snapshot.timestamp).toLocaleString()}`,
+      type: "info",
+    });
+  };
+
+  const formatTimestamp = (timestamp: number): string => {
+    const date = new Date(timestamp);
+    const now = Date.now();
+    const diff = now - timestamp;
+    
+    // Less than 1 hour
+    if (diff < 3600000) {
+      const minutes = Math.floor(diff / 60000);
+      return `${minutes}m ago`;
+    }
+    
+    // Less than 24 hours
+    if (diff < 86400000) {
+      const hours = Math.floor(diff / 3600000);
+      return `${hours}h ago`;
+    }
+    
+    // Less than 7 days
+    if (diff < 604800000) {
+      const days = Math.floor(diff / 86400000);
+      return `${days}d ago`;
+    }
+    
+    // Full date
+    return date.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getCurrentWeekHistory = (): RotaSnapshot[] => {
+    const weekStartStr = weekStart.toISOString();
+    return history.filter(h => h.weekStart === weekStartStr);
   };
 
   const generateYearRota = () => {
@@ -644,6 +732,92 @@ export default function Home() {
                 <Button variant="outline" size="sm" onClick={handleNextWeek} className="rounded-lg">
                   <ChevronRight className="h-4 w-4" />
                 </Button>
+                <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+                  <SheetTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-2 rounded-lg"
+                    >
+                      <History className="h-4 w-4" />
+                      <span className="font-mono text-xs">History</span>
+                      {getCurrentWeekHistory().length > 0 && (
+                        <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px]">
+                          {getCurrentWeekHistory().length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent className="w-[400px] sm:w-[540px]">
+                    <SheetHeader>
+                      <SheetTitle className="font-condensed">Rota History</SheetTitle>
+                      <SheetDescription className="font-mono text-xs">
+                        Browse and restore previous versions for this week
+                      </SheetDescription>
+                    </SheetHeader>
+                    <ScrollArea className="h-[calc(100vh-120px)] mt-6">
+                      <div className="space-y-3">
+                        {getCurrentWeekHistory().length === 0 ? (
+                          <div className="text-center py-12 text-muted-foreground">
+                            <History className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                            <p className="text-sm font-mono">No history for this week</p>
+                          </div>
+                        ) : (
+                          getCurrentWeekHistory().map((snapshot, index) => (
+                            <Card 
+                              key={snapshot.id} 
+                              className="shadow-sm hover:shadow-md transition-smooth cursor-pointer"
+                              onClick={() => restoreSnapshot(snapshot)}
+                            >
+                              <CardHeader className="pb-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <RotateCcw className="h-4 w-4 text-muted-foreground" />
+                                    <CardTitle className="font-mono text-sm">
+                                      {formatTimestamp(snapshot.timestamp)}
+                                    </CardTitle>
+                                  </div>
+                                  {index === 0 && (
+                                    <Badge variant="default" className="font-mono text-[10px]">
+                                      Current
+                                    </Badge>
+                                  )}
+                                </div>
+                                <CardDescription className="font-mono text-xs mt-1">
+                                  {snapshot.assignments.length} assignments
+                                  {snapshot.lockedAssignments.length > 0 && (
+                                    <span className="text-warning ml-2">
+                                      · {snapshot.lockedAssignments.length} locked
+                                    </span>
+                                  )}
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent className="pt-0">
+                                <div className="text-xs font-mono text-muted-foreground">
+                                  <div className="flex flex-wrap gap-1">
+                                    {TASKS.map(task => {
+                                      const count = snapshot.assignments.filter(a => a.task === task).length;
+                                      if (count === 0) return null;
+                                      return (
+                                        <Badge 
+                                          key={task} 
+                                          variant="outline" 
+                                          className="text-[10px] font-mono"
+                                        >
+                                          {task}: {count}
+                                        </Badge>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </SheetContent>
+                </Sheet>
                 <Button 
                   variant="outline" 
                   size="sm" 
