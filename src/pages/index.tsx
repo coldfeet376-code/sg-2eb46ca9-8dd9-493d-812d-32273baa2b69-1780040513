@@ -3,13 +3,13 @@ import Link from "next/link";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Download, RefreshCw, Lock, Unlock, History, RotateCcw, Printer } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, RefreshCw, Lock, Unlock, History, RotateCcw, Printer, AlertCircle } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import type { StaffMember, Assignment } from "@/types";
+import type { StaffMember, Assignment, Task } from "@/types";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { useNotifications } from "@/contexts/NotificationContext";
 
@@ -30,6 +30,14 @@ interface RotaSnapshot {
   lockedAssignments: LockedAssignment[];
 }
 
+interface CoverageGap {
+  task: string;
+  date: string;
+  required: number;
+  available: number;
+  gap: number;
+}
+
 export default function Home() {
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
   const [assignments, setAssignments] = useState<Assignment[]>([]);
@@ -41,6 +49,8 @@ export default function Home() {
   const [lockedAssignments, setLockedAssignments] = useState<LockedAssignment[]>([]);
   const [history, setHistory] = useState<RotaSnapshot[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [coverageGaps, setCoverageGaps] = useState<CoverageGap[]>([]);
+  const [showCoverageWarning, setShowCoverageWarning] = useState(false);
   const { addNotification } = useNotifications();
 
   useEffect(() => {
@@ -85,6 +95,60 @@ export default function Home() {
     }
   }, [staff, taskConfig, weekStart, viewMode, selectedYear]);
 
+  const checkCoverageGaps = (): CoverageGap[] => {
+    if (!staff.length || !taskConfig) return [];
+
+    const gaps: CoverageGap[] = [];
+
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const currentDate = new Date(weekStart);
+      currentDate.setDate(weekStart.getDate() + dayOffset);
+      const dateStr = currentDate.toISOString().split("T")[0];
+
+      TASKS.forEach((task) => {
+        const required = taskConfig[task]?.[dayOffset] || 0;
+        if (required === 0) return;
+
+        // Count available staff for this task on this date
+        const availableStaff = staff.filter((s) => {
+          // Must be trained
+          if (!s.trainedTasks.includes(task as Task)) return false;
+
+          // Check availability
+          if (s.availability) {
+            const entry = s.availability.find((a) => a.date === dateStr);
+            if (entry && entry.type !== "available") return false;
+          }
+
+          // Check regular rest days
+          const dayOfWeek = currentDate.getDay();
+          if (s.restDays?.some(d => Number(d) === dayOfWeek)) return false;
+
+          return true;
+        }).length;
+
+        // Count locked assignments for this task/date
+        const lockedCount = lockedAssignments.filter(
+          (a) => a.task === task && a.date === dateStr
+        ).length;
+
+        const effectiveAvailable = Math.max(0, availableStaff - lockedCount);
+
+        if (effectiveAvailable < required) {
+          gaps.push({
+            task,
+            date: dateStr,
+            required,
+            available: effectiveAvailable,
+            gap: required - effectiveAvailable,
+          });
+        }
+      });
+    }
+
+    return gaps;
+  };
+
   const saveSnapshot = (newAssignments: Assignment[]) => {
     const snapshot: RotaSnapshot = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -101,6 +165,14 @@ export default function Home() {
 
   const generateRota = () => {
     if (!staff.length || !taskConfig) return;
+
+    // Check for coverage gaps first
+    const gaps = checkCoverageGaps();
+    if (gaps.length > 0) {
+      setCoverageGaps(gaps);
+      setShowCoverageWarning(true);
+      return; // Don't generate if gaps exist
+    }
 
     const newAssignments = generateWeeklyRota({
       staff,
@@ -128,6 +200,25 @@ export default function Home() {
         type: "assignment",
         weekStart: weekStart.toISOString(),
       });
+    });
+  };
+
+  const forceGenerateRota = () => {
+    setShowCoverageWarning(false);
+    
+    const newAssignments = generateWeeklyRota({
+      staff,
+      taskConfig,
+      weekStart,
+      lockedAssignments,
+    });
+    setAssignments(newAssignments);
+    saveSnapshot(newAssignments);
+
+    addNotification({
+      staffName: "System",
+      message: `Rota generated with ${coverageGaps.length} coverage gap(s)`,
+      type: "info",
     });
   };
 
@@ -679,6 +770,54 @@ export default function Home() {
       />
       
       <div className="space-y-6">
+        {/* Coverage Warning Modal */}
+        {showCoverageWarning && coverageGaps.length > 0 && (
+          <Alert className="bg-destructive/10 border-destructive">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            <div className="flex-1">
+              <h3 className="font-condensed font-semibold text-destructive mb-2">
+                Coverage Gaps Detected
+              </h3>
+              <p className="text-sm text-destructive/90 mb-3">
+                {coverageGaps.length} instance(s) where staff availability is insufficient for task requirements:
+              </p>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {coverageGaps.map((gap, idx) => (
+                  <div key={idx} className="text-xs font-mono bg-destructive/5 p-2 rounded border border-destructive/20">
+                    <span className="font-semibold">{gap.task}</span> on{" "}
+                    {new Date(gap.date).toLocaleDateString("en-GB", {
+                      weekday: "short",
+                      day: "2-digit",
+                      month: "short",
+                    })}
+                    : Need <span className="font-semibold">{gap.required}</span>, only{" "}
+                    <span className="font-semibold">{gap.available}</span> available (
+                    <span className="text-destructive font-semibold">-{gap.gap}</span> gap)
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCoverageWarning(false)}
+                  className="rounded-lg"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={forceGenerateRota}
+                  className="rounded-lg"
+                >
+                  Generate Anyway
+                </Button>
+              </div>
+            </div>
+          </Alert>
+        )}
+
         <div className="flex items-center justify-between no-print">
           <div>
             <h1 className="font-condensed text-3xl font-bold tracking-tight">

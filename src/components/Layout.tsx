@@ -3,6 +3,7 @@ import Link from "next/link";
 import { LayoutGrid, BarChart3, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -54,6 +55,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <NotificationCenter />
             <Button
               variant="ghost"
