@@ -1,6 +1,6 @@
 ---
 title: Rota Display & PDF Export
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [display, export, pdf]
