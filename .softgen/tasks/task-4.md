@@ -1,9 +1,9 @@
 ---
 title: Rota Generation Algorithm
-status: todo
+status: in_progress
 priority: high
 type: feature
-tags: [algorithm, core]
+tags: [algorithm, rotation]
 created_by: agent
 created_at: 2026-05-16T04:13:03Z
 position: 4

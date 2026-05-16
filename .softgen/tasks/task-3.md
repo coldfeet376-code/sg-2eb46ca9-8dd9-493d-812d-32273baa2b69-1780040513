@@ -1,6 +1,6 @@
 ---
 title: Task Configuration & Requirements
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [config, requirements]
@@ -13,10 +13,10 @@ position: 3
 Configure day-specific requirements for each task (frozen, milk, twi, inbound, outbound, marshaling). Each day of week can have different staffing needs per task.
 
 ## Checklist
-- [ ] Create task configuration interface
-- [ ] Build day-specific requirement inputs (Sun-Sat for each task)
-- [ ] Implement requirement templates for quick setup
-- [ ] Store configuration in localStorage
+- [x] Create task configuration interface
+- [x] Build day-specific requirement inputs (Sun-Sat for each task)
+- [x] Implement requirement templates for quick setup
+- [x] Store configuration in localStorage
 
 ## Acceptance
 - Can set different staff requirements per task per day
