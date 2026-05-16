@@ -916,25 +916,36 @@ export default function StaffPage() {
                               </div>
                               
                               {!batchMode && (
-                                <div className={mobileView ? "mt-3" : "flex items-center gap-2"}>
-                                  {!mobileView && (
-                                    <Button variant="outline" size="sm" onClick={() => handleEditStaff(member)} className="rounded-lg">
-                                      <Edit className="h-4 w-4 mr-2" />
-                                      <span className="font-mono text-xs">Edit</span>
-                                    </Button>
-                                  )}
-                                  
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleEditStaff(member)}
+                                    className="rounded-lg"
+                                  >
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    <span className="font-mono text-xs">Edit</span>
+                                  </Button>
                                   <Sheet>
                                     <SheetTrigger asChild>
-                                      <Button variant="outline" size="sm" onClick={() => setSelectedStaff(member)} className={`rounded-lg ${mobileView ? 'w-full h-9' : ''}`}>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setSelectedStaff(member)}
+                                        className="rounded-lg"
+                                      >
                                         <Calendar2 className="h-4 w-4 mr-2" />
                                         <span className="font-mono text-xs">Availability</span>
                                       </Button>
                                     </SheetTrigger>
                                     <SheetContent className="w-full sm:max-w-2xl">
                                       <SheetHeader>
-                                        <SheetTitle className="font-condensed">{member.name} - Availability</SheetTitle>
-                                        <SheetDescription className="font-mono text-xs">Manage rest days, holidays, and sickness</SheetDescription>
+                                        <SheetTitle className="font-condensed">
+                                          {member.name} - Availability
+                                        </SheetTitle>
+                                        <SheetDescription className="font-mono text-xs">
+                                          Manage rest days, holidays, and sickness
+                                        </SheetDescription>
                                       </SheetHeader>
 
                                       <ScrollArea className="h-[calc(100vh-120px)] mt-6">
@@ -1085,11 +1096,131 @@ export default function StaffPage() {
                                       </ScrollArea>
                                     </SheetContent>
                                   </Sheet>
-                                  {!mobileView && (
-                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteStaff(member.id)} className="text-destructive hover:text-destructive rounded-lg">
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
+                                  <Sheet>
+                                    <SheetTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setSelectedStaff(member)}
+                                        className="rounded-lg"
+                                      >
+                                        <FileSpreadsheet className="h-4 w-4 mr-2" />
+                                        <span className="font-mono text-xs">Import</span>
+                                      </Button>
+                                    </SheetTrigger>
+                                    <SheetContent className="w-full sm:max-w-2xl">
+                                      <SheetHeader>
+                                        <SheetTitle className="font-condensed">
+                                          {member.name} - Quick Import
+                                        </SheetTitle>
+                                        <SheetDescription className="font-mono text-xs">
+                                          Import availability from Excel/CSV
+                                        </SheetDescription>
+                                      </SheetHeader>
+
+                                      <ScrollArea className="h-[calc(100vh-120px)] mt-6">
+                                        <div className="space-y-4">
+                                          <Card className="shadow-sm">
+                                            <CardHeader className="pb-3">
+                                              <CardTitle className="font-condensed text-sm flex items-center gap-2">
+                                                <FileSpreadsheet className="h-4 w-4" />
+                                                CSV/Excel Import
+                                              </CardTitle>
+                                              <CardDescription className="font-mono text-xs">
+                                                Upload a CSV file or paste data directly
+                                              </CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3">
+                                              <div className="text-xs font-mono text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                                                <p className="font-semibold mb-2">Required Format:</p>
+                                                <p>Date,Type,Notes</p>
+                                                <p className="mt-1">2026-01-15,holiday,Christmas</p>
+                                                <p>2026-02-20,rest,Regular rest</p>
+                                                <p>2026-03-10,sick,Flu</p>
+                                                <p className="mt-2 text-muted-foreground/70">
+                                                  Types: rest, holiday, sick, available
+                                                </p>
+                                              </div>
+
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs font-semibold">
+                                                  Option 1: Upload File
+                                                </Label>
+                                                <div className="flex gap-2">
+                                                  <Button
+                                                    variant="outline"
+                                                    className="w-full rounded-lg relative"
+                                                    onClick={() => document.getElementById(`csv-upload-quick-${member.id}`)?.click()}
+                                                  >
+                                                    <Upload className="h-4 w-4 mr-2" />
+                                                    <span className="font-mono text-xs">
+                                                      {csvFileName || "Choose CSV or Excel File"}
+                                                    </span>
+                                                  </Button>
+                                                  <input
+                                                    id={`csv-upload-quick-${member.id}`}
+                                                    type="file"
+                                                    accept=".csv,.txt,.xlsx,.xls"
+                                                    onChange={handleCsvFileUpload}
+                                                    className="hidden"
+                                                  />
+                                                  {csvFileName && (
+                                                    <Button
+                                                      variant="ghost"
+                                                      size="sm"
+                                                      onClick={() => {
+                                                        setCsvFileName("");
+                                                        setExcelImport("");
+                                                        const input = document.getElementById(`csv-upload-quick-${member.id}`) as HTMLInputElement;
+                                                        if (input) input.value = "";
+                                                      }}
+                                                      className="text-destructive hover:text-destructive"
+                                                    >
+                                                      <X className="h-4 w-4" />
+                                                    </Button>
+                                                  )}
+                                                </div>
+                                                <p className="text-[10px] font-mono text-muted-foreground">
+                                                  Supports: .csv, .xlsx, .xls files
+                                                </p>
+                                              </div>
+
+                                              <div className="space-y-2">
+                                                <Label className="font-mono text-xs font-semibold">
+                                                  Option 2: Paste Data
+                                                </Label>
+                                                <Textarea
+                                                  value={excelImport}
+                                                  onChange={(e) => setExcelImport(e.target.value)}
+                                                  placeholder="Date,Type,Notes&#10;2026-01-15,holiday,Christmas&#10;2026-02-20,rest,Regular rest"
+                                                  className="font-mono text-xs h-32 rounded-lg"
+                                                />
+                                              </div>
+
+                                              <Button
+                                                onClick={handleAvailabilityImport}
+                                                className="w-full rounded-lg"
+                                                disabled={!excelImport.trim()}
+                                              >
+                                                <Upload className="h-4 w-4 mr-2" />
+                                                <span className="font-mono text-xs">
+                                                  Import {excelImport.trim() ? excelImport.trim().split('\n').filter(l => l.trim()).length : 0} Entries
+                                                </span>
+                                              </Button>
+                                            </CardContent>
+                                          </Card>
+                                        </div>
+                                      </ScrollArea>
+                                    </SheetContent>
+                                  </Sheet>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteStaff(member.id)}
+                                    className="text-destructive hover:text-destructive rounded-lg"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
                                 </div>
                               )}
                             </div>
