@@ -428,10 +428,6 @@ export default function StaffPage() {
               <Upload className="h-4 w-4 mr-2" />
               Bulk Import
             </TabsTrigger>
-            <TabsTrigger value="certifications" className="font-mono text-xs">
-              <Award className="h-4 w-4 mr-2" />
-              Certifications
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="staff" className="space-y-6">
@@ -551,22 +547,14 @@ export default function StaffPage() {
                                 </SheetHeader>
 
                                 <div className="mt-6 space-y-6">
-                                  <Tabs defaultValue="manual" className="space-y-4">
-                                    <TabsList className="grid w-full grid-cols-3 rounded-lg">
-                                      <TabsTrigger value="manual" className="font-mono text-xs">
-                                        Manual
-                                      </TabsTrigger>
-                                      <TabsTrigger value="pattern" className="font-mono text-xs">
-                                        <Repeat className="h-3 w-3 mr-1" />
-                                        Pattern
-                                      </TabsTrigger>
-                                      <TabsTrigger value="import" className="font-mono text-xs">
-                                        <FileSpreadsheet className="h-3 w-3 mr-1" />
-                                        Import
-                                      </TabsTrigger>
+                                  <Tabs defaultValue="single" className="w-full">
+                                    <TabsList className="grid w-full grid-cols-3">
+                                      <TabsTrigger value="single" className="font-mono text-xs">Single Entry</TabsTrigger>
+                                      <TabsTrigger value="repeating" className="font-mono text-xs">Repeating</TabsTrigger>
+                                      <TabsTrigger value="import" className="font-mono text-xs">Excel Import</TabsTrigger>
                                     </TabsList>
 
-                                    <TabsContent value="manual" className="space-y-4">
+                                    <TabsContent value="single" className="space-y-4">
                                       <Card className="shadow-sm">
                                         <CardHeader className="pb-3">
                                           <CardTitle className="font-condensed text-sm">
@@ -631,7 +619,7 @@ export default function StaffPage() {
                                       </Card>
                                     </TabsContent>
 
-                                    <TabsContent value="pattern" className="space-y-4">
+                                    <TabsContent value="repeating" className="space-y-4">
                                       <Card className="shadow-sm">
                                         <CardHeader className="pb-3">
                                           <CardTitle className="font-condensed text-sm flex items-center gap-2">
@@ -831,180 +819,6 @@ export default function StaffPage() {
                       Staff members imported successfully!
                     </AlertDescription>
                   </Alert>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="certifications" className="space-y-6">
-            {/* Expiring Certifications Alert */}
-            {getExpiringCertifications().length > 0 && (
-              <Alert className="bg-warning/10 border-warning">
-                <AlertTriangle className="h-5 w-5 text-warning" />
-                <div className="flex-1">
-                  <h3 className="font-condensed font-semibold text-warning mb-2">
-                    Certification Alerts ({getExpiringCertifications().length})
-                  </h3>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {getExpiringCertifications().map((item, idx) => (
-                      <div key={idx} className="text-xs font-mono bg-warning/5 p-2 rounded border border-warning/20">
-                        <span className="font-semibold">{item.staff.name}</span> - {item.cert.task}:{" "}
-                        {item.days < 0 ? (
-                          <span className="text-destructive font-semibold">EXPIRED {Math.abs(item.days)} days ago</span>
-                        ) : (
-                          <span className="text-warning font-semibold">Expires in {item.days} days</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </Alert>
-            )}
-
-            <Card className="shadow-sm hover:shadow-md transition-smooth">
-              <CardHeader>
-                <CardTitle className="font-condensed text-xl">All Certifications</CardTitle>
-                <CardDescription className="font-mono text-xs">
-                  Training certifications for all staff members
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {staff.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Award className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                    <p className="text-sm font-mono">No staff members yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {staff.map(member => (
-                      <div key={member.id} className="border border-border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="font-condensed font-semibold">{member.name}</h3>
-                          <Sheet>
-                            <SheetTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setSelectedStaff(member)}
-                                className="rounded-lg"
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                <span className="font-mono text-xs">Add Cert</span>
-                              </Button>
-                            </SheetTrigger>
-                            <SheetContent>
-                              <SheetHeader>
-                                <SheetTitle className="font-condensed">
-                                  Add Certification - {member.name}
-                                </SheetTitle>
-                              </SheetHeader>
-                              <div className="mt-6 space-y-4">
-                                <div className="space-y-2">
-                                  <Label className="font-mono text-xs">Task</Label>
-                                  <Select value={certTask} onValueChange={(v) => setCertTask(v as Task)}>
-                                    <SelectTrigger className="rounded-lg font-mono text-xs">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {TASKS.map(task => (
-                                        <SelectItem key={task} value={task} className="font-mono text-xs">
-                                          {task}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-
-                                <div className="space-y-2">
-                                  <Label className="font-mono text-xs">Issued Date</Label>
-                                  <Input
-                                    type="date"
-                                    value={certIssuedDate}
-                                    onChange={(e) => setCertIssuedDate(e.target.value)}
-                                    className="rounded-lg font-mono text-xs"
-                                  />
-                                </div>
-
-                                <div className="space-y-2">
-                                  <Label className="font-mono text-xs">Expiry Date</Label>
-                                  <Input
-                                    type="date"
-                                    value={certExpiryDate}
-                                    onChange={(e) => setCertExpiryDate(e.target.value)}
-                                    className="rounded-lg font-mono text-xs"
-                                  />
-                                </div>
-
-                                <div className="space-y-2">
-                                  <Label className="font-mono text-xs">Notes (optional)</Label>
-                                  <Input
-                                    value={certNotes}
-                                    onChange={(e) => setCertNotes(e.target.value)}
-                                    placeholder="Training provider, course..."
-                                    className="rounded-lg font-mono text-xs"
-                                  />
-                                </div>
-
-                                <Button
-                                  onClick={handleAddCertification}
-                                  className="w-full rounded-lg"
-                                >
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  <span className="font-mono text-xs">Add Certification</span>
-                                </Button>
-                              </div>
-                            </SheetContent>
-                          </Sheet>
-                        </div>
-
-                        {(member.certifications || []).length === 0 ? (
-                          <p className="text-xs font-mono text-muted-foreground">No certifications</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {member.certifications?.map((cert, idx) => {
-                              const status = getCertificationStatus(cert);
-                              return (
-                                <div
-                                  key={idx}
-                                  className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/50 transition-smooth"
-                                >
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <Award className={`h-4 w-4 ${status.color}`} />
-                                      <span className="font-mono text-sm font-semibold">{cert.task}</span>
-                                    </div>
-                                    <p className="font-mono text-[10px] text-muted-foreground mt-1">
-                                      Issued: {new Date(cert.issuedDate).toLocaleDateString()} · 
-                                      Expires: {new Date(cert.expiryDate).toLocaleDateString()}
-                                      {status.status === "expired" && (
-                                        <span className="text-destructive font-semibold ml-2">EXPIRED</span>
-                                      )}
-                                      {status.status === "expiring-soon" && (
-                                        <span className="text-warning font-semibold ml-2">{status.days} days left</span>
-                                      )}
-                                    </p>
-                                    {cert.notes && (
-                                      <p className="font-mono text-[10px] text-muted-foreground mt-0.5">
-                                        {cert.notes}
-                                      </p>
-                                    )}
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteCertification(member.id, cert.task, cert.issuedDate)}
-                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
                 )}
               </CardContent>
             </Card>

@@ -117,23 +117,29 @@ export function generateWeeklyRota({
   });
 
   // Process each day
-  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
     const currentDate = new Date(weekStart);
-    currentDate.setDate(weekStart.getDate() + dayOffset);
+    currentDate.setDate(currentDate.getDate() + dayIndex);
     const dateStr = currentDate.toISOString().split("T")[0];
 
-    // Process each task for this day
-    tasks.forEach((task) => {
-      const requiredCount = taskConfig[task][dayOffset];
+    // taskConfig format: { "Frozen": [1,2,3,4,5,6,7], "Milk": [2,3,4,5,6,7,8], ... }
+    // Process each task
+    for (const taskName of Object.keys(taskConfig)) {
+      const task = taskName as Task;
+      const dayRequirements = taskConfig[task];
+      if (!dayRequirements || !Array.isArray(dayRequirements)) continue;
+      
+      const required = dayRequirements[dayIndex] || 0;
+      if (required === 0) continue;
 
-      // Check how many locked assignments exist for this task/date
-      const lockedCount = assignments.filter(
-        (a) => a.task === task && a.date === dateStr
+      // Skip if already have locked assignments for this task/day
+      const existingCount = assignments.filter(
+        (a) => a.date === dateStr && a.task === task
       ).length;
 
-      const remainingNeeded = requiredCount - lockedCount;
+      const needed = required - existingCount;
 
-      if (remainingNeeded <= 0) return; // Already filled by locked assignments
+      if (needed <= 0) continue; // Already filled by locked assignments
 
       // Filter staff: trained on this task AND not already assigned this day AND available on this date
       const availableStaff = staff.filter((s) => {
@@ -167,16 +173,19 @@ export function generateWeeklyRota({
         .filter((c) => !c.hasConsecutive) // Remove candidates with consecutive same task
         .sort((a, b) => a.fairnessScore - b.fairnessScore); // Sort by fairness (lowest first)
 
-      // Assign the required number of staff
-      for (let i = 0; i < Math.min(remainingNeeded, candidates.length); i++) {
+      // Assign the needed staff
+      for (let i = 0; i < Math.min(needed, sorted.length); i++) {
+        const selectedStaff = sorted[i];
         assignments.push({
-          staffId: candidates[i].staff.id,
-          staffName: candidates[i].staff.name,
-          task: task as Task,
+          staffId: selectedStaff.id,
+          staffName: selectedStaff.name,
+          task: task,
           date: dateStr,
         });
+        staffAssignmentCounts[selectedStaff.id]++;
+        staffLastTask[selectedStaff.id] = task;
       }
-    });
+    }
   }
 
   return assignments;
