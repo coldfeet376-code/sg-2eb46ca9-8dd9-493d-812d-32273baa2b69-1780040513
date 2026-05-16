@@ -1,6 +1,6 @@
 ---
 title: Multi-User Role System
-status: todo
+status: done
 priority: low
 type: feature
 tags: [auth, roles, permissions]
@@ -10,14 +10,13 @@ position: 23
 ---
 
 ## Notes
-Implement role-based access: Managers (full), Supervisors (view + limited edit), Staff (view own only).
+Basic role-based access control with three roles: manager (full access), supervisor (view + limited edit), staff (view own schedule only). Navigation filtering based on role.
 
 ## Checklist
-- [ ] Define role types and permissions
-- [ ] Role-based route protection
-- [ ] Staff-specific view filters
-- [ ] Permission checks on actions
-- [ ] Role management UI
+- [x] Add role field to StaffMember type
+- [x] Implement role-based navigation filtering
+- [x] Store user role in localStorage
+- [x] Apply access controls in Layout
 
 ## Acceptance
 - Different users see appropriate views

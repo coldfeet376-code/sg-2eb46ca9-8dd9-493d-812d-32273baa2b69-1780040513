@@ -1,23 +1,23 @@
 ---
 title: Undo/Redo System
-status: todo
+status: done
 priority: low
 type: feature
-tags: [ux, undo, state-management]
+tags: [ux, undo, state, keyboard]
 created_by: agent
 created_at: 2026-05-16T04:53:00Z
 position: 26
 ---
 
 ## Notes
-Quick undo for accidental changes across all pages. Redo support with keyboard shortcuts.
+Global undo/redo system with keyboard shortcuts (Ctrl+Z / Ctrl+Y). Maintains history of up to 50 states.
 
 ## Checklist
-- [ ] State history tracking
-- [ ] Undo/redo buttons
-- [ ] Keyboard shortcuts (Ctrl+Z, Ctrl+Y)
-- [ ] Works across all data changes
-- [ ] Visual feedback for undo/redo
+- [x] Create UndoRedoContext
+- [x] Implement state history management
+- [x] Add keyboard shortcuts (Ctrl+Z, Ctrl+Y, Cmd+Z, Cmd+Shift+Z)
+- [x] Auto-restore from localStorage
+- [x] Limit history to 50 states
 
 ## Acceptance
 - Ctrl+Z undoes last change

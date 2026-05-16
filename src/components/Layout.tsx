@@ -1,6 +1,7 @@
 import { useRouter } from "next/router";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { LayoutGrid, BarChart3, LogOut, Menu } from "lucide-react";
+import { LayoutGrid, BarChart3, LogOut, Menu, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -8,10 +9,22 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const [userRole, setUserRole] = useState<"manager" | "supervisor" | "staff">("manager");
+
+  useEffect(() => {
+    const role = localStorage.getItem("warehouse-user-role") || "manager";
+    setUserRole(role as typeof userRole);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("warehouse-auth");
     router.push("/login");
+  };
+
+  const canAccessPage = (page: string) => {
+    if (userRole === "manager") return true;
+    if (userRole === "supervisor") return !["staff", "config"].includes(page);
+    return page === "rota"; // Staff can only view rota
   };
 
   return (
@@ -39,25 +52,40 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   >
                     Rota
                   </Link>
-                  <Link
-                    href="/staff"
-                    className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
-                  >
-                    Staff
-                  </Link>
-                  <Link
-                    href="/config"
-                    className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
-                  >
-                    Config
-                  </Link>
-                  <Link
-                    href="/analytics"
-                    className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
-                  >
-                    <BarChart3 className="h-4 w-4" />
-                    Analytics
-                  </Link>
+                  {canAccessPage("staff") && (
+                    <Link
+                      href="/staff"
+                      className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                    >
+                      Staff
+                    </Link>
+                  )}
+                  {canAccessPage("config") && (
+                    <Link
+                      href="/config"
+                      className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                    >
+                      Config
+                    </Link>
+                  )}
+                  {canAccessPage("analytics") && (
+                    <Link
+                      href="/analytics"
+                      className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                      Analytics
+                    </Link>
+                  )}
+                  {canAccessPage("swaps") && (
+                    <Link
+                      href="/swaps"
+                      className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Swaps
+                    </Link>
+                  )}
                 </nav>
               </SheetContent>
             </Sheet>
@@ -77,25 +105,40 @@ export function Layout({ children }: { children: React.ReactNode }) {
               >
                 Rota
               </Link>
-              <Link
-                href="/staff"
-                className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
-              >
-                Staff
-              </Link>
-              <Link
-                href="/config"
-                className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
-              >
-                Config
-              </Link>
-              <Link
-                href="/analytics"
-                className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
-              >
-                <BarChart3 className="h-4 w-4" />
-                Analytics
-              </Link>
+              {canAccessPage("staff") && (
+                <Link
+                  href="/staff"
+                  className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                >
+                  Staff
+                </Link>
+              )}
+              {canAccessPage("config") && (
+                <Link
+                  href="/config"
+                  className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                >
+                  Config
+                </Link>
+              )}
+              {canAccessPage("analytics") && (
+                <Link
+                  href="/analytics"
+                  className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  Analytics
+                </Link>
+              )}
+              {canAccessPage("swaps") && (
+                <Link
+                  href="/swaps"
+                  className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Swaps
+                </Link>
+              )}
             </nav>
           </div>
           <div className="flex items-center gap-2 md:gap-3">

@@ -28,6 +28,7 @@ export interface StaffMember {
   availability?: AvailabilityEntry[]; // Date-specific availability
   preferences?: StaffPreferences; // Task preferences
   certifications?: Certification[]; // Training certifications with expiry
+  role?: "manager" | "supervisor" | "staff"; // User role
 }
 
 export interface Assignment {
@@ -40,4 +41,19 @@ export interface Assignment {
 export interface WeekRota {
   weekStart: string; // ISO date string (Sunday)
   assignments: Assignment[];
+}
+
+export interface ShiftSwap {
+  id: string;
+  fromStaffId: string;
+  fromStaffName: string;
+  toStaffId: string;
+  toStaffName: string;
+  task: Task;
+  date: string;
+  status: "pending" | "approved" | "rejected";
+  requestedAt: number;
+  reviewedAt?: number;
+  reviewedBy?: string;
+  notes?: string;
 }
