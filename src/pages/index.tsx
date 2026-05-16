@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { StaffMember, Assignment, Task } from "@/types";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { useNotifications } from "@/contexts/NotificationContext";
@@ -340,6 +341,57 @@ export default function Home() {
     } else {
       exportYearPDF();
     }
+  };
+
+  const exportCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    
+    if (viewMode === "week") {
+      csvContent += "Task," + weekDates.map(d => `${DAYS[d.getDay()]} ${d.getDate()}/${d.getMonth()+1}`).join(",") + "\n";
+      
+      TASKS.forEach(task => {
+        let row = task;
+        weekDates.forEach((_, dayIdx) => {
+          const dayAssignments = getAssignmentsForTaskAndDay(task, dayIdx);
+          const staffNames = dayAssignments.map(a => a.staffName).join(" & ");
+          row += `,"${staffNames || ''}"`;
+        });
+        csvContent += row + "\n";
+      });
+    } else {
+      const weeks = getYearWeeks(selectedYear);
+      csvContent += "Week Starting,Task," + DAYS.join(",") + "\n";
+      
+      weeks.forEach(weekStartDate => {
+        const weekKey = weekStartDate.toISOString();
+        const weekAssignments = yearRotas.get(weekKey) || [];
+        const weekDatesLocal = DAYS.map((_, i) => {
+          const date = new Date(weekStartDate);
+          date.setDate(weekStartDate.getDate() + i);
+          return date;
+        });
+        
+        TASKS.forEach(task => {
+          let row = `${weekDatesLocal[0].toLocaleDateString()},${task}`;
+          DAYS.forEach((_, dayIdx) => {
+            const date = weekDatesLocal[dayIdx];
+            const dateStr = date.toISOString().split("T")[0];
+            const dayAssignments = weekAssignments.filter(a => a.task === task && a.date === dateStr);
+            const staffNames = dayAssignments.map(a => a.staffName).join(" & ");
+            row += `,"${staffNames || ''}"`;
+          });
+          csvContent += row + "\n";
+        });
+      });
+    }
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `warehouse_rota_${viewMode}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const exportWeekPDF = () => {
@@ -984,27 +1036,29 @@ export default function Home() {
               </>
             )}
             
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-smooth"
-              onClick={handlePrint}
-              disabled={staff.length === 0 || !taskConfig}
-            >
-              <Printer className="h-4 w-4" />
-              <span className="font-mono text-xs">Print</span>
-            </Button>
-            
-            <Button 
-              variant="default" 
-              size="sm" 
-              className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-smooth"
-              onClick={exportPDF}
-              disabled={staff.length === 0 || !taskConfig}
-            >
-              <Download className="h-4 w-4" />
-              <span className="font-mono text-xs">Export PDF</span>
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="default" 
+                size="sm" 
+                className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-smooth hidden sm:flex"
+                onClick={exportPDF}
+                disabled={staff.length === 0 || !taskConfig}
+              >
+                <Download className="h-4 w-4" />
+                <span className="font-mono text-xs">PDF</span>
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-smooth hidden sm:flex"
+                onClick={exportCSV}
+                disabled={staff.length === 0 || !taskConfig}
+              >
+                <Download className="h-4 w-4" />
+                <span className="font-mono text-xs">CSV</span>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -1138,7 +1192,7 @@ export default function Home() {
               </CardContent>
             </Card>
 
-            <div className="grid gap-4 md:grid-cols-4 no-print">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-4 no-print">
               <Card className="shadow-sm card-hover">
                 <CardHeader>
                   <CardTitle className="font-condensed text-base">Total Staff</CardTitle>
