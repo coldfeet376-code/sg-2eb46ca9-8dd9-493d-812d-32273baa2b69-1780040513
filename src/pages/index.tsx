@@ -25,18 +25,12 @@ const OnboardingTour = dynamic(
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 
-interface LockedAssignment {
-  task: string;
-  date: string;
-  staffName: string;
-}
-
 interface RotaSnapshot {
   id: string;
   timestamp: number;
   weekStart: string;
   assignments: Assignment[];
-  lockedAssignments: LockedAssignment[];
+  lockedAssignments: Assignment[];
 }
 
 interface CoverageGap {
@@ -55,7 +49,7 @@ export default function Home() {
   const [viewMode, setViewMode] = useState<"week" | "year">("week");
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [yearRotas, setYearRotas] = useState<Map<string, Assignment[]>>(new Map());
-  const [lockedAssignments, setLockedAssignments] = useState<LockedAssignment[]>([]);
+  const [lockedAssignments, setLockedAssignments] = useState<Assignment[]>([]);
   const [history, setHistory] = useState<RotaSnapshot[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [coverageGaps, setCoverageGaps] = useState<CoverageGap[]>([]);
@@ -339,7 +333,6 @@ export default function Home() {
     const date = weekDates[dateIndex];
     const dateStr = date.toISOString().split("T")[0];
     
-    const lockKey = `${task}-${dateStr}-${staffName}`;
     const existingLockIndex = lockedAssignments.findIndex(
       lock => lock.task === task && lock.date === dateStr && lock.staffName === staffName
     );
@@ -348,8 +341,14 @@ export default function Home() {
       // Unlock
       setLockedAssignments(lockedAssignments.filter((_, i) => i !== existingLockIndex));
     } else {
-      // Lock
-      setLockedAssignments([...lockedAssignments, { task, date: dateStr, staffName }]);
+      // Lock - Find staff ID for the assignment
+      const staffMember = staff.find(s => s.name === staffName);
+      setLockedAssignments([...lockedAssignments, { 
+        task: task as Task, 
+        date: dateStr, 
+        staffName,
+        staffId: staffMember?.id || `temp-${Date.now()}`
+      }]);
     }
   };
 
