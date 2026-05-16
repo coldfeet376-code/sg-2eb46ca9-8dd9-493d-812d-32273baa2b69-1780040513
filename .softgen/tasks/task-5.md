@@ -1,9 +1,9 @@
 ---
 title: Rota Display & PDF Export
-status: todo
+status: in_progress
 priority: high
 type: feature
-tags: [display, export]
+tags: [display, export, pdf]
 created_by: agent
 created_at: 2026-05-16T04:13:03Z
 position: 5
@@ -13,11 +13,12 @@ position: 5
 Weekly rota display (Sun-Sat) with navigation through weeks. PDF export for printing/display showing who is assigned to which task each day.
 
 ## Checklist
-- [ ] Create weekly rota grid component
-- [ ] Build week navigation (prev/next, date picker)
-- [ ] Implement PDF generation with proper formatting
-- [ ] Add print-friendly styling
-- [ ] Include staff names and task assignments in PDF
+- [x] Add week/year view toggle
+- [x] Implement year view with all 52 weeks
+- [x] Create PDF export for weekly view
+- [x] Create PDF export for annual view
+- [x] Add week navigation (prev/next)
+- [x] Display all assignments in tabular format
 
 ## Acceptance
 - Weekly view shows all assignments clearly

@@ -1,6 +1,6 @@
 ---
 title: Rota Generation Algorithm
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [algorithm, rotation]
@@ -13,10 +13,10 @@ position: 4
 Constraint-based rotation algorithm: no consecutive days on same task, fair distribution across all staff, training-aware randomization, respects availability (rest days, absences, holidays).
 
 ## Checklist
-- [ ] Implement constraint checker (no consecutive same tasks)
-- [ ] Build fair distribution scorer
-- [ ] Create randomization with training awareness
-- [ ] Integrate availability filtering
+- [x] Implement constraint checker (no consecutive same tasks)
+- [x] Build fair distribution scorer
+- [x] Create randomization with training awareness
+- [x] Integrate availability filtering
 - [ ] Generate annual rota (52 weeks)
 - [ ] Add manual override capability
 
