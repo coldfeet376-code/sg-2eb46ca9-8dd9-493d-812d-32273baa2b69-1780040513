@@ -1,12 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/router";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Lock, AlertCircle } from "lucide-react";
 import { SEO } from "@/components/SEO";
+
+// Optimized icon imports
+import Lock from "lucide-react/dist/esm/icons/lock";
+import LayoutGrid from "lucide-react/dist/esm/icons/layout-grid";
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
 
 const CORRECT_PASSWORD = "warehouse2024"; // Generic password - can be changed or moved to .env
 

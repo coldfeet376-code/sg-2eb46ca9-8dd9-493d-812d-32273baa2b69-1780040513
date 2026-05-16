@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,12 +10,21 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { useNotifications } from "@/contexts/NotificationContext";
 import type { StaffMember, Assignment, Task } from "@/types";
-import Link from "next/link";
+
+// Optimized icon imports - tree-shakeable
+import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
+import Download from "lucide-react/dist/esm/icons/download";
+import Lock from "lucide-react/dist/esm/icons/lock";
+import Unlock from "lucide-react/dist/esm/icons/unlock";
+import ChevronLeft from "lucide-react/dist/esm/icons/chevron-left";
+import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
+import History from "lucide-react/dist/esm/icons/history";
+import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(

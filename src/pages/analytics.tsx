@@ -2,9 +2,16 @@ import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { BarChart3, TrendingUp, Users, Calendar, Award, Heart } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import type { StaffMember, Assignment, Task } from "@/types";
+
+// Optimized icon imports
+import BarChart3 from "lucide-react/dist/esm/icons/bar-chart-3";
+import TrendingUp from "lucide-react/dist/esm/icons/trending-up";
+import Users from "lucide-react/dist/esm/icons/users";
+import Calendar2 from "lucide-react/dist/esm/icons/calendar";
+import Award from "lucide-react/dist/esm/icons/award";
+import Heart from "lucide-react/dist/esm/icons/heart";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -241,7 +248,7 @@ export default function AnalyticsPage() {
           <Card className="shadow-sm card-hover">
             <CardHeader className="pb-3">
               <CardTitle className="font-condensed text-sm flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-primary" />
+                <Calendar2 className="h-4 w-4 text-primary" />
                 Active Staff
               </CardTitle>
             </CardHeader>

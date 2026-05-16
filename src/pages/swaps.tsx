@@ -2,14 +2,25 @@ import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RefreshCw, Check, X, Clock } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SEO } from "@/components/SEO";
-import { useAudit } from "@/contexts/AuditContext";
 import { useNotifications } from "@/contexts/NotificationContext";
-import type { ShiftSwap, StaffMember, Assignment } from "@/types";
+import { useAudit } from "@/contexts/AuditContext";
+import type { ShiftSwap, StaffMember, Task, Assignment } from "@/types";
+
+// Optimized icon imports
+import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
+import Check from "lucide-react/dist/esm/icons/check";
+import X from "lucide-react/dist/esm/icons/x";
+import Plus from "lucide-react/dist/esm/icons/plus";
+import Clock from "lucide-react/dist/esm/icons/clock";
+import CheckCircle from "lucide-react/dist/esm/icons/check-circle";
+import XCircle from "lucide-react/dist/esm/icons/x-circle";
 
 export default function SwapsPage() {
   const [swaps, setSwaps] = useState<ShiftSwap[]>([]);

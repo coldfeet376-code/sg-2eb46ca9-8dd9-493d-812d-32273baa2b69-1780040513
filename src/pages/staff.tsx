@@ -6,17 +6,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Users, Upload, Plus, Trash2, Calendar as CalendarIcon, FileSpreadsheet, AlertCircle, Repeat, Award, AlertTriangle } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { useAudit } from "@/contexts/AuditContext";
 import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, Certification } from "@/types";
+
+// Optimized icon imports
+import Users from "lucide-react/dist/esm/icons/users";
+import Upload from "lucide-react/dist/esm/icons/upload";
+import Plus from "lucide-react/dist/esm/icons/plus";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
+import Calendar2 from "lucide-react/dist/esm/icons/calendar";
+import FileSpreadsheet from "lucide-react/dist/esm/icons/file-spreadsheet";
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
+import Repeat from "lucide-react/dist/esm/icons/repeat";
+import Award from "lucide-react/dist/esm/icons/award";
+import AlertTriangle from "lucide-react/dist/esm/icons/alert-triangle";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -536,7 +546,7 @@ export default function StaffPage() {
                                   onClick={() => setSelectedStaff(member)}
                                   className="rounded-lg"
                                 >
-                                  <CalendarIcon className="h-4 w-4 mr-2" />
+                                  <Calendar2 className="h-4 w-4 mr-2" />
                                   <span className="font-mono text-xs">Availability</span>
                                 </Button>
                               </SheetTrigger>

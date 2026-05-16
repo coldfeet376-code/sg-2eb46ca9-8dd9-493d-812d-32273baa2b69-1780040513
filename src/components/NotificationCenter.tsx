@@ -1,10 +1,17 @@
-import { useState } from "react";
-import { Bell, Check, CheckCheck, Trash2, X } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useNotifications } from "@/contexts/NotificationContext";
+
+// Optimized icon imports
+import Bell from "lucide-react/dist/esm/icons/bell";
+import Trash2 from "lucide-react/dist/esm/icons/trash-2";
+import CheckCircle from "lucide-react/dist/esm/icons/check-circle";
+import AlertCircle from "lucide-react/dist/esm/icons/alert-circle";
+import Info from "lucide-react/dist/esm/icons/info";
+import UserPlus from "lucide-react/dist/esm/icons/user-plus";
 
 export function NotificationCenter() {
   const { notifications, unreadCount, markAsRead, markAllAsRead, clearAll } = useNotifications();
@@ -63,7 +70,7 @@ export function NotificationCenter() {
                   onClick={markAllAsRead}
                   className="gap-1 h-8"
                 >
-                  <CheckCheck className="h-3.5 w-3.5" />
+                  <CheckCircle className="h-3.5 w-3.5" />
                   <span className="text-xs font-mono">Mark all</span>
                 </Button>
               )}
@@ -136,7 +143,7 @@ export function NotificationCenter() {
                         onClick={() => markAsRead(notification.id)}
                         className="h-7 w-7 p-0 shrink-0"
                       >
-                        <Check className="h-3.5 w-3.5" />
+                        <CheckCircle className="h-3.5 w-3.5" />
                       </Button>
                     )}
                   </div>
