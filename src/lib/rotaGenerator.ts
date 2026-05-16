@@ -27,20 +27,22 @@ export function generateWeeklyRota({
 
   // Track assignments per staff member for fairness
   const staffAssignmentCounts: Record<string, number> = {};
-  const staffLastTask: Record<string, Task | null> = {};
+  // Track what task each staff member did on each date
+  const staffTasksByDate: Record<string, Record<string, Task>> = {};
   
   staff.forEach((s) => {
     staffAssignmentCounts[s.id] = 0;
-    staffLastTask[s.id] = null;
+    staffTasksByDate[s.id] = {};
   });
 
-  // Count existing locked assignments
+  // Count existing locked assignments and populate task history
   lockedAssignments.forEach((a) => {
     // Fallback to finding staffId by name for backward compatibility with older locked assignments
     const staffMember = staff.find((s) => s.name === a.staffName);
     const staffId = a.staffId || staffMember?.id;
     if (staffId) {
       staffAssignmentCounts[staffId] = (staffAssignmentCounts[staffId] || 0) + 1;
+      staffTasksByDate[staffId][a.date] = a.task as Task;
     }
   });
 
@@ -50,7 +52,7 @@ export function generateWeeklyRota({
     if (!acc[shift]) acc[shift] = [];
     acc[shift].push(s);
     return acc;
-  }, {} as Record<string, StaffMember[]>);
+  }, {} as Record<ShiftStart, StaffMember[]>);
 
   // Define shift priorities (earlier shifts get priority for task assignment)
   const shiftOrder: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
@@ -60,6 +62,11 @@ export function generateWeeklyRota({
     const currentDate = new Date(weekStart);
     currentDate.setDate(currentDate.getDate() + dayIndex);
     const dateStr = currentDate.toISOString().split("T")[0];
+
+    // Get previous day's date for checking consecutive tasks
+    const prevDate = new Date(currentDate);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const prevDateStr = prevDate.toISOString().split("T")[0];
 
     // taskConfig format: { "Frozen": [1,2,3,4,5,6,7], "Milk": [2,3,4,5,6,7,8], ... }
     // Process each task
@@ -119,21 +126,24 @@ export function generateWeeklyRota({
       const shuffled = allAvailable.sort(() => Math.random() - 0.5);
 
       // Sort by:
-      // 1. Fewest assignments (fairness)
-      // 2. Different from last task (variety)
+      // 1. Avoid consecutive same task (PRIORITY #1)
+      // 2. Fewest assignments (fairness)
       // 3. Shift start time (earlier shifts get slight priority)
       const sorted = shuffled.sort((a, b) => {
+        // CRITICAL: Check what task they did on the previous day
+        const aPrevTask = staffTasksByDate[a.id]?.[prevDateStr];
+        const bPrevTask = staffTasksByDate[b.id]?.[prevDateStr];
+        
+        // If A did this task yesterday but B didn't, B goes first
+        if (aPrevTask === task && bPrevTask !== task) return 1;
+        if (aPrevTask !== task && bPrevTask === task) return -1;
+
+        // Secondary: Fewest assignments overall (fairness)
         const aCount = staffAssignmentCounts[a.id] || 0;
         const bCount = staffAssignmentCounts[b.id] || 0;
         if (aCount !== bCount) return aCount - bCount;
 
-        // Prefer staff who didn't do this task yesterday
-        const aLastTask = staffLastTask[a.id];
-        const bLastTask = staffLastTask[b.id];
-        if (aLastTask === task && bLastTask !== task) return 1;
-        if (aLastTask !== task && bLastTask === task) return -1;
-
-        // Slight preference for earlier shifts (but fairness is primary)
+        // Tertiary: Slight preference for earlier shifts
         const aShiftIndex = shiftOrder.indexOf(a.shift);
         const bShiftIndex = shiftOrder.indexOf(b.shift);
         return aShiftIndex - bShiftIndex;
@@ -149,7 +159,8 @@ export function generateWeeklyRota({
           date: dateStr,
         });
         staffAssignmentCounts[selectedStaff.id]++;
-        staffLastTask[selectedStaff.id] = task;
+        // Track what task this staff member did on this date
+        staffTasksByDate[selectedStaff.id][dateStr] = task;
       }
     }
   }
