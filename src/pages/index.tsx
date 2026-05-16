@@ -1,19 +1,25 @@
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Download, RefreshCw, Lock, Unlock, History, RotateCcw, Printer, AlertCircle } from "lucide-react";
-import { SEO } from "@/components/SEO";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import type { StaffMember, Assignment, Task } from "@/types";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History } from "lucide-react";
+import { SEO } from "@/components/SEO";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { useNotifications } from "@/contexts/NotificationContext";
-import { OnboardingTour } from "@/components/OnboardingTour";
+import type { StaffMember, Assignment, Task } from "@/types";
+
+// Dynamic import for OnboardingTour to prevent SSR hydration issues
+const OnboardingTour = dynamic(
+  () => import("@/components/OnboardingTour").then(mod => mod.OnboardingTour),
+  { ssr: false }
+);
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
