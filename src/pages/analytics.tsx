@@ -2,447 +2,488 @@ import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import { BarChart3, TrendingUp, Users, Calendar, Award, Heart } from "lucide-react";
 import { SEO } from "@/components/SEO";
-import { AlertCircle, CheckCircle2, TrendingUp } from "lucide-react";
-import type { StaffMember, Assignment } from "@/types";
-import { generateWeeklyRota, getWeekStart, getYearWeeks } from "@/lib/rotaGenerator";
+import type { StaffMember, Assignment, Task } from "@/types";
 
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
+const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-interface TaskDistribution {
-  staffName: string;
-  taskCounts: { [task: string]: number };
-  totalAssignments: number;
-}
-
-interface ConsecutiveViolation {
-  staffName: string;
-  task: string;
-  dates: string[];
-}
-
-export default function Analytics() {
+export default function AnalyticsPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [taskConfig, setTaskConfig] = useState<any>(null);
-  const [period, setPeriod] = useState<"week" | "month" | "year">("month");
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [distribution, setDistribution] = useState<TaskDistribution[]>([]);
-  const [violations, setViolations] = useState<ConsecutiveViolation[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "quarter">("month");
+  const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
     const savedStaff = localStorage.getItem("warehouse-staff");
-    const savedConfig = localStorage.getItem("warehouse-task-config");
+    const savedHistory = localStorage.getItem("warehouse-rota-history");
     
     if (savedStaff) {
       setStaff(JSON.parse(savedStaff));
     }
-    if (savedConfig) {
-      setTaskConfig(JSON.parse(savedConfig));
+    if (savedHistory) {
+      setHistory(JSON.parse(savedHistory));
     }
   }, []);
 
-  useEffect(() => {
-    if (staff.length > 0 && taskConfig) {
-      generateAnalytics();
-    }
-  }, [staff, taskConfig, period, selectedYear]);
-
-  const generateAnalytics = () => {
-    if (!staff.length || !taskConfig) return;
-
-    // Generate assignments for the period
-    let allAssignments: Assignment[] = [];
-
-    if (period === "week") {
-      const weekStart = getWeekStart(new Date());
-      allAssignments = generateWeeklyRota({ staff, taskConfig, weekStart });
-    } else if (period === "month") {
-      // Get 4 weeks
-      const today = new Date();
-      const weekStart = getWeekStart(today);
-      for (let i = 0; i < 4; i++) {
-        const currentWeek = new Date(weekStart);
-        currentWeek.setDate(currentWeek.getDate() + (i * 7));
-        const weekAssignments = generateWeeklyRota({ 
-          staff, 
-          taskConfig, 
-          weekStart: currentWeek 
-        });
-        allAssignments = [...allAssignments, ...weekAssignments];
-      }
-    } else {
-      // Full year
-      const weeks = getYearWeeks(selectedYear);
-      weeks.forEach(weekStartDate => {
-        const weekAssignments = generateWeeklyRota({
-          staff,
-          taskConfig,
-          weekStart: weekStartDate,
-        });
-        allAssignments = [...allAssignments, ...weekAssignments];
-      });
-    }
-
-    setAssignments(allAssignments);
-    calculateDistribution(allAssignments);
-    checkConsecutiveViolations(allAssignments);
+  const getAllAssignments = (): Assignment[] => {
+    return history.flatMap(h => h.assignments || []);
   };
 
-  const calculateDistribution = (allAssignments: Assignment[]) => {
-    const dist: { [staffName: string]: TaskDistribution } = {};
+  const getStaffWorkload = () => {
+    const assignments = getAllAssignments();
+    const workloadMap = new Map<string, number>();
 
-    // Initialize
+    assignments.forEach(a => {
+      workloadMap.set(a.staffName, (workloadMap.get(a.staffName) || 0) + 1);
+    });
+
+    return Array.from(workloadMap.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  };
+
+  const getTaskDistribution = () => {
+    const assignments = getAllAssignments();
+    const taskMap = new Map<string, number>();
+
+    TASKS.forEach(task => taskMap.set(task, 0));
+    assignments.forEach(a => {
+      taskMap.set(a.task, (taskMap.get(a.task) || 0) + 1);
+    });
+
+    return Array.from(taskMap.entries()).map(([task, count]) => ({ task, count }));
+  };
+
+  const getWorkloadHeatmap = () => {
+    const assignments = getAllAssignments();
+    const heatmap: { [staffName: string]: { [task: string]: number } } = {};
+
     staff.forEach(s => {
-      dist[s.name] = {
-        staffName: s.name,
-        taskCounts: {},
-        totalAssignments: 0,
-      };
+      heatmap[s.name] = {};
       TASKS.forEach(task => {
-        dist[s.name].taskCounts[task] = 0;
+        heatmap[s.name][task] = 0;
       });
     });
 
-    // Count assignments
-    allAssignments.forEach(assignment => {
-      if (dist[assignment.staffName]) {
-        dist[assignment.staffName].taskCounts[assignment.task]++;
-        dist[assignment.staffName].totalAssignments++;
+    assignments.forEach(a => {
+      if (heatmap[a.staffName]) {
+        heatmap[a.staffName][a.task] = (heatmap[a.staffName][a.task] || 0) + 1;
       }
     });
 
-    setDistribution(Object.values(dist));
+    return heatmap;
   };
 
-  const checkConsecutiveViolations = (allAssignments: Assignment[]) => {
-    const violationsMap: { [key: string]: ConsecutiveViolation } = {};
+  const getPreferenceSatisfaction = () => {
+    const assignments = getAllAssignments();
+    const satisfaction: { [staffName: string]: { preferred: number; avoided: number; total: number } } = {};
 
-    // Group by staff
-    const staffAssignments: { [staffName: string]: Assignment[] } = {};
-    allAssignments.forEach(a => {
-      if (!staffAssignments[a.staffName]) {
-        staffAssignments[a.staffName] = [];
-      }
-      staffAssignments[a.staffName].push(a);
+    staff.forEach(s => {
+      satisfaction[s.name] = { preferred: 0, avoided: 0, total: 0 };
     });
 
-    // Check each staff member
-    Object.entries(staffAssignments).forEach(([staffName, assignments]) => {
-      // Sort by date
-      const sorted = assignments.sort((a, b) => 
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-      );
-
-      // Check consecutive days
-      for (let i = 0; i < sorted.length - 1; i++) {
-        const current = sorted[i];
-        const next = sorted[i + 1];
-
-        const currentDate = new Date(current.date);
-        const nextDate = new Date(next.date);
-        const dayDiff = Math.floor((nextDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-
-        if (dayDiff === 1 && current.task === next.task) {
-          const key = `${staffName}-${current.task}-${current.date}`;
-          if (!violationsMap[key]) {
-            violationsMap[key] = {
-              staffName,
-              task: current.task,
-              dates: [current.date, next.date],
-            };
-          } else {
-            violationsMap[key].dates.push(next.date);
-          }
+    assignments.forEach(a => {
+      const staffMember = staff.find(s => s.name === a.staffName);
+      if (staffMember && satisfaction[a.staffName]) {
+        satisfaction[a.staffName].total += 1;
+        
+        if (staffMember.preferences?.preferredTasks?.includes(a.task as Task)) {
+          satisfaction[a.staffName].preferred += 1;
+        }
+        if (staffMember.preferences?.avoidTasks?.includes(a.task as Task)) {
+          satisfaction[a.staffName].avoided += 1;
         }
       }
     });
 
-    setViolations(Object.values(violationsMap));
+    return satisfaction;
   };
 
-  const getFairnessScore = (): number => {
-    if (distribution.length === 0) return 100;
+  const getDayDistribution = () => {
+    const assignments = getAllAssignments();
+    const dayMap = new Map<number, number>();
 
-    const totalAssignments = distribution.reduce((sum, d) => sum + d.totalAssignments, 0);
-    const avgAssignments = totalAssignments / distribution.length;
+    DAYS.forEach((_, i) => dayMap.set(i, 0));
+    
+    assignments.forEach(a => {
+      const day = new Date(a.date).getDay();
+      dayMap.set(day, (dayMap.get(day) || 0) + 1);
+    });
 
-    if (avgAssignments === 0) return 100;
-
-    // Calculate standard deviation
-    const variance = distribution.reduce((sum, d) => {
-      return sum + Math.pow(d.totalAssignments - avgAssignments, 2);
-    }, 0) / distribution.length;
-
-    const stdDev = Math.sqrt(variance);
-    const coefficientOfVariation = (stdDev / avgAssignments) * 100;
-
-    // Convert to fairness score (0-100, where 100 is perfectly fair)
-    return Math.max(0, Math.min(100, 100 - coefficientOfVariation));
+    return Array.from(dayMap.entries()).map(([day, count]) => ({ day: DAYS[day], count }));
   };
 
-  const getTaskVariance = (staffDist: TaskDistribution): number => {
-    const counts = Object.values(staffDist.taskCounts);
+  const getFairnessScore = () => {
+    const workload = getStaffWorkload();
+    if (workload.length === 0) return 100;
+
+    const counts = workload.map(w => w.count);
     const avg = counts.reduce((a, b) => a + b, 0) / counts.length;
     const variance = counts.reduce((sum, count) => sum + Math.pow(count - avg, 2), 0) / counts.length;
-    return Math.sqrt(variance);
+    const stdDev = Math.sqrt(variance);
+
+    // Lower std dev = more fair. Scale to 0-100 where 100 is perfectly fair
+    const fairnessScore = Math.max(0, 100 - (stdDev * 10));
+    return Math.round(fairnessScore);
   };
 
-  const fairnessScore = getFairnessScore();
+  const getUtilizationRate = () => {
+    const assignments = getAllAssignments();
+    if (staff.length === 0) return 0;
+
+    const uniqueWeeks = new Set(history.map(h => h.weekStart));
+    const possibleAssignments = staff.length * uniqueWeeks.size * 7; // staff × weeks × days
+    
+    if (possibleAssignments === 0) return 0;
+    return Math.round((assignments.length / possibleAssignments) * 100);
+  };
+
+  const workload = getStaffWorkload();
+  const taskDist = getTaskDistribution();
+  const dayDist = getDayDistribution();
+  const heatmap = getWorkloadHeatmap();
+  const preferenceSat = getPreferenceSatisfaction();
+  const fairness = getFairnessScore();
+  const utilization = getUtilizationRate();
+
+  const getHeatmapColor = (count: number) => {
+    const max = Math.max(...Object.values(heatmap).flatMap(tasks => Object.values(tasks)));
+    const intensity = max > 0 ? count / max : 0;
+    
+    if (intensity === 0) return "bg-muted";
+    if (intensity < 0.25) return "bg-primary/20";
+    if (intensity < 0.5) return "bg-primary/40";
+    if (intensity < 0.75) return "bg-primary/60";
+    return "bg-primary/80";
+  };
 
   return (
     <Layout>
-      <SEO
-        title="Analytics - Warehouse Rota"
-        description="Workload distribution and fairness analytics"
-      />
+      <SEO title="Analytics - Warehouse Rota" description="Workforce analytics and insights" />
 
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-condensed text-3xl font-bold tracking-tight">
-              Analytics Dashboard
-            </h1>
+            <h1 className="font-condensed text-3xl font-bold tracking-tight">Analytics</h1>
             <p className="text-sm text-muted-foreground font-mono mt-1">
-              Workload distribution and fairness metrics
+              Workforce insights and performance metrics
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Select value={period} onValueChange={(v) => setPeriod(v as "week" | "month" | "year")}>
-              <SelectTrigger className="w-32 font-mono text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="week" className="font-mono text-xs">This Week</SelectItem>
-                <SelectItem value="month" className="font-mono text-xs">This Month</SelectItem>
-                <SelectItem value="year" className="font-mono text-xs">Full Year</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {period === "year" && (
-              <Select value={selectedYear.toString()} onValueChange={(y) => setSelectedYear(parseInt(y))}>
-                <SelectTrigger className="w-24 font-mono text-xs">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {[2024, 2025, 2026, 2027, 2028].map(year => (
-                    <SelectItem key={year} value={year.toString()} className="font-mono text-xs">
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
+          <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as "week" | "month" | "quarter")}>
+            <SelectTrigger className="w-32 rounded-lg font-mono text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week" className="font-mono text-xs">This Week</SelectItem>
+              <SelectItem value="month" className="font-mono text-xs">This Month</SelectItem>
+              <SelectItem value="quarter" className="font-mono text-xs">This Quarter</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-condensed text-base">Fairness Score</CardTitle>
+        {/* Key Metrics */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="shadow-sm card-hover">
+            <CardHeader className="pb-3">
+              <CardTitle className="font-condensed text-sm flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                Fairness Score
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className={`font-mono text-3xl font-bold tabular-nums ${
-                fairnessScore >= 90 ? "text-accent" :
-                fairnessScore >= 70 ? "text-primary" : "text-warning"
+                fairness >= 90 ? "text-success" :
+                fairness >= 70 ? "text-primary" : "text-warning"
               }`}>
-                {fairnessScore.toFixed(0)}
+                {fairness}%
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Distribution balance
+                Distribution equality
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-condensed text-base">Total Assignments</CardTitle>
+          <Card className="shadow-sm card-hover">
+            <CardHeader className="pb-3">
+              <CardTitle className="font-condensed text-sm flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-accent" />
+                Utilization Rate
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="font-mono text-3xl font-bold tabular-nums">
-                {assignments.length}
+              <div className="font-mono text-3xl font-bold tabular-nums text-accent">
+                {utilization}%
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Across {period}
+                Staff assignment rate
               </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-condensed text-base">Violations</CardTitle>
+          <Card className="shadow-sm card-hover">
+            <CardHeader className="pb-3">
+              <CardTitle className="font-condensed text-sm flex items-center gap-2">
+                <Users className="h-4 w-4 text-secondary" />
+                Total Assignments
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`font-mono text-3xl font-bold tabular-nums ${
-                violations.length === 0 ? "text-accent" : "text-destructive"
-              }`}>
-                {violations.length}
+              <div className="font-mono text-3xl font-bold tabular-nums text-secondary">
+                {getAllAssignments().length}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Consecutive task issues
+                Across all rotas
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm card-hover">
+            <CardHeader className="pb-3">
+              <CardTitle className="font-condensed text-sm flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                Active Staff
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="font-mono text-3xl font-bold tabular-nums text-primary">
+                {staff.length}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                In rotation
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {violations.length > 0 && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription className="font-mono text-xs">
-              {violations.length} consecutive task violation(s) detected. Review algorithm constraints.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {violations.length === 0 && assignments.length > 0 && (
-          <Alert className="bg-accent/10 border-accent text-accent">
-            <CheckCircle2 className="h-4 w-4" />
-            <AlertDescription className="font-mono text-xs">
-              No consecutive task violations detected. Algorithm working as expected.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <Card>
+        {/* Workload Heatmap */}
+        <Card className="shadow-sm hover:shadow-md transition-smooth">
           <CardHeader>
-            <CardTitle className="font-condensed text-xl">Task Distribution Matrix</CardTitle>
+            <CardTitle className="font-condensed text-xl">Workload Heatmap</CardTitle>
             <CardDescription className="font-mono text-xs">
-              Assignment count per staff member per task
+              Task distribution across staff members (darker = more assignments)
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50">
-                      Staff Member
-                    </th>
-                    {TASKS.map(task => (
-                      <th key={task} className="text-center p-3 font-mono text-xs font-medium bg-muted/50">
-                        {task}
+            {staff.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                <p className="text-sm font-mono">No data available</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50 rounded-tl-lg">
+                        Staff
                       </th>
-                    ))}
-                    <th className="text-center p-3 font-mono text-xs font-medium bg-muted/50">
-                      Total
-                    </th>
-                    <th className="text-center p-3 font-mono text-xs font-medium bg-muted/50">
-                      Variance
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {distribution.map((dist) => (
-                    <tr key={dist.staffName} className="border-b border-border hover:bg-muted/30">
-                      <td className="p-3 font-condensed text-sm font-semibold">
-                        {dist.staffName}
-                      </td>
-                      {TASKS.map(task => (
-                        <td key={task} className="p-3 text-center">
-                          <span className={`font-mono text-xs tabular-nums ${
-                            dist.taskCounts[task] > 0 ? "text-foreground" : "text-muted-foreground"
-                          }`}>
-                            {dist.taskCounts[task]}
-                          </span>
-                        </td>
+                      {TASKS.map((task, i) => (
+                        <th 
+                          key={task} 
+                          className={`text-center p-3 font-mono text-xs font-medium bg-muted/50 ${i === TASKS.length - 1 ? 'rounded-tr-lg' : ''}`}
+                        >
+                          {task}
+                        </th>
                       ))}
-                      <td className="p-3 text-center">
-                        <Badge variant="outline" className="font-mono text-xs tabular-nums">
-                          {dist.totalAssignments}
-                        </Badge>
-                      </td>
-                      <td className="p-3 text-center">
-                        <span className={`font-mono text-xs tabular-nums ${
-                          getTaskVariance(dist) < 1.5 ? "text-accent" : "text-muted-foreground"
-                        }`}>
-                          {getTaskVariance(dist).toFixed(1)}
-                        </span>
-                      </td>
+                      <th className="text-center p-3 font-mono text-xs font-medium bg-muted/50">
+                        Total
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {staff.map((s) => {
+                      const total = TASKS.reduce((sum, task) => sum + (heatmap[s.name]?.[task] || 0), 0);
+                      return (
+                        <tr key={s.id} className="border-b border-border hover:bg-muted/30 transition-smooth">
+                          <td className="p-3 font-condensed text-sm font-semibold">
+                            {s.name}
+                          </td>
+                          {TASKS.map((task) => {
+                            const count = heatmap[s.name]?.[task] || 0;
+                            return (
+                              <td 
+                                key={task} 
+                                className={`p-3 text-center ${getHeatmapColor(count)}`}
+                              >
+                                <span className="font-mono text-xs font-semibold">
+                                  {count > 0 ? count : "—"}
+                                </span>
+                              </td>
+                            );
+                          })}
+                          <td className="p-3 text-center bg-primary/10">
+                            <span className="font-mono text-xs font-bold text-primary">
+                              {total}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-condensed text-xl">Workload Balance</CardTitle>
-            <CardDescription className="font-mono text-xs">
-              Visual representation of assignment distribution
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {distribution.map((dist) => {
-                const maxAssignments = Math.max(...distribution.map(d => d.totalAssignments));
-                const percentage = maxAssignments > 0 ? (dist.totalAssignments / maxAssignments) * 100 : 0;
-                
-                return (
-                  <div key={dist.staffName} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-condensed font-semibold">{dist.staffName}</span>
-                      <span className="font-mono text-xs tabular-nums text-muted-foreground">
-                        {dist.totalAssignments} assignments
-                      </span>
-                    </div>
-                    <div className="h-2 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary transition-all"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {violations.length > 0 && (
-          <Card>
+        {/* Preference Satisfaction */}
+        {staff.some(s => s.preferences?.preferredTasks || s.preferences?.avoidTasks) && (
+          <Card className="shadow-sm hover:shadow-md transition-smooth">
             <CardHeader>
-              <CardTitle className="font-condensed text-xl text-destructive">
-                Consecutive Task Violations
+              <CardTitle className="font-condensed text-xl flex items-center gap-2">
+                <Heart className="h-5 w-5 text-accent" />
+                Preference Satisfaction
               </CardTitle>
               <CardDescription className="font-mono text-xs">
-                Staff members with same task on consecutive days
+                How often staff receive their preferred tasks vs avoided tasks
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {violations.map((violation, idx) => (
-                  <div key={idx} className="border border-destructive/20 rounded-md p-3 bg-destructive/5">
-                    <div className="flex items-start gap-3">
-                      <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
-                      <div className="flex-1">
-                        <div className="font-condensed font-semibold text-sm">
-                          {violation.staffName} - {violation.task}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {staff.filter(s => s.preferences?.preferredTasks || s.preferences?.avoidTasks).map(s => {
+                  const sat = preferenceSat[s.name];
+                  if (!sat || sat.total === 0) return null;
+
+                  const preferredRate = Math.round((sat.preferred / sat.total) * 100);
+                  const avoidedRate = Math.round((sat.avoided / sat.total) * 100);
+
+                  return (
+                    <Card key={s.id} className="shadow-sm">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="font-condensed text-sm">{s.name}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono text-muted-foreground">Preferred:</span>
+                          <span className="font-mono font-semibold text-success">{preferredRate}%</span>
                         </div>
-                        <div className="font-mono text-xs text-muted-foreground mt-1">
-                          Consecutive days: {violation.dates.map(d => 
-                            new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
-                          ).join(", ")}
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono text-muted-foreground">Avoided:</span>
+                          <span className="font-mono font-semibold text-destructive">{avoidedRate}%</span>
                         </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                        <div className="flex items-center justify-between text-xs pt-2 border-t">
+                          <span className="font-mono text-muted-foreground">Total:</span>
+                          <span className="font-mono font-semibold">{sat.total}</span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
         )}
 
-        {staff.length === 0 && (
-          <div className="bg-warning/10 border border-warning rounded-md p-4">
-            <p className="text-sm font-mono text-warning-foreground">
-              No data available. Configure staff and task requirements first.
-            </p>
-          </div>
-        )}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Staff Workload */}
+          <Card className="shadow-sm hover:shadow-md transition-smooth">
+            <CardHeader>
+              <CardTitle className="font-condensed text-xl">Staff Workload</CardTitle>
+              <CardDescription className="font-mono text-xs">
+                Total assignments per staff member
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {workload.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm font-mono">No assignments yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {workload.map((w) => {
+                    const max = workload[0].count;
+                    const percentage = max > 0 ? (w.count / max) * 100 : 0;
+                    return (
+                      <div key={w.name} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono font-semibold">{w.name}</span>
+                          <span className="font-mono text-muted-foreground">{w.count}</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-primary to-secondary rounded-full transition-all"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Task Distribution */}
+          <Card className="shadow-sm hover:shadow-md transition-smooth">
+            <CardHeader>
+              <CardTitle className="font-condensed text-xl">Task Distribution</CardTitle>
+              <CardDescription className="font-mono text-xs">
+                Total assignments per task type
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {taskDist.every(t => t.count === 0) ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                  <p className="text-sm font-mono">No assignments yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {taskDist.sort((a, b) => b.count - a.count).map((t) => {
+                    const max = taskDist.reduce((m, t) => Math.max(m, t.count), 0);
+                    const percentage = max > 0 ? (t.count / max) * 100 : 0;
+                    return (
+                      <div key={t.task} className="space-y-1.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-mono font-semibold">{t.task}</span>
+                          <span className="font-mono text-muted-foreground">{t.count}</span>
+                        </div>
+                        <div className="h-2 bg-muted rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-accent to-primary rounded-full transition-all"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Day Distribution */}
+          <Card className="shadow-sm hover:shadow-md transition-smooth lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="font-condensed text-xl">Daily Distribution</CardTitle>
+              <CardDescription className="font-mono text-xs">
+                Assignments across days of the week
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-7 gap-2">
+                {dayDist.map((d) => {
+                  const max = dayDist.reduce((m, d) => Math.max(m, d.count), 0);
+                  const percentage = max > 0 ? (d.count / max) * 100 : 0;
+                  return (
+                    <div key={d.day} className="text-center space-y-2">
+                      <div className="font-mono text-xs font-semibold">{d.day}</div>
+                      <div className="h-32 bg-muted rounded-lg flex items-end justify-center overflow-hidden">
+                        <div
+                          className="w-full bg-gradient-to-t from-primary to-secondary transition-all"
+                          style={{ height: `${percentage}%` }}
+                        />
+                      </div>
+                      <div className="font-mono text-xs text-muted-foreground">{d.count}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </Layout>
   );

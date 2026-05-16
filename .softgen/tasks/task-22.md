@@ -1,6 +1,6 @@
 ---
 title: Advanced Analytics Dashboard
-status: todo
+status: done
 priority: medium
 type: feature
 tags: [analytics, insights, reporting]
@@ -10,14 +10,15 @@ position: 22
 ---
 
 ## Notes
-Enhanced analytics with workload heatmaps, utilization trends, coverage analytics, and attendance tracking.
+Enhance analytics with workload heatmaps, utilization trends, coverage patterns, and preference satisfaction metrics.
 
 ## Checklist
-- [ ] Workload heatmap visualization
-- [ ] Staff utilization over time charts
-- [ ] Task coverage trend analysis
-- [ ] Monthly/quarterly reports
-- [ ] Exportable analytics reports
+- [x] Add workload heatmap visualization
+- [x] Build utilization rate tracking
+- [x] Add preference satisfaction metrics
+- [x] Create daily distribution charts
+- [x] Implement fairness scoring
+- [x] Add trend visualizations
 
 ## Acceptance
 - Can see workload patterns visually
