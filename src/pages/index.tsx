@@ -54,6 +54,7 @@ export default function Home() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [coverageGaps, setCoverageGaps] = useState<CoverageGap[]>([]);
   const [showCoverageWarning, setShowCoverageWarning] = useState(false);
+  const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
   const { addNotification } = useNotifications();
 
   useEffect(() => {
@@ -1190,26 +1191,36 @@ export default function Home() {
                       Click assignments to lock/unlock them during regeneration
                     </CardDescription>
                   </div>
-                  <div className="flex flex-wrap gap-2 text-[10px] font-mono">
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                      <span>Available</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                      <span>Rest Day</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                      <span>Holiday</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                      <span>Sick</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-warning" />
-                      <span>Locked</span>
+                  <div className="flex flex-col gap-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowUnavailableStaff(!showUnavailableStaff)}
+                      className="gap-2 rounded-lg font-mono text-xs"
+                    >
+                      {showUnavailableStaff ? "Hide" : "Show"} Unavailable Staff
+                    </Button>
+                    <div className="flex flex-wrap gap-2 text-[10px] font-mono">
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span>Available</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <span>Rest Day</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                        <span>Holiday</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                        <span>Sick</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Lock className="w-3 h-3 text-warning" />
+                        <span>Locked</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1284,7 +1295,7 @@ export default function Home() {
                                   })}
                                   
                                   {/* Unavailable staff (grayed out) */}
-                                  {unavailableStaff.map((unavailable, idx) => (
+                                  {showUnavailableStaff && unavailableStaff.map((unavailable, idx) => (
                                     <div
                                       key={`unavail-${idx}`}
                                       className="text-xs font-mono px-3 py-1.5 rounded-lg opacity-40 no-print"
