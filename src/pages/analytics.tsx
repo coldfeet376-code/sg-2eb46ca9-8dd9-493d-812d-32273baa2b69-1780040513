@@ -1,20 +1,28 @@
 import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/SEO";
 import { Badge } from "@/components/ui/badge";
 import type { StaffMember, Assignment, Task } from "@/types";
-import { Users, Calendar, Clock, TrendingUp, AlertCircle, Download, Trash2, BarChart3, Heart } from "lucide-react";
+import { Users, Calendar, Clock, TrendingUp, AlertCircle, Download, Trash2, BarChart3, Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
-const DAYS = ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function getWeekStart(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  d.setDate(d.getDate() - day);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
 export default function AnalyticsPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [selectedPeriod, setSelectedPeriod] = useState<"week" | "month" | "quarter">("month");
   const [history, setHistory] = useState<any[]>([]);
+  const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
 
   useEffect(() => {
     const savedStaff = localStorage.getItem("warehouse-staff");
@@ -28,12 +36,21 @@ export default function AnalyticsPage() {
     }
   }, []);
 
-  const getAllAssignments = (): Assignment[] => {
-    return history.flatMap(h => h.assignments || []);
+  // Get assignments for the selected week only
+  const getWeekAssignments = (): Assignment[] => {
+    const weekStartStr = weekStart.toISOString();
+    const weekHistory = history.filter(h => h.weekStart === weekStartStr);
+    return weekHistory.flatMap(h => h.assignments || []);
   };
 
+  const weekDates = DAYS.map((_, i) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + i);
+    return date;
+  });
+
   const getStaffWorkload = () => {
-    const assignments = getAllAssignments();
+    const assignments = getWeekAssignments();
     const workloadMap = new Map<string, number>();
 
     assignments.forEach(a => {
@@ -46,7 +63,7 @@ export default function AnalyticsPage() {
   };
 
   const getTaskDistribution = () => {
-    const assignments = getAllAssignments();
+    const assignments = getWeekAssignments();
     const taskMap = new Map<string, number>();
 
     TASKS.forEach(task => taskMap.set(task, 0));
@@ -58,7 +75,7 @@ export default function AnalyticsPage() {
   };
 
   const getWorkloadHeatmap = () => {
-    const assignments = getAllAssignments();
+    const assignments = getWeekAssignments();
     const heatmap: { [staffName: string]: { [task: string]: number } } = {};
 
     staff.forEach(s => {
@@ -78,7 +95,7 @@ export default function AnalyticsPage() {
   };
 
   const getPreferenceSatisfaction = () => {
-    const assignments = getAllAssignments();
+    const assignments = getWeekAssignments();
     const satisfaction: { [staffName: string]: { preferred: number; avoided: number; total: number } } = {};
 
     staff.forEach(s => {
@@ -103,7 +120,7 @@ export default function AnalyticsPage() {
   };
 
   const getDayDistribution = () => {
-    const assignments = getAllAssignments();
+    const assignments = getWeekAssignments();
     const dayMap = new Map<number, number>();
 
     DAYS.forEach((_, i) => dayMap.set(i, 0));
@@ -131,17 +148,16 @@ export default function AnalyticsPage() {
   };
 
   const getUtilizationRate = () => {
-    const assignments = getAllAssignments();
+    const assignments = getWeekAssignments();
     if (staff.length === 0) return 0;
 
-    const uniqueWeeks = new Set(history.map(h => h.weekStart));
-    const possibleAssignments = staff.length * uniqueWeeks.size * 7; // staff × weeks × days
+    const possibleAssignments = staff.length * 7; // staff × 7 days
     
     if (possibleAssignments === 0) return 0;
     return Math.round((assignments.length / possibleAssignments) * 100);
   };
 
-  // Calculate fairness metrics
+  // Calculate fairness metrics for the current week
   const calculateFairnessMetrics = () => {
     const staffAssignments: Record<string, { total: number; byTask: Record<string, number> }> = {};
     
@@ -153,16 +169,15 @@ export default function AnalyticsPage() {
       };
     });
     
-    // Count assignments
-    history.forEach(week => {
-      week.assignments.forEach(assignment => {
-        const staffMember = staff.find(s => s.name === assignment.staffName);
-        if (staffMember) {
-          staffAssignments[staffMember.id].total++;
-          staffAssignments[staffMember.id].byTask[assignment.task] = 
-            (staffAssignments[staffMember.id].byTask[assignment.task] || 0) + 1;
-        }
-      });
+    // Count assignments for the current week
+    const weekAssignments = getWeekAssignments();
+    weekAssignments.forEach(assignment => {
+      const staffMember = staff.find(s => s.name === assignment.staffName);
+      if (staffMember) {
+        staffAssignments[staffMember.id].total++;
+        staffAssignments[staffMember.id].byTask[assignment.task] = 
+          (staffAssignments[staffMember.id].byTask[assignment.task] || 0) + 1;
+      }
     });
     
     // Calculate fairness (standard deviation from mean)
@@ -197,16 +212,38 @@ export default function AnalyticsPage() {
     return "bg-primary/80";
   };
 
+  const handlePrevWeek = () => {
+    const newDate = new Date(weekStart);
+    newDate.setDate(weekStart.getDate() - 7);
+    setWeekStart(newDate);
+  };
+
+  const handleNextWeek = () => {
+    const newDate = new Date(weekStart);
+    newDate.setDate(weekStart.getDate() + 7);
+    setWeekStart(newDate);
+  };
+
   return (
     <Layout>
       <SEO title="Analytics - Warehouse Rota" description="View rotation history and task distribution analytics" />
 
       <div className="space-y-6">
-        <div>
-          <h1 className="font-condensed text-3xl font-bold tracking-tight">Analytics & Insights</h1>
-          <p className="text-sm text-muted-foreground font-mono mt-1">
-            Track rotation history, task distribution, and fairness metrics
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-condensed text-3xl font-bold tracking-tight">Analytics & Insights</h1>
+            <p className="text-sm text-muted-foreground font-mono mt-1">
+              Week: {weekDates[0].toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} - {weekDates[6].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handlePrevWeek} className="rounded-lg">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleNextWeek} className="rounded-lg">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Fairness Metrics Section */}
@@ -214,18 +251,18 @@ export default function AnalyticsPage() {
           <CardHeader>
             <CardTitle className="font-condensed text-xl flex items-center gap-2">
               <BarChart3 className="h-5 w-5 text-accent" />
-              Task Rotation Fairness
+              Task Rotation Fairness - Current Week
             </CardTitle>
             <CardDescription className="font-mono text-xs">
-              Analyze how fairly tasks are distributed across staff members
+              Analyze how fairly tasks are distributed across staff members this week
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {staff.length === 0 || history.length === 0 ? (
+            {staff.length === 0 || getWeekAssignments().length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <BarChart3 className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                <p className="text-sm font-mono">No assignment data yet</p>
-                <p className="text-xs font-mono mt-1">Generate some rotas to see fairness metrics</p>
+                <p className="text-sm font-mono">No assignment data for this week</p>
+                <p className="text-xs font-mono mt-1">Generate a rota to see fairness metrics</p>
               </div>
             ) : (
               <div className="space-y-6">
@@ -369,10 +406,10 @@ export default function AnalyticsPage() {
             </CardHeader>
             <CardContent>
               <div className="font-mono text-3xl font-bold tabular-nums text-secondary">
-                {getAllAssignments().length}
+                {getWeekAssignments().length}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Across all rotas
+                This week
               </p>
             </CardContent>
           </Card>
@@ -411,21 +448,21 @@ export default function AnalyticsPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+                <table className="w-full border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50 rounded-tl-lg">
+                      <th className="text-left p-2 font-condensed text-xs font-semibold bg-muted/50 rounded-tl-md">
                         Staff
                       </th>
                       {TASKS.map((task, i) => (
                         <th 
                           key={task} 
-                          className={`text-center p-3 font-mono text-xs font-medium bg-muted/50 ${i === TASKS.length - 1 ? 'rounded-tr-lg' : ''}`}
+                          className={`text-center p-2 font-mono text-[10px] font-medium bg-muted/50 ${i === TASKS.length - 1 ? 'rounded-tr-md' : ''}`}
                         >
                           {task}
                         </th>
                       ))}
-                      <th className="text-center p-3 font-mono text-xs font-medium bg-muted/50">
+                      <th className="text-center p-2 font-mono text-[10px] font-medium bg-muted/50">
                         Total
                       </th>
                     </tr>
@@ -435,7 +472,7 @@ export default function AnalyticsPage() {
                       const total = TASKS.reduce((sum, task) => sum + (heatmap[s.name]?.[task] || 0), 0);
                       return (
                         <tr key={s.id} className="border-b border-border hover:bg-muted/30 transition-smooth">
-                          <td className="p-3 font-condensed text-sm font-semibold">
+                          <td className="p-2 font-condensed text-xs font-semibold">
                             {s.name}
                           </td>
                           {TASKS.map((task) => {
@@ -443,7 +480,7 @@ export default function AnalyticsPage() {
                             return (
                               <td 
                                 key={task} 
-                                className={`p-3 text-center ${getHeatmapColor(count)}`}
+                                className={`p-2 text-center ${getHeatmapColor(count)}`}
                               >
                                 <span className="font-mono text-xs font-semibold">
                                   {count > 0 ? count : "—"}
@@ -451,7 +488,7 @@ export default function AnalyticsPage() {
                               </td>
                             );
                           })}
-                          <td className="p-3 text-center bg-primary/10">
+                          <td className="p-2 text-center bg-primary/10">
                             <span className="font-mono text-xs font-bold text-primary">
                               {total}
                             </span>
@@ -475,7 +512,7 @@ export default function AnalyticsPage() {
                 Preference Satisfaction
               </CardTitle>
               <CardDescription className="font-mono text-xs">
-                How often staff receive their preferred tasks vs avoided tasks
+                How often staff receive their preferred tasks vs avoided tasks this week
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -520,14 +557,14 @@ export default function AnalyticsPage() {
             <CardHeader>
               <CardTitle className="font-condensed text-xl">Staff Workload</CardTitle>
               <CardDescription className="font-mono text-xs">
-                Total assignments per staff member
+                Total assignments per staff member this week
               </CardDescription>
             </CardHeader>
             <CardContent>
               {workload.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                  <p className="text-sm font-mono">No assignments yet</p>
+                  <p className="text-sm font-mono">No assignments this week</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -559,14 +596,14 @@ export default function AnalyticsPage() {
             <CardHeader>
               <CardTitle className="font-condensed text-xl">Task Distribution</CardTitle>
               <CardDescription className="font-mono text-xs">
-                Total assignments per task type
+                Total assignments per task type this week
               </CardDescription>
             </CardHeader>
             <CardContent>
               {taskDist.every(t => t.count === 0) ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                  <p className="text-sm font-mono">No assignments yet</p>
+                  <p className="text-sm font-mono">No assignments this week</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -608,7 +645,7 @@ export default function AnalyticsPage() {
                   const percentage = max > 0 ? (d.count / max) * 100 : 0;
                   return (
                     <div key={d.day} className="text-center space-y-2">
-                      <div className="font-mono text-xs font-semibold">{d.day}</div>
+                      <div className="font-mono text-xs font-semibold">{d.day.slice(0, 3)}</div>
                       <div className="h-32 bg-muted rounded-lg flex items-end justify-center overflow-hidden">
                         <div
                           className="w-full bg-gradient-to-t from-primary to-secondary transition-all"

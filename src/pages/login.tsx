@@ -9,6 +9,7 @@ import { SEO } from "@/components/SEO";
 import { Lock, LayoutGrid, AlertCircle } from "lucide-react";
 
 const CORRECT_PASSWORD = "warehouse2024"; // Generic password - can be changed or moved to .env
+const ALTERNATE_PASSWORD = "Lenziemill"; // Alternate password
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,7 +27,7 @@ export default function LoginPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (password === CORRECT_PASSWORD) {
+    if (password === CORRECT_PASSWORD || password === ALTERNATE_PASSWORD) {
       localStorage.setItem("warehouse-auth", "true");
       router.push("/");
     } else {
