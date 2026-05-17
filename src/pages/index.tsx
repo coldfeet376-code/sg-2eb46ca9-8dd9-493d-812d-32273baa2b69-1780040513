@@ -65,6 +65,28 @@ export default function Home() {
   const { data: staff = [], isLoading: staffLoading } = useStaff();
   const { data: taskConfig, isLoading: configLoading } = useTaskConfig();
 
+  // React Query hooks - cached data with error handling
+  const { data: staff = [], isLoading: staffLoading, error: staffError } = useStaff();
+  const { data: taskConfig, isLoading: configLoading, error: configError } = useTaskConfig();
+
+  // Debug logging
+  useEffect(() => {
+    console.log("Staff Query State:", { 
+      staff, 
+      staffCount: staff.length, 
+      staffLoading, 
+      staffError: staffError?.message 
+    });
+  }, [staff, staffLoading, staffError]);
+
+  useEffect(() => {
+    console.log("Task Config Query State:", { 
+      taskConfig, 
+      configLoading, 
+      configError: configError?.message 
+    });
+  }, [taskConfig, configLoading, configError]);
+
   useEffect(() => {
     // Load locked assignments and history from localStorage
     const savedLocked = localStorage.getItem("warehouse-locked-assignments");
@@ -1440,6 +1462,56 @@ export default function Home() {
         )}
 
         {!taskConfig && staff.length > 0 && (
+          <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm no-print">
+            <p className="text-sm font-mono text-warning-foreground">
+              No task configuration found. Visit the <Link href="/config" className="underline font-semibold hover:text-warning transition-smooth">Config page</Link> to set up daily task requirements.
+            </p>
+          </div>
+        )}
+
+        {staffError && (
+          <Alert className="bg-destructive/10 border-destructive no-print">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            <div className="flex-1">
+              <h3 className="font-condensed font-semibold text-destructive mb-2">
+                Staff Data Error
+              </h3>
+              <p className="text-sm text-destructive/90 font-mono">
+                {staffError.message}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Check browser console for details
+              </p>
+            </div>
+          </Alert>
+        )}
+
+        {configError && (
+          <Alert className="bg-destructive/10 border-destructive no-print">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            <div className="flex-1">
+              <h3 className="font-condensed font-semibold text-destructive mb-2">
+                Configuration Error
+              </h3>
+              <p className="text-sm text-destructive/90 font-mono">
+                {configError.message}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Check browser console for details
+              </p>
+            </div>
+          </Alert>
+        )}
+
+        {staff.length === 0 && !staffLoading && !staffError && (
+          <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm no-print">
+            <p className="text-sm font-mono text-warning-foreground">
+              No staff members configured. Visit the <Link href="/staff" className="underline font-semibold hover:text-warning transition-smooth">Staff page</Link> to add employees.
+            </p>
+          </div>
+        )}
+
+        {!taskConfig && !configLoading && !configError && staff.length > 0 && (
           <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm no-print">
             <p className="text-sm font-mono text-warning-foreground">
               No task configuration found. Visit the <Link href="/config" className="underline font-semibold hover:text-warning transition-smooth">Config page</Link> to set up daily task requirements.
