@@ -131,6 +131,19 @@ export const staffService = {
     }
   },
 
+  // Clear all availability entries for a staff member
+  async clearAllAvailability(staffId: string): Promise<void> {
+    const { error } = await supabase
+      .from("availability")
+      .delete()
+      .eq("staff_id", staffId);
+
+    if (error) {
+      console.error("Error clearing availability:", error);
+      throw error;
+    }
+  },
+
   // Bulk import staff from CSV/Excel
   async bulkImportStaff(
     staffData: Array<{
