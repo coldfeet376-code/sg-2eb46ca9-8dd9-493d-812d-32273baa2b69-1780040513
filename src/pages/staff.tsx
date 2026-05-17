@@ -6,25 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { SEO } from "@/components/SEO";
 import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart } from "@/types";
 import { Badge } from "@/components/ui/badge";
-import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, AlertCircle, Repeat, Clock, Edit, X } from "lucide-react";
-import * as XLSX from "xlsx";
+import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
-const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const SHIFT_STARTS: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
 
 export default function StaffPage() {
@@ -32,23 +28,18 @@ export default function StaffPage() {
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
   const [shiftStart, setShiftStart] = useState<ShiftStart>("06:00");
   const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
-  const [bulkInput, setBulkInput] = useState("");
-  const [bulkSuccess, setBulkSuccess] = useState(false);
-  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
-  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
-  const [availabilityType, setAvailabilityType] = useState<AvailabilityType>("rest");
-  const [availabilityNotes, setAvailabilityNotes] = useState("");
-  const [excelImport, setExcelImport] = useState("");
-  const [csvFileName, setCsvFileName] = useState("");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
-  // Batch availability state
-  const [batchMode, setBatchMode] = useState(false);
-  const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
-  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
-  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
-  const [clearAllConfirm, setClearAllConfirm] = useState<string | null>(null);
-  const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
+  // Week navigation
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
+    const today = new Date();
+    const day = today.getDay();
+    const diff = day === 0 ? 0 : 7 - day; // Days until next Saturday
+    const saturday = new Date(today);
+    saturday.setDate(today.getDate() + diff);
+    saturday.setHours(0, 0, 0, 0);
+    return saturday;
+  });
   
   const { addAuditEntry } = useAudit();
   const { toast } = useToast();
@@ -60,22 +51,43 @@ export default function StaffPage() {
   const [editTasks, setEditTasks] = useState<Task[]>([]);
   const [editShift, setEditShift] = useState<ShiftStart>("06:00");
   
-  // Recurring pattern state
-  const [patternDayOfWeek, setPatternDayOfWeek] = useState<number>(1);
-  const [patternType, setPatternType] = useState<AvailabilityType>("rest");
-  const [patternStartDate, setPatternStartDate] = useState<Date>(new Date());
-  const [patternEndDate, setPatternEndDate] = useState<Date>(() => {
-    const end = new Date();
-    end.setMonth(end.getMonth() + 3);
-    return end;
-  });
-  const [patternNotes, setPatternNotes] = useState("");
+  // Expanded staff IDs for collapsible sections
+  const [expandedStaffIds, setExpandedStaffIds] = useState<Set<string>>(new Set());
 
-  // React Query hooks - cached data
+  // React Query hooks
   const { data: staff = [], isLoading: staffLoading } = useStaff();
   const addStaffMutation = useAddStaff();
   const updateStaffMutation = useUpdateStaff();
   const deleteStaffMutation = useDeleteStaff();
+
+  // Get week dates (Saturday to Sunday)
+  const getWeekDates = (weekStart: Date): Date[] => {
+    const dates: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
+  const weekDates = getWeekDates(currentWeekStart);
+
+  const navigateWeek = (direction: "prev" | "next") => {
+    const newStart = new Date(currentWeekStart);
+    newStart.setDate(currentWeekStart.getDate() + (direction === "next" ? 7 : -7));
+    setCurrentWeekStart(newStart);
+  };
+
+  const goToToday = () => {
+    const today = new Date();
+    const day = today.getDay();
+    const diff = day === 0 ? 0 : 7 - day;
+    const saturday = new Date(today);
+    saturday.setDate(today.getDate() + diff);
+    saturday.setHours(0, 0, 0, 0);
+    setCurrentWeekStart(saturday);
+  };
 
   const handleAddStaff = async () => {
     if (!name.trim() || selectedTasks.length === 0) return;
@@ -100,14 +112,6 @@ export default function StaffPage() {
           toast({
             title: "Staff added",
             description: `${newStaff.name} has been added successfully`,
-          });
-        },
-        onError: (error) => {
-          console.error("Error adding staff:", error);
-          toast({
-            title: "Error",
-            description: "Failed to add staff member",
-            variant: "destructive",
           });
         },
       }
@@ -155,191 +159,8 @@ export default function StaffPage() {
             description: "Changes saved successfully",
           });
         },
-        onError: (error) => {
-          console.error("Error updating staff:", error);
-          toast({
-            title: "Error",
-            description: "Failed to update staff member",
-            variant: "destructive",
-          });
-        },
       }
     );
-  };
-
-  // Quick action handlers
-  const handleQuickSickToday = async (staffId: string) => {
-    const today = new Date();
-    const dateStr = today.toISOString().split("T")[0];
-    
-    try {
-      await staffService.addAvailability(staffId, [{
-        date: dateStr,
-        type: "sick",
-        notes: "Marked sick",
-      }]);
-
-      const updatedStaff = staff.map((s) => {
-        if (s.id === staffId) {
-          const newEntry: AvailabilityEntry = {
-            date: dateStr,
-            type: "sick",
-            notes: "Marked sick",
-          };
-          return {
-            ...s,
-            availability: [...(s.availability || []), newEntry],
-          };
-        }
-        return s;
-      });
-
-      toast({
-        title: "Marked sick",
-        description: "Staff member marked as sick for today",
-      });
-
-      // Invalidate React Query cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
-    } catch (error) {
-      console.error("Error marking sick:", error);
-      toast({
-        title: "Error",
-        description: "Failed to mark as sick",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleQuickRestTomorrow = async (staffId: string) => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = tomorrow.toISOString().split("T")[0];
-    
-    try {
-      await staffService.addAvailability(staffId, [{
-        date: dateStr,
-        type: "rest",
-        notes: "Quick rest day",
-      }]);
-
-      const updatedStaff = staff.map((s) => {
-        if (s.id === staffId) {
-          const newEntry: AvailabilityEntry = {
-            date: dateStr,
-            type: "rest",
-            notes: "Quick rest day",
-          };
-          return {
-            ...s,
-            availability: [...(s.availability || []), newEntry],
-          };
-        }
-        return s;
-      });
-
-      toast({
-        title: "Rest day added",
-        description: "Rest day added for tomorrow",
-      });
-
-      // Invalidate React Query cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
-    } catch (error) {
-      console.error("Error adding rest day:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add rest day",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // Batch availability handler
-  const handleBatchAvailability = async () => {
-    if (!dateFrom || !dateTo || selectedStaffIds.length === 0) return;
-
-    const dates: Date[] = [];
-    const current = new Date(dateFrom);
-    const end = new Date(dateTo);
-
-    while (current <= end) {
-      dates.push(new Date(current));
-      current.setDate(current.getDate() + 1);
-    }
-
-    const newEntries: AvailabilityEntry[] = dates.map((date) => ({
-      date: date.toISOString().split("T")[0],
-      type: availabilityType,
-      notes: availabilityNotes || "Batch entry",
-    }));
-
-    try {
-      for (const staffId of selectedStaffIds) {
-        await staffService.addAvailability(staffId, newEntries);
-      }
-
-      // Invalidate React Query cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
-
-      toast({
-        title: "Batch availability added",
-        description: `Added ${dates.length} days for ${selectedStaffIds.length} staff members`,
-      });
-    } catch (error) {
-      console.error("Error adding batch availability:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add batch availability",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleClearAllAvailability = async () => {
-    if (!clearAllConfirm) return;
-
-    try {
-      for (const staffId of selectedStaffIds) {
-        const staffMember = staff.find((s) => s.id === staffId);
-        if (staffMember && staffMember.availability) {
-          for (const entry of staffMember.availability) {
-            await staffService.deleteAvailability(staffId, entry.date);
-          }
-        }
-      }
-
-      toast({
-        title: "Availability cleared",
-        description: "All availability entries for selected staff have been removed",
-      });
-
-      // Invalidate React Query cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
-    } catch (error) {
-      console.error("Error clearing availability:", error);
-      toast({
-        title: "Error",
-        description: "Failed to clear availability",
-        variant: "destructive",
-      });
-    } finally {
-      setClearAllConfirm(null);
-    }
-  };
-
-  const toggleStaffSelection = (staffId: string) => {
-    setSelectedStaffIds((prev) =>
-      prev.includes(staffId) ? prev.filter((id) => id !== staffId) : [...prev, staffId]
-    );
-  };
-
-  const handleEditTaskToggle = (task: Task) => {
-    if (editTasks.includes(task)) {
-      setEditTasks(editTasks.filter((t) => t !== task));
-    } else {
-      setEditTasks([...editTasks, task]);
-    }
   };
 
   const handleDeleteStaff = async (id: string) => {
@@ -362,14 +183,6 @@ export default function StaffPage() {
         });
         setDeleteConfirmId(null);
       },
-      onError: (error) => {
-        console.error("Error deleting staff:", error);
-        toast({
-          title: "Error",
-          description: "Failed to delete staff member",
-          variant: "destructive",
-        });
-      },
     });
   };
 
@@ -381,420 +194,73 @@ export default function StaffPage() {
     }
   };
 
-  const handleBulkImport = async () => {
-    const lines = bulkInput.trim().split("\n");
-    const staffData: Array<{
-      name: string;
-      trainedTasks: string[];
-      shiftStart?: string;
-    }> = [];
+  const handleEditTaskToggle = (task: Task) => {
+    if (editTasks.includes(task)) {
+      setEditTasks(editTasks.filter((t) => t !== task));
+    } else {
+      setEditTasks([...editTasks, task]);
+    }
+  };
 
-    lines.forEach((line) => {
-      const parts = line.split(",").map((p) => p.trim());
-      if (parts.length < 2) return;
-
-      const staffName = parts[0];
-      
-      const lastPart = parts[parts.length - 1];
-      let shift: ShiftStart = "06:00";
-      let tasksEndIndex = parts.length;
-      
-      if (SHIFT_STARTS.includes(lastPart as ShiftStart)) {
-        shift = lastPart as ShiftStart;
-        tasksEndIndex = parts.length - 1;
+  const toggleStaffExpanded = (staffId: string) => {
+    setExpandedStaffIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(staffId)) {
+        newSet.delete(staffId);
+      } else {
+        newSet.add(staffId);
       }
-      
-      const tasks = parts
-        .slice(1, tasksEndIndex)
-        .filter((t) => TASKS.includes(t as Task)) as Task[];
-
-      if (staffName && tasks.length > 0) {
-        staffData.push({
-          name: staffName,
-          trainedTasks: tasks,
-          shiftStart: shift,
-        });
-      }
+      return newSet;
     });
+  };
 
-    if (staffData.length > 0) {
+  const handleDayClick = async (staffId: string, date: Date, currentType: AvailabilityType | null) => {
+    const dateStr = date.toISOString().split("T")[0];
+    
+    // Cycle through: null -> rest -> holiday -> sick -> null
+    let newType: AvailabilityType | null = null;
+    if (currentType === null) {
+      newType = "rest";
+    } else if (currentType === "rest") {
+      newType = "holiday";
+    } else if (currentType === "holiday") {
+      newType = "sick";
+    } else {
+      // sick -> null (remove)
       try {
-        await staffService.bulkImportStaff(staffData);
+        await staffService.deleteAvailability(staffId, dateStr);
+        await queryClient.invalidateQueries({ queryKey: ["staff"] });
         toast({
-          title: "Import successful",
-          description: `Imported ${staffData.length} staff members`,
+          title: "Cleared",
+          description: "Day marked as working",
         });
       } catch (error) {
-        console.error("Error bulk importing:", error);
-        toast({
-          title: "Error",
-          description: "Failed to import staff",
-          variant: "destructive",
-        });
+        console.error("Error removing availability:", error);
       }
-    }
-  };
-
-  const handleCsvFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setCsvFileName(file.name);
-
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const data = e.target?.result;
-      
-      if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-        const workbook = XLSX.read(data, { type: 'binary' });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const csvText = XLSX.utils.sheet_to_csv(firstSheet);
-        setExcelImport(csvText);
-      } else {
-        const text = data as string;
-        setExcelImport(text);
-      }
-    };
-
-    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-      reader.readAsBinaryString(file);
-    } else {
-      reader.readAsText(file);
-    }
-  };
-
-  const handleAvailabilityImport = async () => {
-    if (!selectedStaff || !excelImport.trim()) {
-      toast({
-        title: "No data",
-        description: "Please paste or upload CSV data first",
-        variant: "destructive",
-      });
       return;
     }
 
-    const lines = excelImport.trim().split("\n");
-    const newAvailability: AvailabilityEntry[] = [];
-    const errors: string[] = [];
-    let headerSkipped = false;
-    let workingDaysSkipped = 0;
-
-    console.log("🔍 Parsing CSV - Total lines:", lines.length);
-
-    lines.forEach((line, index) => {
-      // Skip empty lines
-      if (!line.trim()) return;
-
-      const parts = line.split(/,|\t/).map((p) => p.trim());
-      
-      if (parts.length < 2) {
-        errors.push(`Line ${index + 1}: Not enough columns (need at least Date,Type)`);
-        return;
-      }
-
-      const dateStr = parts[0];
-      const statusStr = parts[1].toLowerCase();
-      const typeLabel = parts[2] || "";
-
-      console.log(`Line ${index + 1}: Date="${dateStr}", Status="${statusStr}"`);
-
-      // Skip header row if present
-      if (index === 0 && (dateStr.toLowerCase().includes('date') || statusStr.toLowerCase().includes('type') || statusStr.toLowerCase().includes('status'))) {
-        headerSkipped = true;
-        console.log("✓ Skipped header row");
-        return;
-      }
-
-      // Parse DD/MM/YYYY format
-      let parsedDate: Date | null = null;
-      
-      // Try DD/MM/YYYY format first
-      const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-      if (ddmmyyyyMatch) {
-        const day = parseInt(ddmmyyyyMatch[1], 10);
-        const month = parseInt(ddmmyyyyMatch[2], 10) - 1; // Month is 0-indexed
-        const year = parseInt(ddmmyyyyMatch[3], 10);
-        parsedDate = new Date(year, month, day);
-        console.log(`  Parsed DD/MM/YYYY: ${day}/${month + 1}/${year} → ${parsedDate.toISOString().split('T')[0]}`);
-      } else {
-        // Fallback to standard Date parsing (YYYY-MM-DD)
-        parsedDate = new Date(dateStr + "T00:00:00");
-        if (!isNaN(parsedDate.getTime())) {
-          console.log(`  Parsed YYYY-MM-DD: ${dateStr} → ${parsedDate.toISOString().split('T')[0]}`);
-        }
-      }
-
-      if (!parsedDate || isNaN(parsedDate.getTime())) {
-        errors.push(`Line ${index + 1}: Invalid date format "${dateStr}"`);
-        console.error(`✗ Invalid date: "${dateStr}"`);
-        return;
-      }
-
-      // Map status to availability type
-      let availType: AvailabilityType | null = null;
-      
-      if (statusStr === "rest") {
-        availType = "rest";
-      } else if (statusStr === "holiday") {
-        availType = "holiday";
-      } else if (statusStr === "sick") {
-        availType = "sick";
-      } else if (statusStr === "working") {
-        // Skip working days - we only store exceptions
-        workingDaysSkipped++;
-        console.log(`  ⊘ Skipped "working" day`);
-        return;
-      } else if (statusStr === "available") {
-        availType = "available";
-      } else {
-        errors.push(`Line ${index + 1}: Unknown status "${statusStr}"`);
-        console.error(`✗ Unknown status: "${statusStr}"`);
-        return;
-      }
-
-      if (!availType) return;
-
-      const entry: AvailabilityEntry = {
-        date: parsedDate.toISOString().split("T")[0],
-        type: availType,
-        notes: typeLabel || `Imported ${availType}`,
-      };
-
-      newAvailability.push(entry);
-      console.log(`  ✓ Added ${availType} entry for ${entry.date}`);
-    });
-
-    console.log("📊 Parse complete:", {
-      totalLines: lines.length,
-      headerSkipped,
-      workingDaysSkipped,
-      successfulEntries: newAvailability.length,
-      errors: errors.length,
-    });
-
-    // Show detailed feedback
-    if (newAvailability.length === 0) {
-      const errorSummary = errors.length > 0 
-        ? errors.slice(0, 3).join("\n") + (errors.length > 3 ? `\n...and ${errors.length - 3} more` : "")
-        : "No valid entries found. All rows were either 'working' days or failed to parse.";
-      
-      toast({
-        title: "Import failed",
-        description: `Processed ${lines.length} lines, found 0 valid entries.\n${workingDaysSkipped} working days skipped (expected).\n${errors.length > 0 ? `Errors: ${errorSummary}` : ""}`,
-        variant: "destructive",
-      });
-      
-      console.error("Import failed - no valid entries");
-      return;
-    }
-
-    // Import successful entries
+    // Add or update
     try {
-      console.log("🚀 Starting database import of", newAvailability.length, "entries for staff:", selectedStaff.id);
-      
-      await staffService.addAvailability(selectedStaff.id, newAvailability);
-
-      console.log("✅ Database import successful, invalidating cache...");
-      
-      // Invalidate React Query cache to refresh UI
+      await staffService.addAvailability(staffId, [{
+        date: dateStr,
+        type: newType,
+        notes: `Marked as ${newType}`,
+      }]);
       await queryClient.invalidateQueries({ queryKey: ["staff"] });
-      
-      console.log("✅ Cache invalidated, resetting UI...");
-
       toast({
-        title: "Import successful",
-        description: `✓ Imported ${newAvailability.length} entries\n⊘ Skipped ${workingDaysSkipped} working days\n${errors.length > 0 ? `⚠️ ${errors.length} errors` : ""}`,
+        title: "Updated",
+        description: `Day marked as ${newType}`,
       });
-      
-      // Clear the import field after success
-      setExcelImport("");
-      setCsvFileName("");
-      
-      // Close the import sheet
-      setIsImportSheetOpen(false);
-      
-      // Reset selected staff to force re-read from cache
-      const staffId = selectedStaff.id;
-      setSelectedStaff(null);
-      setTimeout(() => {
-        const updated = staff.find(s => s.id === staffId);
-        if (updated) setSelectedStaff(updated);
-      }, 100);
-      
     } catch (error) {
-      console.error("❌ Error importing availability:", error);
-      console.error("Error details:", {
-        message: error instanceof Error ? error.message : String(error),
-        code: (error as any)?.code,
-        details: (error as any)?.details,
-        hint: (error as any)?.hint,
-      });
-      
-      toast({
-        title: "Database error",
-        description: `Failed to save ${newAvailability.length} entries. ${error instanceof Error ? error.message : "Unknown error"}`,
-        variant: "destructive",
-      });
+      console.error("Error updating availability:", error);
     }
   };
 
-  const handleAddAvailability = async () => {
-    if (!selectedStaff || selectedDates.length === 0) return;
-
-    const newEntries: AvailabilityEntry[] = selectedDates.map((date) => ({
-      date: date.toISOString().split("T")[0],
-      type: availabilityType,
-      notes: availabilityNotes,
-    }));
-
-    try {
-      await staffService.addAvailability(selectedStaff.id, newEntries);
-
-      // Invalidate React Query cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
-
-      toast({
-        title: "Availability added",
-        description: `Added ${newEntries.length} availability entries`,
-      });
-    } catch (error) {
-      console.error("Error adding availability:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add availability",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDeleteAvailability = async (staffId: string, date: string) => {
-    try {
-      await staffService.deleteAvailability(staffId, date);
-
-      // Invalidate React Query cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
-
-      toast({
-        title: "Entry deleted",
-        description: "Availability entry removed",
-      });
-    } catch (error) {
-      console.error("Error deleting availability:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete availability",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleClearStaffAvailability = async (staffId: string) => {
-    const staffMember = staff.find(s => s.id === staffId);
-    if (!staffMember || !staffMember.availability || staffMember.availability.length === 0) {
-      toast({
-        title: "No data",
-        description: "No availability entries to clear",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      console.log("🗑️ Clearing all availability for staff:", staffId, "Count:", staffMember.availability.length);
-      
-      // Delete all availability entries for this staff member
-      await staffService.clearAllAvailability(staffId);
-
-      console.log("✅ Database delete successful, invalidating cache...");
-      
-      // Invalidate React Query cache to refresh UI
-      await queryClient.invalidateQueries({ queryKey: ["staff"] });
-      
-      console.log("✅ Cache invalidated, resetting UI...");
-
-      toast({
-        title: "All entries cleared",
-        description: `Removed ${staffMember.availability.length} availability entries for ${staffMember.name}`,
-      });
-      
-      setClearAllConfirm(null);
-      
-      // Reset selected staff to force re-read from cache
-      setSelectedStaff(null);
-      setTimeout(() => {
-        const updated = staff.find(s => s.id === staffId);
-        if (updated) setSelectedStaff(updated);
-      }, 100);
-      
-    } catch (error) {
-      console.error("❌ Error clearing availability:", error);
-      toast({
-        title: "Error",
-        description: "Failed to clear availability data",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleApplyPattern = async () => {
-    if (!selectedStaff) return;
-
-    const entries: AvailabilityEntry[] = [];
-    const current = new Date(patternStartDate);
-    const end = new Date(patternEndDate);
-
-    while (current <= end) {
-      if (current.getDay() === patternDayOfWeek) {
-        entries.push({
-          date: current.toISOString().split("T")[0],
-          type: patternType,
-          notes: patternNotes || `Every ${DAYS_OF_WEEK[patternDayOfWeek]}`,
-        });
-      }
-      current.setDate(current.getDate() + 1);
-    }
-
-    if (entries.length === 0) return;
-
-    try {
-      await staffService.addAvailability(selectedStaff.id, entries);
-
-      // Invalidate React Query cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
-
-      const updatedStaff = staff.map((s) => {
-        if (s.id === selectedStaff.id) {
-          const existingDates = new Set(entries.map((e) => e.date));
-          const filtered = (s.availability || []).filter((a) => !existingDates.has(a.date));
-          return {
-            ...s,
-            availability: [...filtered, ...entries].sort((a, b) => a.date.localeCompare(b.date)),
-          };
-        }
-        return s;
-      });
-
-      toast({
-        title: "Pattern applied",
-        description: `Added ${entries.length} recurring entries`,
-      });
-    } catch (error) {
-      console.error("Error applying pattern:", error);
-      toast({
-        title: "Error",
-        description: "Failed to apply pattern",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const getAvailabilityColor = (type: AvailabilityType) => {
-    switch (type) {
-      case "rest": return "bg-blue-100 text-blue-800 border-blue-300";
-      case "holiday": return "bg-purple-100 text-purple-800 border-purple-300";
-      case "sick": return "bg-red-100 text-red-800 border-red-300";
-      default: return "bg-green-100 text-green-800 border-green-300";
-    }
+  const getAvailabilityForDate = (staffMember: StaffMember, date: Date): AvailabilityType | null => {
+    const dateStr = date.toISOString().split("T")[0];
+    const entry = staffMember.availability?.find(a => a.date === dateStr);
+    return entry ? entry.type : null;
   };
 
   const getAvailabilityStats = (staffMember: StaffMember) => {
@@ -806,6 +272,16 @@ export default function StaffPage() {
     };
   };
 
+  const getDayColor = (type: AvailabilityType | null) => {
+    if (!type) return "bg-background hover:bg-muted/50";
+    switch (type) {
+      case "rest": return "bg-blue-100 hover:bg-blue-200 border-blue-400 text-blue-900";
+      case "holiday": return "bg-purple-100 hover:bg-purple-200 border-purple-400 text-purple-900";
+      case "sick": return "bg-red-100 hover:bg-red-200 border-red-400 text-red-900";
+      default: return "bg-green-100 hover:bg-green-200 border-green-400 text-green-900";
+    }
+  };
+
   return (
     <Layout>
       <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
@@ -814,667 +290,311 @@ export default function StaffPage() {
         <div>
           <h1 className="font-condensed text-3xl font-bold tracking-tight">Staff Management</h1>
           <p className="text-sm text-muted-foreground font-mono mt-1">
-            Manage employees, training, and availability
+            Manage employees, training, and weekly availability
           </p>
         </div>
 
-        <Tabs defaultValue="staff" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 max-w-2xl rounded-lg">
-            <TabsTrigger value="staff" className="font-mono text-xs">
-              <Users className="h-4 w-4 mr-2" />
-              Staff List
-            </TabsTrigger>
-            <TabsTrigger value="bulk" className="font-mono text-xs">
-              <Upload className="h-4 w-4 mr-2" />
-              Bulk Import
-            </TabsTrigger>
-          </TabsList>
+        <Card className="shadow-sm hover:shadow-md transition-smooth">
+          <CardHeader>
+            <CardTitle className="font-condensed text-xl">Add Staff Member</CardTitle>
+            <CardDescription className="font-mono text-xs">
+              Enter staff details and select their trained tasks
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name" className="font-mono text-xs">Name</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="John Smith"
+                className="rounded-lg"
+              />
+            </div>
 
-          <TabsContent value="staff" className="space-y-6">
-            <Card className="shadow-sm hover:shadow-md transition-smooth">
-              <CardHeader>
-                <CardTitle className="font-condensed text-xl">Add Staff Member</CardTitle>
-                <CardDescription className="font-mono text-xs">
-                  Enter staff details and select their trained tasks
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="font-mono text-xs">Name</Label>
-                  <Input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="John Smith"
-                    className="rounded-lg"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label className="font-mono text-xs">Trained Tasks</Label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {TASKS.map((task) => (
-                      <div key={task} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={task}
-                          checked={selectedTasks.includes(task)}
-                          onCheckedChange={() => handleTaskToggle(task)}
-                        />
-                        <Label htmlFor={task} className="font-mono text-xs cursor-pointer">{task}</Label>
-                      </div>
-                    ))}
+            <div className="space-y-2">
+              <Label className="font-mono text-xs">Trained Tasks</Label>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {TASKS.map((task) => (
+                  <div key={task} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={task}
+                      checked={selectedTasks.includes(task)}
+                      onCheckedChange={() => handleTaskToggle(task)}
+                    />
+                    <Label htmlFor={task} className="font-mono text-xs cursor-pointer">{task}</Label>
                   </div>
-                </div>
+                ))}
+              </div>
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="shift" className="font-mono text-xs flex items-center gap-2">
-                    <Clock className="h-3.5 w-3.5" />
-                    Shift Start Time
-                  </Label>
-                  <Select value={shiftStart} onValueChange={(v) => setShiftStart(v as ShiftStart)}>
-                    <SelectTrigger id="shift" className="rounded-lg font-mono text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SHIFT_STARTS.map((shift) => (
-                        <SelectItem key={shift} value={shift} className="font-mono text-xs">{shift}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="shift" className="font-mono text-xs flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5" />
+                Shift Start Time
+              </Label>
+              <Select value={shiftStart} onValueChange={(v) => setShiftStart(v as ShiftStart)}>
+                <SelectTrigger id="shift" className="rounded-lg font-mono text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SHIFT_STARTS.map((shift) => (
+                    <SelectItem key={shift} value={shift} className="font-mono text-xs">{shift}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-                <Button onClick={handleAddStaff} className="rounded-lg shadow-sm hover:shadow-md transition-smooth" disabled={addStaffMutation.isPending || !name.trim() || selectedTasks.length === 0}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  <span className="font-mono text-xs">{addStaffMutation.isPending ? "Adding..." : "Add Staff"}</span>
+            <Button onClick={handleAddStaff} className="rounded-lg shadow-sm hover:shadow-md transition-smooth" disabled={addStaffMutation.isPending || !name.trim() || selectedTasks.length === 0}>
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="font-mono text-xs">{addStaffMutation.isPending ? "Adding..." : "Add Staff"}</span>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <div>
+              <CardTitle className="font-condensed flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Staff Members
+              </CardTitle>
+              <CardDescription className="font-mono text-xs mt-1">
+                {staff.length} staff member{staff.length !== 1 ? "s" : ""}
+                {filterShift !== "all" && ` (${filterShift} shift)`}
+              </CardDescription>
+            </div>
+            <Select value={filterShift} onValueChange={(v) => setFilterShift(v as ShiftStart | "all")}>
+              <SelectTrigger className="w-32 rounded-lg font-mono text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="font-mono text-xs">All Shifts</SelectItem>
+                {SHIFT_STARTS.map((shift) => (
+                  <SelectItem key={shift} value={shift} className="font-mono text-xs">{shift}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardHeader>
+
+          <CardContent>
+            {/* Week Navigation */}
+            <div className="mb-6 p-4 bg-muted/30 rounded-lg">
+              <div className="flex items-center justify-between mb-4">
+                <Button variant="outline" size="sm" onClick={() => navigateWeek("prev")} className="rounded-lg">
+                  <ChevronDown className="h-4 w-4 rotate-90" />
                 </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <div>
-                  <CardTitle className="font-condensed flex items-center gap-2">
-                    <Users className="h-5 w-5" />
-                    Staff Members
-                  </CardTitle>
-                  <CardDescription className="font-mono text-xs mt-1">
-                    {staff.length} staff member{staff.length !== 1 ? "s" : ""}
-                    {filterShift !== "all" && ` (${filterShift} shift)`}
-                  </CardDescription>
+                <div className="flex items-center gap-2">
+                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                  <span className="font-condensed font-semibold">
+                    {weekDates[0].toLocaleDateString("en-GB", { day: "numeric", month: "short" })} - {weekDates[6].toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </span>
                 </div>
-                <div className="flex gap-2">
-                  <Select value={filterShift} onValueChange={(v) => setFilterShift(v as ShiftStart | "all")}>
-                    <SelectTrigger className="w-32 rounded-lg font-mono text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all" className="font-mono text-xs">
-                        All Shifts
-                      </SelectItem>
-                      {SHIFT_STARTS.map((shift) => (
-                        <SelectItem key={shift} value={shift} className="font-mono text-xs">
-                          {shift}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant={batchMode ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      setBatchMode(!batchMode);
-                      if (batchMode) setSelectedStaffIds([]);
-                    }}
-                    className="rounded-lg"
-                  >
-                    <Calendar2 className="h-4 w-4 mr-2" />
-                    <span className="font-mono text-xs">Batch Dates</span>
-                  </Button>
-                </div>
-              </CardHeader>
-
-              {batchMode && (
-                <div className="px-6 pb-4">
-                  <Card className="border-2 border-primary/20 bg-primary/5">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="font-condensed text-sm flex items-center gap-2">
-                        <Calendar2 className="h-4 w-4" />
-                        Batch Add Availability
-                      </CardTitle>
-                      <CardDescription className="font-mono text-xs">
-                        Select staff below, then choose dates and type
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                      <Alert>
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="font-mono text-xs">
-                          {selectedStaffIds.length} staff selected. Click checkboxes below to select.
-                        </AlertDescription>
-                      </Alert>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="font-mono text-xs">From Date</Label>
-                          <Calendar 
-                            mode="single" 
-                            selected={dateFrom} 
-                            onSelect={setDateFrom} 
-                            toDate={new Date(2027, 11, 31)}
-                            className="rounded-lg border" 
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="font-mono text-xs">To Date</Label>
-                          <Calendar 
-                            mode="single" 
-                            selected={dateTo} 
-                            onSelect={setDateTo} 
-                            toDate={new Date(2027, 11, 31)}
-                            className="rounded-lg border" 
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label className="font-mono text-xs">Type</Label>
-                          <Select value={availabilityType} onValueChange={(v) => setAvailabilityType(v as AvailabilityType)}>
-                            <SelectTrigger className="rounded-lg font-mono text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="rest" className="font-mono text-xs">Rest Day</SelectItem>
-                              <SelectItem value="holiday" className="font-mono text-xs">Holiday</SelectItem>
-                              <SelectItem value="sick" className="font-mono text-xs">Sick Leave</SelectItem>
-                              <SelectItem value="available" className="font-mono text-xs">Available</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="space-y-2">
-                          <Label className="font-mono text-xs">Notes (Optional)</Label>
-                          <Input value={availabilityNotes} onChange={(e) => setAvailabilityNotes(e.target.value)} className="rounded-lg font-mono text-xs" />
-                        </div>
-                      </div>
-
-                      <Button onClick={handleBatchAvailability} disabled={!dateFrom || !dateTo || selectedStaffIds.length === 0} className="w-full rounded-lg">
-                        <Plus className="h-4 w-4 mr-2" />
-                        <span className="font-mono text-xs">Add to {selectedStaffIds.length} Staff</span>
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
-              )}
-
-              <CardContent>
-                {staff.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                    <p className="text-sm font-mono">No staff members yet</p>
-                    <p className="text-xs font-mono mt-1">Add staff above to get started</p>
+                <Button variant="outline" size="sm" onClick={() => navigateWeek("next")} className="rounded-lg">
+                  <ChevronDown className="h-4 w-4 -rotate-90" />
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-7 gap-1">
+                {weekDates.map((date, idx) => (
+                  <div key={idx} className="text-center">
+                    <div className="font-mono text-[10px] text-muted-foreground mb-1">
+                      {["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"][idx]}
+                    </div>
+                    <div className="font-mono text-sm font-semibold">
+                      {date.getDate()}
+                    </div>
                   </div>
-                ) : (
-                  <div className="space-y-3">
-                    {staff
-                      .filter((member) => filterShift === "all" || member.shiftStart === filterShift)
-                      .map((member) => {
-                      const stats = getAvailabilityStats(member);
-                      const isEditing = editingStaffId === member.id;
-                      
-                      return (
-                        <div
-                          key={member.id}
-                          className="border border-border rounded-lg hover:shadow-sm transition-smooth"
-                        >
-                          {isEditing ? (
-                            // Inline Edit Mode
-                            <div className="p-4 space-y-4 bg-muted/30">
-                              <div className="flex items-center justify-between mb-2">
-                                <h3 className="font-condensed font-semibold text-sm">Editing: {member.name}</h3>
+                ))}
+              </div>
+              
+              <Button variant="ghost" size="sm" onClick={goToToday} className="w-full mt-3 rounded-lg font-mono text-xs">
+                Today
+              </Button>
+            </div>
+
+            {staff.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
+                <p className="text-sm font-mono">No staff members yet</p>
+                <p className="text-xs font-mono mt-1">Add staff above to get started</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {staff
+                  .filter((member) => filterShift === "all" || member.shiftStart === filterShift)
+                  .map((member) => {
+                    const stats = getAvailabilityStats(member);
+                    const isEditing = editingStaffId === member.id;
+                    const isExpanded = expandedStaffIds.has(member.id);
+                    
+                    return (
+                      <Collapsible key={member.id} open={isExpanded} onOpenChange={() => toggleStaffExpanded(member.id)}>
+                        <Card className="shadow-sm border-l-4 border-l-primary/20">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <CollapsibleTrigger asChild>
+                                <Button variant="ghost" className="flex-1 justify-start p-0 h-auto hover:bg-transparent">
+                                  <div className="flex items-center gap-3 w-full">
+                                    <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
+                                    <div className="flex-1 text-left">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <h3 className="font-condensed font-semibold text-base">{member.name}</h3>
+                                        {member.shiftStart && (
+                                          <Badge variant="secondary" className="font-mono text-xs">
+                                            <Clock className="h-3 w-3 mr-1" />
+                                            {member.shiftStart}
+                                          </Badge>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {member.trainedTasks.map((task) => (
+                                          <Badge key={task} variant="outline" className="font-mono text-[10px]">
+                                            {task}
+                                          </Badge>
+                                        ))}
+                                      </div>
+                                      <div className="flex gap-3 mt-2 text-xs font-mono">
+                                        <span className="text-blue-600">Rest: {stats.rest}</span>
+                                        <span className="text-purple-600">Holiday: {stats.holiday}</span>
+                                        <span className="text-red-600">Sick: {stats.sick}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </Button>
+                              </CollapsibleTrigger>
+                              
+                              <div className="flex gap-1">
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={handleCancelEdit}
-                                  className="text-muted-foreground"
+                                  onClick={() => handleEditStaff(member)}
+                                  className="h-8 w-8 p-0"
                                 >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label htmlFor={`edit-name-${member.id}`} className="font-mono text-xs">
-                                  Name
-                                </Label>
-                                <Input
-                                  id={`edit-name-${member.id}`}
-                                  value={editName}
-                                  onChange={(e) => setEditName(e.target.value)}
-                                  className="rounded-lg"
-                                />
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label className="font-mono text-xs">Trained Tasks</Label>
-                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                  {TASKS.map((task) => (
-                                    <div key={task} className="flex items-center space-x-2">
-                                      <Checkbox
-                                        id={`edit-${member.id}-${task}`}
-                                        checked={editTasks.includes(task)}
-                                        onCheckedChange={() => handleEditTaskToggle(task)}
-                                      />
-                                      <Label htmlFor={`edit-${member.id}-${task}`} className="font-mono text-xs cursor-pointer">
-                                        {task}
-                                      </Label>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label htmlFor={`edit-shift-${member.id}`} className="font-mono text-xs flex items-center gap-2">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  Shift Start Time
-                                </Label>
-                                <Select value={editShift} onValueChange={(v) => setEditShift(v as ShiftStart)}>
-                                  <SelectTrigger id={`edit-shift-${member.id}`} className="rounded-lg font-mono text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {SHIFT_STARTS.map((shift) => (
-                                      <SelectItem key={shift} value={shift} className="font-mono text-xs">
-                                        {shift}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-
-                              <div className="flex gap-2 pt-2">
-                                <Button
-                                  onClick={handleSaveEdit}
-                                  className="flex-1 rounded-lg"
-                                  disabled={!editName.trim() || editTasks.length === 0}
-                                >
-                                  <span className="font-mono text-xs">Save Changes</span>
+                                  <Edit className="h-4 w-4" />
                                 </Button>
                                 <Button
-                                  variant="outline"
-                                  onClick={handleCancelEdit}
-                                  className="rounded-lg"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setDeleteConfirmId(member.id)}
+                                  className="text-destructive h-8 w-8 p-0"
                                 >
-                                  <span className="font-mono text-xs">Cancel</span>
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
                             </div>
-                          ) : (
-                            // Display Mode - Single unified responsive layout
-                            <div className="p-4">
-                              <div className="flex items-start gap-3 mb-3">
-                                {batchMode && (
-                                  <Checkbox
-                                    checked={selectedStaffIds.includes(member.id)}
-                                    onCheckedChange={() => toggleStaffSelection(member.id)}
-                                    className="mt-1"
-                                  />
-                                )}
-                                
+
+                            {deleteConfirmId === member.id && (
+                              <Alert className="mt-3 bg-destructive/10 border-destructive">
+                                <AlertCircle className="h-4 w-4 text-destructive" />
                                 <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <h3 className="font-condensed font-semibold text-base">{member.name}</h3>
-                                    {member.shiftStart && (
-                                      <Badge variant="secondary" className="font-mono text-xs">
-                                        <Clock className="h-3 w-3 mr-1" />
-                                        {member.shiftStart}
-                                      </Badge>
-                                    )}
+                                  <p className="text-sm text-destructive mb-2">
+                                    Delete {member.name}? This action cannot be undone.
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleDeleteStaff(member.id)}
+                                      className="rounded-lg text-destructive"
+                                    >
+                                      Confirm Delete
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => setDeleteConfirmId(null)}
+                                      className="rounded-lg"
+                                    >
+                                      Cancel
+                                    </Button>
                                   </div>
-                                  <div className="flex flex-wrap gap-1.5 mt-2">
-                                    {member.trainedTasks.map((task) => (
-                                      <Badge key={task} variant="outline" className="font-mono text-xs">
-                                        {task}
-                                      </Badge>
+                                </div>
+                              </Alert>
+                            )}
+
+                            {isEditing && (
+                              <div className="mt-4 p-4 space-y-4 bg-muted/30 rounded-lg">
+                                <div className="space-y-2">
+                                  <Label className="font-mono text-xs">Name</Label>
+                                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="rounded-lg" />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="font-mono text-xs">Trained Tasks</Label>
+                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                    {TASKS.map((task) => (
+                                      <div key={task} className="flex items-center space-x-2">
+                                        <Checkbox
+                                          checked={editTasks.includes(task)}
+                                          onCheckedChange={() => handleEditTaskToggle(task)}
+                                        />
+                                        <Label className="font-mono text-xs cursor-pointer">{task}</Label>
+                                      </div>
                                     ))}
                                   </div>
-                                  <div className="flex gap-3 mt-2 text-sm font-mono">
-                                    <span className="text-blue-600">Rest: {stats.rest}</span>
-                                    <span className="text-purple-600">Holiday: {stats.holiday}</span>
-                                    <span className="text-red-600">Sick: {stats.sick}</span>
-                                  </div>
                                 </div>
-                                
-                                {!batchMode && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setDeleteConfirmId(member.id)}
-                                    className="text-destructive h-8 w-8 p-0"
-                                    disabled={deleteStaffMutation.isPending}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
+                                <div className="space-y-2">
+                                  <Label className="font-mono text-xs">Shift Start</Label>
+                                  <Select value={editShift} onValueChange={(v) => setEditShift(v as ShiftStart)}>
+                                    <SelectTrigger className="rounded-lg font-mono text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {SHIFT_STARTS.map((shift) => (
+                                        <SelectItem key={shift} value={shift} className="font-mono text-xs">{shift}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button onClick={handleSaveEdit} className="flex-1 rounded-lg">Save</Button>
+                                  <Button variant="outline" onClick={handleCancelEdit} className="rounded-lg">Cancel</Button>
+                                </div>
                               </div>
+                            )}
+                          </CardHeader>
 
-                              {/* Delete Confirmation Alert */}
-                              {deleteConfirmId === member.id && (
-                                <Alert className="mt-3 bg-destructive/10 border-destructive">
-                                  <AlertCircle className="h-4 w-4 text-destructive" />
-                                  <div className="flex-1">
-                                    <p className="text-sm text-destructive mb-2">
-                                      Delete {member.name}? This action cannot be undone.
-                                    </p>
-                                    <div className="flex gap-2">
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handleDeleteStaff(member.id)}
-                                        disabled={deleteStaffMutation.isPending}
-                                        className="rounded-lg text-destructive hover:text-destructive"
-                                      >
-                                        {deleteStaffMutation.isPending ? "Deleting..." : "Confirm Delete"}
-                                      </Button>
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setDeleteConfirmId(null)}
-                                        disabled={deleteStaffMutation.isPending}
-                                        className="rounded-lg"
-                                      >
-                                        Cancel
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </Alert>
-                              )}
-
-                              {!batchMode && (
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleQuickSickToday(member.id)}
-                                    className="rounded-lg"
-                                  >
-                                    <AlertCircle className="h-4 w-4 mr-2" />
-                                    <span className="font-mono text-xs">Sick Today</span>
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleQuickRestTomorrow(member.id)}
-                                    className="rounded-lg"
-                                  >
-                                    <Calendar2 className="h-4 w-4 mr-2" />
-                                    <span className="font-mono text-xs">Rest Tomorrow</span>
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleEditStaff(member)}
-                                    className="rounded-lg"
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    <span className="font-mono text-xs">Edit Skills</span>
-                                  </Button>
-                                  <Sheet open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
-                                    <SheetTrigger asChild>
-                                      <Button
-                                        variant="default"
-                                        size="sm"
-                                        onClick={() => {
-                                          setSelectedStaff(member);
-                                          setIsImportSheetOpen(true);
-                                        }}
-                                        className="rounded-lg"
-                                      >
-                                        <FileSpreadsheet className="h-4 w-4 mr-2" />
-                                        <span className="font-mono text-xs">Import Rota</span>
-                                      </Button>
-                                    </SheetTrigger>
-                                    <SheetContent className="w-full sm:max-w-lg">
-                                      <SheetHeader>
-                                        <SheetTitle className="font-condensed">
-                                          {member.name} - Import Availability
-                                        </SheetTitle>
-                                        <SheetDescription className="font-mono text-xs">
-                                          Quick import from Excel/CSV file
-                                        </SheetDescription>
-                                      </SheetHeader>
-
-                                      <div className="mt-6 space-y-4">
-                                        <Card className="shadow-sm">
-                                          <CardHeader className="pb-3">
-                                            <CardTitle className="font-condensed text-sm flex items-center gap-2">
-                                              <FileSpreadsheet className="h-4 w-4" />
-                                              Excel/CSV Import
-                                            </CardTitle>
-                                          </CardHeader>
-                                          <CardContent className="space-y-4">
-                                            <div className="text-xs font-mono bg-muted p-3 rounded-lg space-y-1">
-                                              <p className="font-semibold">Format:</p>
-                                              <p className="text-muted-foreground">Date,Type,Notes</p>
-                                              <p className="text-muted-foreground">2026-05-20,rest,Weekly rest</p>
-                                              <p className="text-muted-foreground">2026-05-25,holiday,Bank holiday</p>
-                                              <p className="mt-2 text-xs">Types: rest, holiday, sick</p>
-                                            </div>
-
-                                            <div className="text-xs font-mono bg-muted p-3 rounded-lg space-y-1">
-                                              <p className="font-semibold">Supported Formats:</p>
-                                              <p className="text-muted-foreground mt-2">Format 1 (Your Rota):</p>
-                                              <p className="text-muted-foreground">28/12/2025,rest,REST</p>
-                                              <p className="text-muted-foreground">29/12/2025,working,IN</p>
-                                              <p className="text-muted-foreground">30/12/2025,holiday,Holiday</p>
-                                              <p className="text-muted-foreground mt-2">Format 2 (Standard):</p>
-                                              <p className="text-muted-foreground">2026-05-20,rest,Weekly rest</p>
-                                              <p className="mt-2 text-xs">Status: rest, holiday, sick, working (working=skipped)</p>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                              <Label className="font-mono text-xs font-semibold">Upload File</Label>
-                                              <div className="flex gap-2">
-                                                <Button
-                                                  variant="outline"
-                                                  className="w-full rounded-lg"
-                                                  onClick={() => document.getElementById(`csv-upload-${member.id}`)?.click()}
-                                                >
-                                                  <Upload className="h-4 w-4 mr-2" />
-                                                  <span className="font-mono text-xs">
-                                                    {csvFileName || "Choose File (.csv, .xlsx)"}
-                                                  </span>
-                                                </Button>
-                                                <input
-                                                  id={`csv-upload-${member.id}`}
-                                                  type="file"
-                                                  accept=".csv,.txt,.xlsx,.xls"
-                                                  onChange={handleCsvFileUpload}
-                                                  className="hidden"
-                                                />
-                                                {csvFileName && (
-                                                  <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => {
-                                                      setCsvFileName("");
-                                                      setExcelImport("");
-                                                      const input = document.getElementById(`csv-upload-${member.id}`) as HTMLInputElement;
-                                                      if (input) input.value = "";
-                                                    }}
-                                                    className="text-destructive"
-                                                  >
-                                                    <X className="h-4 w-4" />
-                                                  </Button>
-                                                )}
-                                              </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                              <Label className="font-mono text-xs font-semibold">Or Paste Data</Label>
-                                              <Textarea
-                                                value={excelImport}
-                                                onChange={(e) => setExcelImport(e.target.value)}
-                                                placeholder="Date,Type,Notes&#10;2026-05-20,rest,Weekly rest"
-                                                className="font-mono text-xs h-32 rounded-lg"
-                                              />
-                                            </div>
-
-                                            <Button
-                                              onClick={handleAvailabilityImport}
-                                              className="w-full rounded-lg"
-                                              disabled={!excelImport.trim()}
-                                            >
-                                              <Upload className="h-4 w-4 mr-2" />
-                                              <span className="font-mono text-xs">
-                                                Import {excelImport.trim() ? excelImport.trim().split('\n').filter(l => l.trim() && !l.startsWith('Date')).length : 0} Dates
-                                              </span>
-                                            </Button>
-                                          </CardContent>
-                                        </Card>
-
-                                        {selectedStaff && selectedStaff.availability && selectedStaff.availability.length > 0 && (
-                                          <Card className="shadow-sm">
-                                            <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                                              <CardTitle className="font-condensed text-sm">
-                                                Current Entries ({selectedStaff.availability.length})
-                                              </CardTitle>
-                                              {clearAllConfirm === selectedStaff.id ? (
-                                                <div className="flex gap-2">
-                                                  <Button
-                                                    variant="destructive"
-                                                    size="sm"
-                                                    onClick={() => handleClearStaffAvailability(selectedStaff.id)}
-                                                    className="rounded-lg"
-                                                  >
-                                                    <span className="font-mono text-xs">Confirm</span>
-                                                  </Button>
-                                                  <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => setClearAllConfirm(null)}
-                                                    className="rounded-lg"
-                                                  >
-                                                    <span className="font-mono text-xs">Cancel</span>
-                                                  </Button>
-                                                </div>
-                                              ) : (
-                                                <Button
-                                                  variant="outline"
-                                                  size="sm"
-                                                  onClick={() => setClearAllConfirm(selectedStaff.id)}
-                                                  className="text-destructive hover:text-destructive rounded-lg"
-                                                >
-                                                  <Trash2 className="h-3.5 w-3.5 mr-2" />
-                                                  <span className="font-mono text-xs">Clear All</span>
-                                                </Button>
-                                              )}
-                                            </CardHeader>
-                                            <CardContent>
-                                              {clearAllConfirm === selectedStaff.id && (
-                                                <Alert className="mb-3 bg-destructive/10 border-destructive">
-                                                  <AlertCircle className="h-4 w-4 text-destructive" />
-                                                  <AlertDescription className="text-sm text-destructive font-mono">
-                                                    Delete all {selectedStaff.availability.length} availability entries? This cannot be undone.
-                                                  </AlertDescription>
-                                                </Alert>
-                                              )}
-                                              <ScrollArea className="h-48">
-                                                <div className="space-y-2">
-                                                  {selectedStaff.availability
-                                                    .sort((a, b) => a.date.localeCompare(b.date))
-                                                    .map((entry, idx) => (
-                                                      <div
-                                                        key={idx}
-                                                        className="flex items-center justify-between p-2 rounded-lg border text-xs"
-                                                      >
-                                                        <div className="flex-1">
-                                                          <div className="flex items-center gap-2">
-                                                            <span className="font-mono font-semibold">
-                                                              {new Date(entry.date + "T00:00:00").toLocaleDateString("en-GB")}
-                                                            </span>
-                                                            <Badge variant="secondary" className="font-mono text-[10px]">
-                                                              {entry.type}
-                                                            </Badge>
-                                                          </div>
-                                                          {entry.notes && (
-                                                            <p className="text-[10px] font-mono mt-1 text-muted-foreground">
-                                                              {entry.notes}
-                                                            </p>
-                                                          )}
-                                                        </div>
-                                                        <Button
-                                                          variant="ghost"
-                                                          size="sm"
-                                                          onClick={() => handleDeleteAvailability(selectedStaff.id, entry.date)}
-                                                          className="h-6 w-6 p-0 hover:bg-destructive/20"
-                                                        >
-                                                          <X className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                      </div>
-                                                    ))}
-                                                </div>
-                                              </ScrollArea>
-                                            </CardContent>
-                                          </Card>
-                                        )}
-                                      </div>
-                                    </SheetContent>
-                                  </Sheet>
+                          <CollapsibleContent>
+                            <CardContent className="pt-0">
+                              <div className="space-y-2">
+                                <div className="text-xs font-mono text-muted-foreground mb-2">
+                                  Click days to cycle: Working → Rest → Holiday → Sick → Working
                                 </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="bulk" className="space-y-4">
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="font-condensed text-xl">Bulk Import Staff</CardTitle>
-                <CardDescription className="font-mono text-xs">
-                  Paste a CSV list of staff and their tasks
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-xs font-mono text-muted-foreground bg-muted/50 p-4 rounded-lg">
-                  <p className="font-semibold mb-2">Required Format:</p>
-                  <p>Name, Task1, Task2, ..., ShiftTime</p>
-                  <p className="mt-2 text-muted-foreground/70">Examples:</p>
-                  <p>John Smith, Frozen, Milk, 06:00</p>
-                  <p>Jane Doe, TWI, Inbound, Outbound, 08:30</p>
-                  <p>Bob Wilson, Marshaling, 06:00</p>
-                </div>
-
-                <Textarea
-                  value={bulkInput}
-                  onChange={(e) => setBulkInput(e.target.value)}
-                  placeholder="Paste CSV data here..."
-                  className="font-mono text-xs h-64 rounded-lg"
-                />
-
-                {bulkSuccess && (
-                  <Alert className="bg-green-50 text-green-900 border-green-200">
-                    <AlertDescription className="font-mono text-xs font-semibold">
-                      Successfully imported staff members!
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <Button
-                  onClick={handleBulkImport}
-                  className="w-full rounded-lg"
-                  disabled={!bulkInput.trim()}
-                >
-                  <Upload className="h-4 w-4 mr-2" />
-                  <span className="font-mono text-xs">Import Data</span>
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                                <div className="grid grid-cols-7 gap-1">
+                                  {weekDates.map((date, idx) => {
+                                    const availType = getAvailabilityForDate(member, date);
+                                    return (
+                                      <button
+                                        key={idx}
+                                        onClick={() => handleDayClick(member.id, date, availType)}
+                                        className={cn(
+                                          "aspect-square rounded-lg border-2 transition-all font-mono text-xs font-semibold",
+                                          getDayColor(availType)
+                                        )}
+                                      >
+                                        {availType ? availType.substring(0, 1).toUpperCase() : "—"}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <div className="flex gap-2 text-[10px] font-mono mt-2 flex-wrap">
+                                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-background border-2"></span>Working</span>
+                                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-100 border-2 border-blue-400"></span>Rest</span>
+                                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-100 border-2 border-purple-400"></span>Holiday</span>
+                                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border-2 border-red-400"></span>Sick</span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </CollapsibleContent>
+                        </Card>
+                      </Collapsible>
+                    );
+                  })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );
