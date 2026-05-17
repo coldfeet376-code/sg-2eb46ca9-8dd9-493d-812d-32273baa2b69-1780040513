@@ -4,10 +4,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SEO } from "@/components/SEO";
 import type { StaffMember, Assignment, Task } from "@/types";
-import { BarChart3, TrendingUp, Users, Calendar as Calendar2, Award, Heart } from "lucide-react";
+import { Users, Calendar, Clock, TrendingUp, AlertCircle, Download, Trash2, BarChart3, Heart } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAYS = ["Saturday", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 
 export default function AnalyticsPage() {
   const [staff, setStaff] = useState<StaffMember[]>([]);
@@ -139,6 +140,43 @@ export default function AnalyticsPage() {
     return Math.round((assignments.length / possibleAssignments) * 100);
   };
 
+  // Calculate fairness metrics
+  const calculateFairnessMetrics = () => {
+    const staffAssignments: Record<string, { total: number; byTask: Record<string, number> }> = {};
+    
+    // Initialize
+    staff.forEach(member => {
+      staffAssignments[member.id] = {
+        total: 0,
+        byTask: {},
+      };
+    });
+    
+    // Count assignments
+    rotaHistory.forEach(week => {
+      week.assignments.forEach(assignment => {
+        const staffMember = staff.find(s => s.name === assignment.staffName);
+        if (staffMember) {
+          staffAssignments[staffMember.id].total++;
+          staffAssignments[staffMember.id].byTask[assignment.task] = 
+            (staffAssignments[staffMember.id].byTask[assignment.task] || 0) + 1;
+        }
+      });
+    });
+    
+    // Calculate fairness (standard deviation from mean)
+    const totals = Object.values(staffAssignments).map(s => s.total);
+    const mean = totals.length > 0 ? totals.reduce((a, b) => a + b, 0) / totals.length : 0;
+    const variance = totals.length > 0 
+      ? totals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / totals.length 
+      : 0;
+    const stdDev = Math.sqrt(variance);
+    
+    return { staffAssignments, mean, stdDev };
+  };
+  
+  const fairnessData = calculateFairnessMetrics();
+
   const workload = getStaffWorkload();
   const taskDist = getTaskDistribution();
   const dayDist = getDayDistribution();
@@ -160,27 +198,127 @@ export default function AnalyticsPage() {
 
   return (
     <Layout>
-      <SEO title="Analytics - Warehouse Rota" description="Workforce analytics and insights" />
+      <SEO title="Analytics - Warehouse Rota" description="View rotation history and task distribution analytics" />
 
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-condensed text-3xl font-bold tracking-tight">Analytics</h1>
-            <p className="text-sm text-muted-foreground font-mono mt-1">
-              Workforce insights and performance metrics
-            </p>
-          </div>
-          <Select value={selectedPeriod} onValueChange={(v) => setSelectedPeriod(v as "week" | "month" | "quarter")}>
-            <SelectTrigger className="w-32 rounded-lg font-mono text-xs">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week" className="font-mono text-xs">This Week</SelectItem>
-              <SelectItem value="month" className="font-mono text-xs">This Month</SelectItem>
-              <SelectItem value="quarter" className="font-mono text-xs">This Quarter</SelectItem>
-            </SelectContent>
-          </Select>
+        <div>
+          <h1 className="font-condensed text-3xl font-bold tracking-tight">Analytics & Insights</h1>
+          <p className="text-sm text-muted-foreground font-mono mt-1">
+            Track rotation history, task distribution, and fairness metrics
+          </p>
         </div>
+
+        {/* Fairness Metrics Section */}
+        <Card className="shadow-sm border-l-4 border-l-accent">
+          <CardHeader>
+            <CardTitle className="font-condensed text-xl flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-accent" />
+              Task Rotation Fairness
+            </CardTitle>
+            <CardDescription className="font-mono text-xs">
+              Analyze how fairly tasks are distributed across staff members
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {staff.length === 0 || rotaHistory.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <BarChart3 className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                <p className="text-sm font-mono">No assignment data yet</p>
+                <p className="text-xs font-mono mt-1">Generate some rotas to see fairness metrics</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="bg-muted/30 border-none">
+                    <CardContent className="pt-6">
+                      <div className="text-center">
+                        <p className="text-xs font-mono text-muted-foreground mb-1">Average Assignments</p>
+                        <p className="text-3xl font-bold font-mono">{fairnessData.mean.toFixed(1)}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-muted/30 border-none">
+                    <CardContent className="pt-6">
+                      <div className="text-center">
+                        <p className="text-xs font-mono text-muted-foreground mb-1">Standard Deviation</p>
+                        <p className="text-3xl font-bold font-mono">{fairnessData.stdDev.toFixed(1)}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-muted/30 border-none">
+                    <CardContent className="pt-6">
+                      <div className="text-center">
+                        <p className="text-xs font-mono text-muted-foreground mb-1">Fairness Rating</p>
+                        <p className={cn(
+                          "text-3xl font-bold font-mono",
+                          fairnessData.stdDev < 2 ? "text-green-600" : fairnessData.stdDev < 4 ? "text-yellow-600" : "text-red-600"
+                        )}>
+                          {fairnessData.stdDev < 2 ? "Excellent" : fairnessData.stdDev < 4 ? "Good" : "Needs Balance"}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="font-condensed font-semibold text-base">Staff Assignment Distribution</h3>
+                  {staff
+                    .map(member => ({
+                      ...member,
+                      stats: fairnessData.staffAssignments[member.id] || { total: 0, byTask: {} },
+                      deviation: Math.abs((fairnessData.staffAssignments[member.id]?.total || 0) - fairnessData.mean),
+                    }))
+                    .sort((a, b) => b.stats.total - a.stats.total)
+                    .map(member => {
+                      const isOverworked = member.stats.total > fairnessData.mean + fairnessData.stdDev;
+                      const isUnderworked = member.stats.total < fairnessData.mean - fairnessData.stdDev;
+                      
+                      return (
+                        <Card key={member.id} className={cn(
+                          "transition-all",
+                          isOverworked && "border-l-4 border-l-red-500",
+                          isUnderworked && "border-l-4 border-l-yellow-500"
+                        )}>
+                          <CardContent className="pt-4">
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <h4 className="font-condensed font-semibold">{member.name}</h4>
+                                  {isOverworked && (
+                                    <Badge variant="destructive" className="font-mono text-[10px]">
+                                      Overworked (+{member.deviation.toFixed(1)})
+                                    </Badge>
+                                  )}
+                                  {isUnderworked && (
+                                    <Badge variant="secondary" className="font-mono text-[10px] bg-yellow-500/20 text-yellow-700">
+                                      Underutilized (-{member.deviation.toFixed(1)})
+                                    </Badge>
+                                  )}
+                                </div>
+                                <span className="font-mono text-lg font-bold">{member.stats.total} total</span>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                                {TASKS.map(task => {
+                                  const count = member.stats.byTask[task] || 0;
+                                  return (
+                                    <div key={task} className="flex flex-col items-center gap-1 p-2 bg-muted/30 rounded-md">
+                                      <span className="text-[10px] font-mono text-muted-foreground">{task}</span>
+                                      <span className="text-lg font-bold font-mono">{count}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Key Metrics */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

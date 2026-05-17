@@ -16,6 +16,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SEO } from "@/components/SEO";
+import { BulkOperationsPanel } from "@/components/BulkOperationsPanel";
 import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart } from "@/types";
@@ -67,6 +68,9 @@ export default function StaffPage() {
   
   // Force re-render key - increments after successful cache updates
   const [renderKey, setRenderKey] = useState(0);
+  
+  // Bulk operations - multi-select state
+  const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
 
   // React Query hooks
   const { data: staff = [], isLoading: staffLoading } = useStaff();
@@ -370,6 +374,102 @@ export default function StaffPage() {
     }
   };
 
+  // Bulk operations handlers
+  const toggleStaffSelection = (staffId: string) => {
+    setSelectedStaffIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(staffId)) {
+        newSet.delete(staffId);
+      } else {
+        newSet.add(staffId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAllStaff = () => {
+    setSelectedStaffIds(new Set(staff.map(s => s.id)));
+  };
+
+  const clearStaffSelection = () => {
+    setSelectedStaffIds(new Set());
+  };
+
+  const handleBulkSetAvailability = async (staffIds: string[], dates: string[], type: AvailabilityType) => {
+    try {
+      for (const staffId of staffIds) {
+        for (const dateStr of dates) {
+          await staffService.addAvailability(staffId, [{
+            date: dateStr,
+            type: type,
+            notes: `Bulk set as ${type}`,
+          }]);
+        }
+      }
+      
+      await queryClient.invalidateQueries({ queryKey: ["staff"] });
+      await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setRenderKey(prev => prev + 1);
+      
+      toast({
+        title: "✓ Bulk Update Complete",
+        description: `Applied ${type.toUpperCase()} to ${staffIds.length} staff`,
+      });
+    } catch (error) {
+      console.error("Error in bulk availability update:", error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to apply bulk changes",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleCopyWeek = async (fromWeek: Date, toWeek: Date, staffIds: string[]) => {
+    try {
+      for (const staffId of staffIds) {
+        const staffMember = staff.find(s => s.id === staffId);
+        if (!staffMember?.availability) continue;
+        
+        // Get availability for source week
+        const sourceWeekDates = getWeekDates(fromWeek);
+        const targetWeekDates = getWeekDates(toWeek);
+        
+        for (let i = 0; i < 7; i++) {
+          const sourceDateStr = sourceWeekDates[i].toISOString().split("T")[0];
+          const targetDateStr = targetWeekDates[i].toISOString().split("T")[0];
+          
+          const sourceEntry = staffMember.availability.find(a => a.date === sourceDateStr);
+          if (sourceEntry) {
+            await staffService.addAvailability(staffId, [{
+              date: targetDateStr,
+              type: sourceEntry.type,
+              notes: `Copied from ${sourceDateStr}`,
+            }]);
+          }
+        }
+      }
+      
+      await queryClient.invalidateQueries({ queryKey: ["staff"] });
+      await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setRenderKey(prev => prev + 1);
+      
+      toast({
+        title: "✓ Week Copied",
+        description: `Copied availability for ${staffIds.length} staff`,
+      });
+    } catch (error) {
+      console.error("Error copying week:", error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to copy week",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <Layout>
       <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
@@ -440,6 +540,17 @@ export default function StaffPage() {
             </Button>
           </CardContent>
         </Card>
+
+        <BulkOperationsPanel
+          staff={staff}
+          selectedStaffIds={selectedStaffIds}
+          onToggleStaff={toggleStaffSelection}
+          onSelectAll={selectAllStaff}
+          onClearSelection={clearStaffSelection}
+          onBulkSetAvailability={handleBulkSetAvailability}
+          onCopyWeek={handleCopyWeek}
+          weekStart={currentWeekStart}
+        />
 
         <Card className="shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -522,54 +633,43 @@ export default function StaffPage() {
                         <Card className="shadow-sm border-l-4 border-l-primary/20">
                           <CardHeader className="pb-4 px-6 pt-5">
                             <div className="flex items-center justify-between">
-                              <CollapsibleTrigger asChild>
-                                <Button variant="ghost" className="flex-1 justify-start p-0 h-auto hover:bg-transparent">
-                                  <div className="flex items-center gap-4 w-full">
-                                    <ChevronDown className={cn("h-5 w-5 transition-transform", isExpanded && "rotate-180")} />
-                                    <div className="flex-1 text-left">
-                                      <div className="flex items-center gap-3 mb-2">
-                                        <h3 className="font-condensed font-semibold text-lg">{member.name}</h3>
-                                        {member.shiftStart && (
-                                          <Badge variant="secondary" className="font-mono text-xs">
-                                            <Clock className="h-3 w-3 mr-1" />
-                                            {member.shiftStart}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                      <div className="flex flex-wrap gap-2">
-                                        {member.trainedTasks.map((task) => (
-                                          <Badge key={task} variant="outline" className="font-mono text-xs px-2.5 py-0.5">
-                                            {task}
-                                          </Badge>
-                                        ))}
-                                      </div>
-                                      <div className="flex gap-4 mt-3 text-xs font-mono">
-                                        <span className="text-blue-600">Rest: {stats.rest}</span>
-                                        <span className="text-purple-600">Holiday: {stats.holiday}</span>
-                                        <span className="text-red-600">Sick: {stats.sick}</span>
+                              <div className="flex items-center gap-3 flex-1">
+                                <Checkbox
+                                  checked={selectedStaffIds.has(member.id)}
+                                  onCheckedChange={() => toggleStaffSelection(member.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="shrink-0"
+                                />
+                                <CollapsibleTrigger asChild>
+                                  <Button variant="ghost" className="flex-1 justify-start p-0 h-auto hover:bg-transparent">
+                                    <div className="flex items-center gap-4 w-full">
+                                      <ChevronDown className={cn("h-5 w-5 transition-transform", isExpanded && "rotate-180")} />
+                                      <div className="flex-1 text-left">
+                                        <div className="flex items-center gap-3 mb-2">
+                                          <h3 className="font-condensed font-semibold text-lg">{member.name}</h3>
+                                          {member.shiftStart && (
+                                            <Badge variant="secondary" className="font-mono text-xs">
+                                              <Clock className="h-3 w-3 mr-1" />
+                                              {member.shiftStart}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                          {member.trainedTasks.map((task) => (
+                                            <Badge key={task} variant="outline" className="font-mono text-xs px-2.5 py-0.5">
+                                              {task}
+                                            </Badge>
+                                          ))}
+                                        </div>
+                                        <div className="flex gap-4 mt-3 text-xs font-mono">
+                                          <span className="text-blue-600">Rest: {stats.rest}</span>
+                                          <span className="text-purple-600">Holiday: {stats.holiday}</span>
+                                          <span className="text-red-600">Sick: {stats.sick}</span>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                </Button>
-                              </CollapsibleTrigger>
-                              
-                              <div className="flex gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleEditStaff(member)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setDeleteConfirmId(member.id)}
-                                  className="text-destructive h-8 w-8 p-0"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                  </Button>
+                                </CollapsibleTrigger>
                               </div>
                             </div>
 
