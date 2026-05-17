@@ -1119,32 +1119,21 @@ export default function Home() {
                     </ScrollArea>
                   </SheetContent>
                 </Sheet>
+                
+                {/* Generate Rota Button - Always visible when config exists */}
+                {taskConfig && staff.length > 0 && (
+                  <Button
+                    onClick={generateRota}
+                    size="lg"
+                    className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base"
+                  >
+                    <Zap className="h-5 w-5" />
+                    <span className="font-mono">Generate Rota</span>
+                  </Button>
+                )}
+
                 {assignments.length > 0 && (
                   <>
-                    {/* Generate Rota Button - Always visible when config exists */}
-                    {taskConfig && (
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={generateRota}
-                          disabled={staff.length === 0}
-                          size="lg"
-                          className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base"
-                        >
-                          {staff.length === 0 ? (
-                            <>
-                              <RefreshCw className="h-5 w-5 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Zap className="h-5 w-5" />
-                              Generate Rota
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    )}
-
                     {lockedAssignments.length < assignments.length && (
                       <Button 
                         variant="outline" 
