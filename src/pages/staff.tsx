@@ -26,6 +26,7 @@ import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
+const DAYS = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const SHIFT_STARTS: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
 
@@ -470,6 +471,35 @@ export default function StaffPage() {
     }
   };
 
+  const toggleTaskTraining = async (staffId: string, task: string) => {
+    try {
+      const staffMember = staff.find(s => s.id === staffId);
+      if (!staffMember) return;
+
+      const currentTasks = staffMember.trained_tasks || [];
+      const newTasks = currentTasks.includes(task)
+        ? currentTasks.filter(t => t !== task)
+        : [...currentTasks, task];
+
+      await staffService.updateStaff(staffId, { trained_tasks: newTasks });
+      
+      await queryClient.invalidateQueries({ queryKey: ["staff"] });
+      await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
+      
+      toast({
+        title: currentTasks.includes(task) ? "✓ Training Removed" : "✓ Training Added",
+        description: `${staffMember.name} ${currentTasks.includes(task) ? "removed from" : "trained for"} ${task}`,
+      });
+    } catch (error) {
+      console.error("Error updating training:", error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to update training",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <Layout>
       <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
@@ -757,103 +787,35 @@ export default function StaffPage() {
                                     className="h-7 text-xs font-mono text-destructive hover:text-destructive hover:bg-destructive/10"
                                   >
                                     <X className="h-3 w-3 mr-1" />
-                                    Clear All
+                                    Clear All Availability
                                   </Button>
                                 </div>
-                                {/* Day of week labels */}
-                                <div className="grid grid-cols-7 gap-2 mb-2">
-                                  {["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"].map((day, idx) => (
-                                    <div key={idx} className="text-center font-mono text-xs text-muted-foreground font-semibold">
-                                      {day}
-                                    </div>
-                                  ))}
-                                </div>
-                                {/* Calendar grid */}
-                                <div className="grid grid-cols-7 gap-2" key={`${member.id}-${renderKey}`}>
-                                  {weekDates.map((date, idx) => {
-                                    const availType = getAvailabilityForDate(member, date);
-                                    const dateStr = date.toISOString().split("T")[0];
-                                    const isOpen = openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr;
-                                    const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
-                                    
-                                    return (
-                                      <Popover key={`${idx}-${renderKey}`} open={isOpen} onOpenChange={(open) => {
-                                        if (open) {
-                                          setOpenDayDropdown({ staffId: member.id, date: dateStr });
-                                        } else if (openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr) {
-                                          setOpenDayDropdown(null);
-                                        }
-                                      }}>
-                                        <PopoverTrigger asChild>
-                                          <button
-                                            disabled={isLoading}
-                                            className={cn(
-                                              "aspect-square rounded-lg border-2 transition-all font-mono text-sm font-bold flex items-center justify-center min-h-[48px] hover:scale-105",
-                                              getDayColor(availType),
-                                              isLoading && "opacity-50 cursor-wait animate-pulse"
-                                            )}
-                                          >
-                                            {isLoading ? "..." : getDayLabel(availType)}
-                                          </button>
-                                        </PopoverTrigger>
-                                        <PopoverContent align="center" className="w-56 p-2">
-                                          <div className="space-y-1">
-                                            <button
-                                              onClick={() => setDayAvailability(member.id, dateStr, "rest")}
-                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-blue-500/10 transition-colors font-mono text-sm"
-                                            >
-                                              <span className="w-8 h-8 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center shrink-0">R</span>
-                                              <span className="font-semibold">Rest Day</span>
-                                            </button>
-                                            <button
-                                              onClick={() => setDayAvailability(member.id, dateStr, "holiday")}
-                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-purple-500/10 transition-colors font-mono text-sm"
-                                            >
-                                              <span className="w-8 h-8 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center shrink-0">H</span>
-                                              <span className="font-semibold">Holiday</span>
-                                            </button>
-                                            <button
-                                              onClick={() => setDayAvailability(member.id, dateStr, "sick")}
-                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-red-500/10 transition-colors font-mono text-sm"
-                                            >
-                                              <span className="w-8 h-8 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center shrink-0">S</span>
-                                              <span className="font-semibold">Sick Leave</span>
-                                            </button>
-                                            {availType !== null && (
-                                              <>
-                                                <div className="border-t my-2"></div>
-                                                <button
-                                                  onClick={() => setDayAvailability(member.id, dateStr, "clear")}
-                                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors font-mono text-sm text-muted-foreground"
-                                                >
-                                                  <X className="h-5 w-5 shrink-0" />
-                                                  <span className="font-semibold">Clear (Working)</span>
-                                                </button>
-                                              </>
-                                            )}
-                                          </div>
-                                        </PopoverContent>
-                                      </Popover>
-                                    );
-                                  })}
-                                </div>
-                                <div className="flex gap-4 text-xs font-mono mt-4 flex-wrap">
-                                  <span className="flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded border-2 bg-background text-[10px] flex items-center justify-center">—</span>
-                                    Working
-                                  </span>
-                                  <span className="flex items-center gap-1.5">
-                                    <span className="w-4 h-4 rounded bg-blue-500 text-white text-[8px] font-bold flex items-center justify-center">R</span>
-                                    Rest
-                                  </span>
-                                  <span className="flex items-center gap-1.5">
-                                    <span className="w-4 h-4 rounded bg-purple-500 text-white text-[8px] font-bold flex items-center justify-center">H</span>
-                                    Holiday
-                                  </span>
-                                  <span className="flex items-center gap-1.5">
-                                    <span className="w-4 h-4 rounded bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">S</span>
-                                    Sick
-                                  </span>
+
+                                {/* Training Assignment Section */}
+                                <div className="border-t pt-4">
+                                  <h4 className="font-condensed font-semibold text-sm mb-3 flex items-center gap-2">
+                                    <Users className="h-4 w-4" />
+                                    Trained Tasks
+                                  </h4>
+                                  <div className="flex flex-wrap gap-2">
+                                    {TASKS.map(task => {
+                                      const isTrained = member.trained_tasks?.includes(task);
+                                      return (
+                                        <Button
+                                          key={task}
+                                          variant={isTrained ? "default" : "outline"}
+                                          size="sm"
+                                          onClick={() => toggleTaskTraining(member.id, task)}
+                                          className={cn(
+                                            "font-mono text-xs transition-all",
+                                            isTrained ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                                          )}
+                                        >
+                                          {task}
+                                        </Button>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               </div>
                             </CardContent>
