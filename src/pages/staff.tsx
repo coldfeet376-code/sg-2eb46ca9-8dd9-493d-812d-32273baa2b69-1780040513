@@ -10,7 +10,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { SEO } from "@/components/SEO";
 import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
@@ -673,57 +677,63 @@ export default function StaffPage() {
                                     const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
                                     
                                     return (
-                                      <DropdownMenu key={`${idx}-${renderKey}`} open={isOpen} onOpenChange={(open) => {
+                                      <Popover key={`${idx}-${renderKey}`} open={isOpen} onOpenChange={(open) => {
                                         if (open) {
                                           setOpenDayDropdown({ staffId: member.id, date: dateStr });
-                                        } else {
+                                        } else if (openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr) {
                                           setOpenDayDropdown(null);
                                         }
                                       }}>
-                                        <DropdownMenuTrigger asChild>
+                                        <PopoverTrigger asChild>
                                           <button
                                             disabled={isLoading}
                                             className={cn(
-                                              "aspect-square rounded-lg border-2 transition-all font-mono text-sm font-bold flex items-center justify-center min-h-[48px]",
+                                              "aspect-square rounded-lg border-2 transition-all font-mono text-sm font-bold flex items-center justify-center min-h-[48px] hover:scale-105",
                                               getDayColor(availType),
                                               isLoading && "opacity-50 cursor-wait animate-pulse"
                                             )}
                                           >
                                             {isLoading ? "..." : getDayLabel(availType)}
                                           </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="center" className="w-40">
-                                          <DropdownMenuItem
-                                            onClick={() => setDayAvailability(member.id, dateStr, "rest")}
-                                            className="font-mono text-xs"
-                                          >
-                                            <span className="w-3 h-3 rounded bg-blue-500 mr-2"></span>
-                                            Rest Day
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem
-                                            onClick={() => setDayAvailability(member.id, dateStr, "holiday")}
-                                            className="font-mono text-xs"
-                                          >
-                                            <span className="w-3 h-3 rounded bg-purple-500 mr-2"></span>
-                                            Holiday
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem
-                                            onClick={() => setDayAvailability(member.id, dateStr, "sick")}
-                                            className="font-mono text-xs"
-                                          >
-                                            <span className="w-3 h-3 rounded bg-red-500 mr-2"></span>
-                                            Sick Leave
-                                          </DropdownMenuItem>
-                                          {availType && (
-                                            <DropdownMenuItem
-                                              onClick={() => setDayAvailability(member.id, dateStr, "clear")}
-                                              className="font-mono text-xs text-muted-foreground"
+                                        </PopoverTrigger>
+                                        <PopoverContent align="center" className="w-56 p-2">
+                                          <div className="space-y-1">
+                                            <button
+                                              onClick={() => setDayAvailability(member.id, dateStr, "rest")}
+                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-blue-500/10 transition-colors font-mono text-sm"
                                             >
-                                              Clear (Working)
-                                            </DropdownMenuItem>
-                                          )}
-                                        </DropdownMenuContent>
-                                      </DropdownMenu>
+                                              <span className="w-8 h-8 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center shrink-0">R</span>
+                                              <span className="font-semibold">Rest Day</span>
+                                            </button>
+                                            <button
+                                              onClick={() => setDayAvailability(member.id, dateStr, "holiday")}
+                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-purple-500/10 transition-colors font-mono text-sm"
+                                            >
+                                              <span className="w-8 h-8 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center shrink-0">H</span>
+                                              <span className="font-semibold">Holiday</span>
+                                            </button>
+                                            <button
+                                              onClick={() => setDayAvailability(member.id, dateStr, "sick")}
+                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-red-500/10 transition-colors font-mono text-sm"
+                                            >
+                                              <span className="w-8 h-8 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center shrink-0">S</span>
+                                              <span className="font-semibold">Sick Leave</span>
+                                            </button>
+                                            {availType !== null && (
+                                              <>
+                                                <div className="border-t my-2"></div>
+                                                <button
+                                                  onClick={() => setDayAvailability(member.id, dateStr, "clear")}
+                                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors font-mono text-sm text-muted-foreground"
+                                                >
+                                                  <X className="h-5 w-5 shrink-0" />
+                                                  <span className="font-semibold">Clear (Working)</span>
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
                                     );
                                   })}
                                 </div>
