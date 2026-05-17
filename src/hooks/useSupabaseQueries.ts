@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { StaffMember, Task } from "@/types";
+import type { StaffMember, Task, ShiftStart } from "@/types";
 
 interface TaskConfig {
   [task: string]: number[];
@@ -28,7 +28,7 @@ export function useStaff() {
         id: s.id,
         name: s.name,
         trainedTasks: (s.trained_tasks || []) as Task[],
-        shiftStart: (s.shift_start || "06:00") as "06:00" | "14:00",
+        shiftStart: (s.shift_start || "06:00") as ShiftStart,
         availability: (availabilityData || [])
           .filter((a) => a.staff_id === s.id)
           .map((a) => ({
