@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, Al
 import * as XLSX from "xlsx";
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -50,6 +52,7 @@ export default function StaffPage() {
   
   const { addAuditEntry } = useAudit();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   // Edit staff state
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
@@ -195,6 +198,9 @@ export default function StaffPage() {
         title: "Marked sick",
         description: "Staff member marked as sick for today",
       });
+
+      // Invalidate React Query cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
     } catch (error) {
       console.error("Error marking sick:", error);
       toast({
@@ -236,6 +242,9 @@ export default function StaffPage() {
         title: "Rest day added",
         description: "Rest day added for tomorrow",
       });
+
+      // Invalidate React Query cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
     } catch (error) {
       console.error("Error adding rest day:", error);
       toast({
@@ -270,15 +279,8 @@ export default function StaffPage() {
         await staffService.addAvailability(staffId, newEntries);
       }
 
-      const updatedStaff = staff.map((s) => {
-        if (selectedStaffIds.includes(s.id)) {
-          return {
-            ...s,
-            availability: [...(s.availability || []), ...newEntries],
-          };
-        }
-        return s;
-      });
+      // Invalidate React Query cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
 
       toast({
         title: "Batch availability added",
@@ -311,6 +313,9 @@ export default function StaffPage() {
         title: "Availability cleared",
         description: "All availability entries for selected staff have been removed",
       });
+
+      // Invalidate React Query cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
     } catch (error) {
       console.error("Error clearing availability:", error);
       toast({
@@ -587,6 +592,9 @@ export default function StaffPage() {
     try {
       await staffService.addAvailability(selectedStaff.id, newAvailability);
 
+      // Invalidate React Query cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+
       toast({
         title: "Import successful",
         description: `✓ Imported ${newAvailability.length} entries\n⊘ Skipped ${workingDaysSkipped} working days\n${errors.length > 0 ? `⚠️ ${errors.length} errors` : ""}`,
@@ -600,7 +608,7 @@ export default function StaffPage() {
       console.error("Error importing availability:", error);
       toast({
         title: "Database error",
-        description: `Parsed ${newAvailability.length} entries but failed to save to database.`,
+        description: `Parsed ${newAvailability.length} entries but failed to save to database. ${error instanceof Error ? error.message : ""}`,
         variant: "destructive",
       });
     }
@@ -618,17 +626,8 @@ export default function StaffPage() {
     try {
       await staffService.addAvailability(selectedStaff.id, newEntries);
 
-      const updatedStaff = staff.map((s) => {
-        if (s.id === selectedStaff.id) {
-          const existingDates = new Set(newEntries.map((e) => e.date));
-          const filtered = (s.availability || []).filter((a) => !existingDates.has(a.date));
-          return {
-            ...s,
-            availability: [...filtered, ...newEntries].sort((a, b) => a.date.localeCompare(b.date)),
-          };
-        }
-        return s;
-      });
+      // Invalidate React Query cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
 
       toast({
         title: "Availability added",
@@ -648,15 +647,9 @@ export default function StaffPage() {
     try {
       await staffService.deleteAvailability(staffId, date);
 
-      const updatedStaff = staff.map((s) => {
-        if (s.id === staffId) {
-          return {
-            ...s,
-            availability: (s.availability || []).filter((a) => a.date !== date),
-          };
-        }
-        return s;
-      });
+      // Invalidate React Query cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+
       toast({
         title: "Entry deleted",
         description: "Availability entry removed",
@@ -686,20 +679,15 @@ export default function StaffPage() {
       // Delete all availability entries for this staff member
       await staffService.clearAllAvailability(staffId);
 
+      // Invalidate React Query cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+
       toast({
         title: "All entries cleared",
         description: `Removed ${staffMember.availability.length} availability entries for ${staffMember.name}`,
       });
       
       setClearAllConfirm(null);
-      
-      // Update local state by re-triggering query or manual update
-      const updatedStaff = staff.map((s) => {
-        if (s.id === staffId) {
-          return { ...s, availability: [] };
-        }
-        return s;
-      });
       
     } catch (error) {
       console.error("Error clearing availability:", error);
@@ -733,6 +721,9 @@ export default function StaffPage() {
 
     try {
       await staffService.addAvailability(selectedStaff.id, entries);
+
+      // Invalidate React Query cache to refresh UI
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
 
       const updatedStaff = staff.map((s) => {
         if (s.id === selectedStaff.id) {
