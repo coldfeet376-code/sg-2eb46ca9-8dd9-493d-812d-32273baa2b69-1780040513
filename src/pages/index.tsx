@@ -1027,6 +1027,18 @@ export default function Home() {
 
             {viewMode === "week" && (
               <>
+                {/* Generate Rota Button - Always visible when staff exists */}
+                {staff.length > 0 && (
+                  <Button
+                    onClick={generateRota}
+                    size="lg"
+                    className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base"
+                  >
+                    <Zap className="h-5 w-5" />
+                    <span className="font-mono">Generate Rota</span>
+                  </Button>
+                )}
+                
                 <Button variant="outline" size="sm" onClick={handlePrevWeek} className="rounded-lg">
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -1119,18 +1131,6 @@ export default function Home() {
                     </ScrollArea>
                   </SheetContent>
                 </Sheet>
-                
-                {/* Generate Rota Button - Always visible when config exists */}
-                {taskConfig && staff.length > 0 && (
-                  <Button
-                    onClick={generateRota}
-                    size="lg"
-                    className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base"
-                  >
-                    <Zap className="h-5 w-5" />
-                    <span className="font-mono">Generate Rota</span>
-                  </Button>
-                )}
 
                 {assignments.length > 0 && (
                   <>
