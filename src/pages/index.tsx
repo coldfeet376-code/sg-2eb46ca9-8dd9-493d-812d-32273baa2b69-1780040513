@@ -55,7 +55,6 @@ export default function Home() {
   const [coverageGaps, setCoverageGaps] = useState<CoverageGap[]>([]);
   const [showCoverageWarning, setShowCoverageWarning] = useState(false);
   const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const { addNotification } = useNotifications();
 
@@ -198,26 +197,10 @@ export default function Home() {
   };
 
   const generateRota = () => {
-    console.log("Generate button clicked", { 
-      staffLength: staff.length, 
-      hasTaskConfig: !!taskConfig,
-      isGenerating 
-    });
-    
-    if (!staff.length || !taskConfig) {
-      console.warn("Cannot generate rota:", { 
-        reason: !staff.length ? "No staff" : "No task config" 
-      });
-      return;
-    }
+    if (!staff.length || !taskConfig) return;
 
-    setIsGenerating(true);
-    
-    console.log("Starting rota generation...");
-    
     // Check for coverage gaps first
     const gaps = checkCoverageGaps();
-    console.log("Coverage gaps found:", gaps.length);
 
     // Always generate the rota
     const newAssignments = generateWeeklyRota({
@@ -226,8 +209,6 @@ export default function Home() {
       weekStart,
       lockedAssignments,
     });
-    
-    console.log("Generated assignments:", newAssignments.length);
     
     setAssignments(newAssignments);
     saveSnapshot(newAssignments);
@@ -267,9 +248,6 @@ export default function Home() {
         type: "info",
       });
     }
-    
-    console.log("Rota generation complete");
-    setIsGenerating(false);
   };
 
   const forceGenerateRota = () => {
@@ -1139,14 +1117,12 @@ export default function Home() {
                   variant="outline" 
                   size="sm" 
                   onClick={generateRota}
-                  disabled={isGenerating || !staff.length || !taskConfig}
+                  disabled={!staff.length || !taskConfig}
                   className="gap-2 ml-2 rounded-lg"
                   data-tour="generate-button"
                 >
-                  <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
-                  <span className="font-mono text-xs">
-                    {isGenerating ? "Generating..." : "Generate Rota"}
-                  </span>
+                  <RefreshCw className="h-4 w-4" />
+                  <span className="font-mono text-xs">Generate Rota</span>
                 </Button>
                 {lockedAssignments.length > 0 && (
                   <Button 
