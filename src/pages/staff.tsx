@@ -295,11 +295,14 @@ export default function StaffPage() {
       await queryClient.invalidateQueries({ queryKey: ["staff"] });
       await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
       
-      // Wait 500ms for cache to fully settle
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait 800ms for cache to fully settle and propagate to component
+      await new Promise(resolve => setTimeout(resolve, 800));
       
       // Force component re-render to show updated data
       setRenderKey(prev => prev + 1);
+      
+      // Another small delay to ensure re-render completes before clearing loading
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       // Show success toast
       if (type === "clear") {
