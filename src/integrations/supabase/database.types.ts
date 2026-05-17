@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -15,6 +15,47 @@ export type Database = {
   }
   public: {
     Tables: {
+      assignments: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          shift_pattern: string | null
+          staff_id: string | null
+          staff_name: string
+          task: string
+          week_start: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          shift_pattern?: string | null
+          staff_id?: string | null
+          staff_name: string
+          task: string
+          week_start: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          shift_pattern?: string | null
+          staff_id?: string | null
+          staff_name?: string
+          task?: string
+          week_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       availability: {
         Row: {
           created_at: string | null
@@ -77,11 +118,39 @@ export type Database = {
         }
         Relationships: []
       }
+      rota_backups: {
+        Row: {
+          assignments: Json
+          created_at: string | null
+          created_by: string | null
+          id: string
+          locked_assignments: Json
+          week_start: string
+        }
+        Insert: {
+          assignments: Json
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          locked_assignments: Json
+          week_start: string
+        }
+        Update: {
+          assignments?: Json
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          locked_assignments?: Json
+          week_start?: string
+        }
+        Relationships: []
+      }
       staff: {
         Row: {
           created_at: string | null
           id: string
           name: string
+          shift_pattern: string | null
           shift_start: string
           trained_tasks: string[]
           updated_at: string | null
@@ -90,6 +159,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           name: string
+          shift_pattern?: string | null
           shift_start?: string
           trained_tasks?: string[]
           updated_at?: string | null
@@ -98,6 +168,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           name?: string
+          shift_pattern?: string | null
           shift_start?: string
           trained_tasks?: string[]
           updated_at?: string | null
