@@ -1438,6 +1438,14 @@ export default function Home() {
             </p>
           </div>
         )}
+
+        {!taskConfig && staff.length > 0 && (
+          <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm no-print">
+            <p className="text-sm font-mono text-warning-foreground">
+              No task configuration found. Visit the <Link href="/config" className="underline font-semibold hover:text-warning transition-smooth">Config page</Link> to set up daily task requirements.
+            </p>
+          </div>
+        )}
       </div>
     </Layout>
   );
