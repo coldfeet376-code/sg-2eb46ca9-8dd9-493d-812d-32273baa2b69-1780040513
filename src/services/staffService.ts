@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { StaffMember, AvailabilityEntry } from "@/types";
+import type { StaffMember, AvailabilityEntry, Task, ShiftStart } from "@/types";
 
 export const staffService = {
   // Fetch all staff members with their availability
@@ -26,8 +26,8 @@ export const staffService = {
     const staff: StaffMember[] = (staffData || []).map((s) => ({
       id: s.id,
       name: s.name,
-      trainedTasks: s.trained_tasks || [],
-      shiftStart: s.shift_start || "06:00",
+      trainedTasks: (s.trained_tasks || []) as Task[],
+      shiftStart: (s.shift_start || "06:00") as ShiftStart,
       availability: (availabilityData || [])
         .filter((a) => a.staff_id === s.id)
         .map((a) => ({
@@ -60,8 +60,8 @@ export const staffService = {
     return {
       id: data.id,
       name: data.name,
-      trainedTasks: data.trained_tasks || [],
-      shiftStart: data.shift_start || "06:00",
+      trainedTasks: (data.trained_tasks || []) as Task[],
+      shiftStart: (data.shift_start || "06:00") as ShiftStart,
       availability: [],
     };
   },
@@ -71,7 +71,7 @@ export const staffService = {
     id: string,
     updates: Partial<Omit<StaffMember, "id" | "availability">>
   ): Promise<void> {
-    const updateData: Record<string, unknown> = {};
+    const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.trainedTasks !== undefined) updateData.trained_tasks = updates.trainedTasks;
     if (updates.shiftStart !== undefined) updateData.shift_start = updates.shiftStart;
