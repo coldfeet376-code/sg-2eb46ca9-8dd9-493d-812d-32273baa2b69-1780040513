@@ -55,6 +55,8 @@ export default function Home() {
   const [coverageGaps, setCoverageGaps] = useState<CoverageGap[]>([]);
   const [showCoverageWarning, setShowCoverageWarning] = useState(false);
   const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const { addNotification } = useNotifications();
 
   useEffect(() => {
@@ -196,8 +198,10 @@ export default function Home() {
   };
 
   const generateRota = () => {
-    if (!staff.length || !taskConfig) return;
+    if (!staff.length || !taskConfig || isGenerating) return;
 
+    setIsGenerating(true);
+    
     // Check for coverage gaps first
     const gaps = checkCoverageGaps();
 
@@ -239,7 +243,15 @@ export default function Home() {
           weekStart: weekStart.toISOString(),
         });
       });
+      
+      addNotification({
+        staffName: "System",
+        message: "Rota generated successfully",
+        type: "info",
+      });
     }
+    
+    setIsGenerating(false);
   };
 
   const forceGenerateRota = () => {
@@ -376,6 +388,7 @@ export default function Home() {
       message: "All assignments unlocked",
       type: "info",
     });
+    setShowUnlockConfirm(false);
   };
 
   const exportPDF = () => {
@@ -435,6 +448,12 @@ export default function Home() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    
+    addNotification({
+      staffName: "System",
+      message: "CSV exported successfully",
+      type: "info",
+    });
   };
 
   const exportWeekPDF = () => {
@@ -1102,17 +1121,20 @@ export default function Home() {
                   variant="outline" 
                   size="sm" 
                   onClick={generateRota}
+                  disabled={isGenerating || !staff.length || !taskConfig}
                   className="gap-2 ml-2 rounded-lg"
                   data-tour="generate-button"
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  <span className="font-mono text-xs">Generate Rota</span>
+                  <RefreshCw className={`h-4 w-4 ${isGenerating ? 'animate-spin' : ''}`} />
+                  <span className="font-mono text-xs">
+                    {isGenerating ? "Generating..." : "Generate Rota"}
+                  </span>
                 </Button>
                 {lockedAssignments.length > 0 && (
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={unlockAll}
+                    onClick={() => setShowUnlockConfirm(true)}
                     className="gap-2 rounded-lg text-warning hover:text-warning"
                   >
                     <Unlock className="h-4 w-4" />
@@ -1147,6 +1169,39 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* Unlock All Confirmation */}
+        {showUnlockConfirm && (
+          <Alert className="bg-warning/10 border-warning">
+            <AlertCircle className="h-5 w-5 text-warning" />
+            <div className="flex-1">
+              <h3 className="font-condensed font-semibold text-warning mb-2">
+                Unlock All Assignments?
+              </h3>
+              <p className="text-sm text-warning/90 mb-3">
+                This will remove all {getLockedCount()} locked assignments. They will be reassigned when you regenerate the rota.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={unlockAll}
+                  className="rounded-lg text-warning hover:text-warning"
+                >
+                  Confirm Unlock
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowUnlockConfirm(false)}
+                  className="rounded-lg"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </Alert>
+        )}
 
         {/* Print-only header */}
         <div className="hidden print:block mb-4">

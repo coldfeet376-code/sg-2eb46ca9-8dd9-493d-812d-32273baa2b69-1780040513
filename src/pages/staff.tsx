@@ -39,6 +39,8 @@ export default function StaffPage() {
   const [availabilityNotes, setAvailabilityNotes] = useState("");
   const [excelImport, setExcelImport] = useState("");
   const [csvFileName, setCsvFileName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
   // Batch availability state
   const [batchMode, setBatchMode] = useState(false);
@@ -88,6 +90,7 @@ export default function StaffPage() {
   const handleAddStaff = async () => {
     if (!name.trim() || selectedTasks.length === 0) return;
 
+    setIsLoading(true);
     try {
       const newStaff = await staffService.addStaff({
         name: name.trim(),
@@ -116,6 +119,8 @@ export default function StaffPage() {
         description: "Failed to add staff member",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -356,6 +361,7 @@ export default function StaffPage() {
   const handleDeleteStaff = async (id: string) => {
     const staffMember = staff.find(s => s.id === id);
     
+    setIsLoading(true);
     try {
       await staffService.deleteStaff(id);
       setStaff(staff.filter((s) => s.id !== id));
@@ -372,6 +378,7 @@ export default function StaffPage() {
         title: "Staff deleted",
         description: `${staffMember?.name} has been removed`,
       });
+      setDeleteConfirmId(null);
     } catch (error) {
       console.error("Error deleting staff:", error);
       toast({
@@ -379,6 +386,8 @@ export default function StaffPage() {
         description: "Failed to delete staff member",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -754,9 +763,9 @@ export default function StaffPage() {
                   </Select>
                 </div>
 
-                <Button onClick={handleAddStaff} className="rounded-lg shadow-sm hover:shadow-md transition-smooth">
+                <Button onClick={handleAddStaff} className="rounded-lg shadow-sm hover:shadow-md transition-smooth" disabled={isLoading || !name.trim() || selectedTasks.length === 0}>
                   <Plus className="h-4 w-4 mr-2" />
-                  <span className="font-mono text-xs">Add Staff</span>
+                  <span className="font-mono text-xs">{isLoading ? "Adding..." : "Add Staff"}</span>
                 </Button>
               </CardContent>
             </Card>
@@ -1006,13 +1015,46 @@ export default function StaffPage() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => handleDeleteStaff(member.id)}
+                                    onClick={() => setDeleteConfirmId(member.id)}
                                     className="text-destructive h-8 w-8 p-0"
+                                    disabled={isLoading}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
                                 )}
                               </div>
+
+                              {/* Delete Confirmation Alert */}
+                              {deleteConfirmId === member.id && (
+                                <Alert className="mt-3 bg-destructive/10 border-destructive">
+                                  <AlertCircle className="h-4 w-4 text-destructive" />
+                                  <div className="flex-1">
+                                    <p className="text-sm text-destructive mb-2">
+                                      Delete {member.name}? This action cannot be undone.
+                                    </p>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleDeleteStaff(member.id)}
+                                        disabled={isLoading}
+                                        className="rounded-lg text-destructive hover:text-destructive"
+                                      >
+                                        {isLoading ? "Deleting..." : "Confirm Delete"}
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setDeleteConfirmId(null)}
+                                        disabled={isLoading}
+                                        className="rounded-lg"
+                                      >
+                                        Cancel
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </Alert>
+                              )}
 
                               {!batchMode && (
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
