@@ -22,6 +22,7 @@ export interface StaffMember {
   name: string;
   trainedTasks: Task[];
   shiftStart?: ShiftStart;
+  shiftPattern?: ShiftPattern;
   restDays?: number[]; // Day of week (0-6)
   availability?: AvailabilityEntry[]; // Date-specific availability
   preferences?: StaffPreferences; // Task preferences
