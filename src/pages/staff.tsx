@@ -589,10 +589,16 @@ export default function StaffPage() {
 
     // Import successful entries
     try {
+      console.log("🚀 Starting database import of", newAvailability.length, "entries for staff:", selectedStaff.id);
+      
       await staffService.addAvailability(selectedStaff.id, newAvailability);
 
+      console.log("✅ Database import successful, invalidating cache...");
+      
       // Invalidate React Query cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      await queryClient.invalidateQueries({ queryKey: ["staff"] });
+      
+      console.log("✅ Cache invalidated, resetting UI...");
 
       toast({
         title: "Import successful",
@@ -603,11 +609,26 @@ export default function StaffPage() {
       setExcelImport("");
       setCsvFileName("");
       
+      // Reset selected staff to force re-read from cache
+      const staffId = selectedStaff.id;
+      setSelectedStaff(null);
+      setTimeout(() => {
+        const updated = staff.find(s => s.id === staffId);
+        if (updated) setSelectedStaff(updated);
+      }, 100);
+      
     } catch (error) {
-      console.error("Error importing availability:", error);
+      console.error("❌ Error importing availability:", error);
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        code: (error as any)?.code,
+        details: (error as any)?.details,
+        hint: (error as any)?.hint,
+      });
+      
       toast({
         title: "Database error",
-        description: `Parsed ${newAvailability.length} entries but failed to save to database. ${error instanceof Error ? error.message : ""}`,
+        description: `Failed to save ${newAvailability.length} entries. ${error instanceof Error ? error.message : "Unknown error"}`,
         variant: "destructive",
       });
     }
@@ -675,11 +696,17 @@ export default function StaffPage() {
     }
 
     try {
+      console.log("🗑️ Clearing all availability for staff:", staffId, "Count:", staffMember.availability.length);
+      
       // Delete all availability entries for this staff member
       await staffService.clearAllAvailability(staffId);
 
+      console.log("✅ Database delete successful, invalidating cache...");
+      
       // Invalidate React Query cache to refresh UI
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      await queryClient.invalidateQueries({ queryKey: ["staff"] });
+      
+      console.log("✅ Cache invalidated, resetting UI...");
 
       toast({
         title: "All entries cleared",
@@ -688,8 +715,15 @@ export default function StaffPage() {
       
       setClearAllConfirm(null);
       
+      // Reset selected staff to force re-read from cache
+      setSelectedStaff(null);
+      setTimeout(() => {
+        const updated = staff.find(s => s.id === staffId);
+        if (updated) setSelectedStaff(updated);
+      }, 100);
+      
     } catch (error) {
-      console.error("Error clearing availability:", error);
+      console.error("❌ Error clearing availability:", error);
       toast({
         title: "Error",
         description: "Failed to clear availability data",
