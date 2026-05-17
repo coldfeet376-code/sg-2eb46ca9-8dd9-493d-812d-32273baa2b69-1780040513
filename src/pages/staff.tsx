@@ -915,7 +915,7 @@ export default function StaffPage() {
                                 )}
                               </div>
                               
-                              {!batchMode && (
+                              {!batchMode && !mobileView && (
                                 <div className="flex items-center gap-2">
                                   <Button
                                     variant="outline"
