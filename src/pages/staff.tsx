@@ -18,6 +18,8 @@ import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart
 import { Badge } from "@/components/ui/badge";
 import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, AlertCircle, Repeat, Clock, Edit, X } from "lucide-react";
 import * as XLSX from "xlsx";
+import { staffService } from "@/services/staffService";
+import { useToast } from "@/hooks/use-toast";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -45,6 +47,7 @@ export default function StaffPage() {
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   
   const { addAuditEntry } = useAudit();
+  const { toast } = useToast();
   
   // Edit staff state
   const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
@@ -63,38 +66,57 @@ export default function StaffPage() {
   });
   const [patternNotes, setPatternNotes] = useState("");
 
+  // Load staff from Supabase on mount
   useEffect(() => {
-    const savedStaff = localStorage.getItem("warehouse-staff");
-    if (savedStaff) {
-      setStaff(JSON.parse(savedStaff));
-    }
+    loadStaff();
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem("warehouse-staff", JSON.stringify(staff));
-  }, [staff]);
+  const loadStaff = async () => {
+    try {
+      const data = await staffService.getAllStaff();
+      setStaff(data);
+    } catch (error) {
+      console.error("Error loading staff:", error);
+      toast({
+        title: "Error loading staff",
+        description: "Failed to load staff from database",
+        variant: "destructive",
+      });
+    }
+  };
 
-  const handleAddStaff = () => {
+  const handleAddStaff = async () => {
     if (!name.trim() || selectedTasks.length === 0) return;
 
-    const newStaff: StaffMember = {
-      id: Date.now().toString(),
-      name: name.trim(),
-      trainedTasks: selectedTasks,
-      shiftStart,
-      availability: [],
-    };
+    try {
+      const newStaff = await staffService.addStaff({
+        name: name.trim(),
+        trainedTasks: selectedTasks,
+        shiftStart,
+      });
 
-    setStaff([...staff, newStaff]);
-    addAuditEntry({
-      user: "System",
-      action: "created",
-      entity: "staff",
-      entityId: newStaff.id,
-      details: `Added staff member: ${newStaff.name}`,
-    });
-    setName("");
-    setSelectedTasks([]);
+      setStaff([...staff, newStaff]);
+      addAuditEntry({
+        user: "System",
+        action: "created",
+        entity: "staff",
+        entityId: newStaff.id,
+        details: `Added staff member: ${newStaff.name}`,
+      });
+      setName("");
+      setSelectedTasks([]);
+      toast({
+        title: "Staff added",
+        description: `${newStaff.name} has been added successfully`,
+      });
+    } catch (error) {
+      console.error("Error adding staff:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add staff member",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleEditStaff = (member: StaffMember) => {
@@ -111,94 +133,151 @@ export default function StaffPage() {
     setEditShift("06:00");
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingStaffId || !editName.trim() || editTasks.length === 0) return;
 
-    const updatedStaff = staff.map((s) => {
-      if (s.id === editingStaffId) {
-        return {
-          ...s,
-          name: editName.trim(),
-          trainedTasks: editTasks,
-          shiftStart: editShift,
-        };
-      }
-      return s;
-    });
+    try {
+      await staffService.updateStaff(editingStaffId, {
+        name: editName.trim(),
+        trainedTasks: editTasks,
+        shiftStart: editShift,
+      });
 
-    setStaff(updatedStaff);
-    addAuditEntry({
-      user: "System",
-      action: "updated",
-      entity: "staff",
-      entityId: editingStaffId,
-      details: `Updated staff member: ${editName.trim()}`,
-    });
-    setEditingStaffId(null);
+      const updatedStaff = staff.map((s) => {
+        if (s.id === editingStaffId) {
+          return {
+            ...s,
+            name: editName.trim(),
+            trainedTasks: editTasks,
+            shiftStart: editShift,
+          };
+        }
+        return s;
+      });
+
+      setStaff(updatedStaff);
+      addAuditEntry({
+        user: "System",
+        action: "updated",
+        entity: "staff",
+        entityId: editingStaffId,
+        details: `Updated staff member: ${editName.trim()}`,
+      });
+      setEditingStaffId(null);
+      toast({
+        title: "Staff updated",
+        description: "Changes saved successfully",
+      });
+    } catch (error) {
+      console.error("Error updating staff:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update staff member",
+        variant: "destructive",
+      });
+    }
   };
 
   // Quick action handlers
-  const handleQuickSickToday = (staffId: string) => {
+  const handleQuickSickToday = async (staffId: string) => {
     const today = new Date();
     const dateStr = today.toISOString().split("T")[0];
     
-    const updatedStaff = staff.map((s) => {
-      if (s.id === staffId) {
-        const newEntry: AvailabilityEntry = {
-          date: dateStr,
-          type: "sick",
-          notes: "Marked sick",
-        };
-        return {
-          ...s,
-          availability: [...(s.availability || []), newEntry],
-        };
-      }
-      return s;
-    });
+    try {
+      await staffService.addAvailability(staffId, [{
+        date: dateStr,
+        type: "sick",
+        notes: "Marked sick",
+      }]);
 
-    setStaff(updatedStaff);
-    addAuditEntry({
-      user: "System",
-      action: "created",
-      entity: "availability",
-      entityId: staffId,
-      details: `Marked sick for today`,
-    });
+      const updatedStaff = staff.map((s) => {
+        if (s.id === staffId) {
+          const newEntry: AvailabilityEntry = {
+            date: dateStr,
+            type: "sick",
+            notes: "Marked sick",
+          };
+          return {
+            ...s,
+            availability: [...(s.availability || []), newEntry],
+          };
+        }
+        return s;
+      });
+
+      setStaff(updatedStaff);
+      addAuditEntry({
+        user: "System",
+        action: "created",
+        entity: "availability",
+        entityId: staffId,
+        details: `Marked sick for today`,
+      });
+      toast({
+        title: "Marked sick",
+        description: "Staff member marked as sick for today",
+      });
+    } catch (error) {
+      console.error("Error marking sick:", error);
+      toast({
+        title: "Error",
+        description: "Failed to mark as sick",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleQuickRestTomorrow = (staffId: string) => {
+  const handleQuickRestTomorrow = async (staffId: string) => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const dateStr = tomorrow.toISOString().split("T")[0];
     
-    const updatedStaff = staff.map((s) => {
-      if (s.id === staffId) {
-        const newEntry: AvailabilityEntry = {
-          date: dateStr,
-          type: "rest",
-          notes: "Quick rest day",
-        };
-        return {
-          ...s,
-          availability: [...(s.availability || []), newEntry],
-        };
-      }
-      return s;
-    });
+    try {
+      await staffService.addAvailability(staffId, [{
+        date: dateStr,
+        type: "rest",
+        notes: "Quick rest day",
+      }]);
 
-    setStaff(updatedStaff);
-    addAuditEntry({
-      user: "System",
-      action: "created",
-      entity: "availability",
-      entityId: staffId,
-      details: `Added rest day for tomorrow`,
-    });
+      const updatedStaff = staff.map((s) => {
+        if (s.id === staffId) {
+          const newEntry: AvailabilityEntry = {
+            date: dateStr,
+            type: "rest",
+            notes: "Quick rest day",
+          };
+          return {
+            ...s,
+            availability: [...(s.availability || []), newEntry],
+          };
+        }
+        return s;
+      });
+
+      setStaff(updatedStaff);
+      addAuditEntry({
+        user: "System",
+        action: "created",
+        entity: "availability",
+        entityId: staffId,
+        details: `Added rest day for tomorrow`,
+      });
+      toast({
+        title: "Rest day added",
+        description: "Rest day added for tomorrow",
+      });
+    } catch (error) {
+      console.error("Error adding rest day:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add rest day",
+        variant: "destructive",
+      });
+    }
   };
 
   // Batch availability handler
-  const handleBatchAvailability = () => {
+  const handleBatchAvailability = async () => {
     if (!dateFrom || !dateTo || selectedStaffIds.length === 0) return;
 
     const dates: Date[] = [];
@@ -210,36 +289,54 @@ export default function StaffPage() {
       current.setDate(current.getDate() + 1);
     }
 
-    const updatedStaff = staff.map((s) => {
-      if (selectedStaffIds.includes(s.id)) {
-        const newEntries: AvailabilityEntry[] = dates.map((date) => ({
-          date: date.toISOString().split("T")[0],
-          type: availabilityType,
-          notes: availabilityNotes || "Batch entry",
-        }));
-        return {
-          ...s,
-          availability: [...(s.availability || []), ...newEntries],
-        };
+    const newEntries: AvailabilityEntry[] = dates.map((date) => ({
+      date: date.toISOString().split("T")[0],
+      type: availabilityType,
+      notes: availabilityNotes || "Batch entry",
+    }));
+
+    try {
+      for (const staffId of selectedStaffIds) {
+        await staffService.addAvailability(staffId, newEntries);
       }
-      return s;
-    });
 
-    setStaff(updatedStaff);
-    addAuditEntry({
-      user: "System",
-      action: "created",
-      entity: "availability",
-      entityId: "batch",
-      details: `Added ${dates.length} days for ${selectedStaffIds.length} staff`,
-    });
+      const updatedStaff = staff.map((s) => {
+        if (selectedStaffIds.includes(s.id)) {
+          return {
+            ...s,
+            availability: [...(s.availability || []), ...newEntries],
+          };
+        }
+        return s;
+      });
 
-    // Reset batch form
-    setSelectedStaffIds([]);
-    setDateFrom(undefined);
-    setDateTo(undefined);
-    setAvailabilityNotes("");
-    setBatchMode(false);
+      setStaff(updatedStaff);
+      addAuditEntry({
+        user: "System",
+        action: "created",
+        entity: "availability",
+        entityId: "batch",
+        details: `Added ${dates.length} days for ${selectedStaffIds.length} staff`,
+      });
+
+      // Reset batch form
+      setSelectedStaffIds([]);
+      setDateFrom(undefined);
+      setDateTo(undefined);
+      setAvailabilityNotes("");
+      setBatchMode(false);
+      toast({
+        title: "Batch availability added",
+        description: `Added ${dates.length} days for ${selectedStaffIds.length} staff members`,
+      });
+    } catch (error) {
+      console.error("Error adding batch availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add batch availability",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleStaffSelection = (staffId: string) => {
@@ -256,16 +353,31 @@ export default function StaffPage() {
     }
   };
 
-  const handleDeleteStaff = (id: string) => {
+  const handleDeleteStaff = async (id: string) => {
     const staffMember = staff.find(s => s.id === id);
-    setStaff(staff.filter((s) => s.id !== id));
-    if (staffMember) {
-      addAuditEntry({
-        user: "System",
-        action: "deleted",
-        entity: "staff",
-        entityId: id,
-        details: `Deleted staff member: ${staffMember.name}`,
+    
+    try {
+      await staffService.deleteStaff(id);
+      setStaff(staff.filter((s) => s.id !== id));
+      if (staffMember) {
+        addAuditEntry({
+          user: "System",
+          action: "deleted",
+          entity: "staff",
+          entityId: id,
+          details: `Deleted staff member: ${staffMember.name}`,
+        });
+      }
+      toast({
+        title: "Staff deleted",
+        description: `${staffMember?.name} has been removed`,
+      });
+    } catch (error) {
+      console.error("Error deleting staff:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete staff member",
+        variant: "destructive",
       });
     }
   };
@@ -278,9 +390,13 @@ export default function StaffPage() {
     }
   };
 
-  const handleBulkImport = () => {
+  const handleBulkImport = async () => {
     const lines = bulkInput.trim().split("\n");
-    const newStaff: StaffMember[] = [];
+    const staffData: Array<{
+      name: string;
+      trainedTasks: string[];
+      shiftStart?: string;
+    }> = [];
 
     lines.forEach((line) => {
       const parts = line.split(",").map((p) => p.trim());
@@ -302,21 +418,33 @@ export default function StaffPage() {
         .filter((t) => TASKS.includes(t as Task)) as Task[];
 
       if (staffName && tasks.length > 0) {
-        newStaff.push({
-          id: Date.now().toString() + Math.random(),
+        staffData.push({
           name: staffName,
           trainedTasks: tasks,
           shiftStart: shift,
-          availability: [],
         });
       }
     });
 
-    if (newStaff.length > 0) {
-      setStaff([...staff, ...newStaff]);
-      setBulkInput("");
-      setBulkSuccess(true);
-      setTimeout(() => setBulkSuccess(false), 3000);
+    if (staffData.length > 0) {
+      try {
+        await staffService.bulkImportStaff(staffData);
+        await loadStaff(); // Reload all staff from database
+        setBulkInput("");
+        setBulkSuccess(true);
+        setTimeout(() => setBulkSuccess(false), 3000);
+        toast({
+          title: "Import successful",
+          description: `Imported ${staffData.length} staff members`,
+        });
+      } catch (error) {
+        console.error("Error bulk importing:", error);
+        toast({
+          title: "Error",
+          description: "Failed to import staff",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -348,7 +476,7 @@ export default function StaffPage() {
     }
   };
 
-  const handleAvailabilityImport = () => {
+  const handleAvailabilityImport = async () => {
     if (!selectedStaff || !excelImport.trim()) return;
 
     const lines = excelImport.trim().split("\n");
@@ -375,24 +503,40 @@ export default function StaffPage() {
     });
 
     if (newAvailability.length > 0) {
-      const updatedStaff = staff.map((s) => {
-        if (s.id === selectedStaff.id) {
-          const existingDates = new Set(s.availability?.map((a) => a.date) || []);
-          const filtered = newAvailability.filter((a) => !existingDates.has(a.date));
-          return {
-            ...s,
-            availability: [...(s.availability || []), ...filtered],
-          };
-        }
-        return s;
-      });
-      setStaff(updatedStaff);
-      setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
-      setExcelImport("");
+      try {
+        await staffService.addAvailability(selectedStaff.id, newAvailability);
+
+        const updatedStaff = staff.map((s) => {
+          if (s.id === selectedStaff.id) {
+            const existingDates = new Set(s.availability?.map((a) => a.date) || []);
+            const filtered = newAvailability.filter((a) => !existingDates.has(a.date));
+            return {
+              ...s,
+              availability: [...(s.availability || []), ...filtered],
+            };
+          }
+          return s;
+        });
+        setStaff(updatedStaff);
+        setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
+        setExcelImport("");
+        setCsvFileName("");
+        toast({
+          title: "Import successful",
+          description: `Imported ${newAvailability.length} availability entries`,
+        });
+      } catch (error) {
+        console.error("Error importing availability:", error);
+        toast({
+          title: "Error",
+          description: "Failed to import availability",
+          variant: "destructive",
+        });
+      }
     }
   };
 
-  const handleAddAvailability = () => {
+  const handleAddAvailability = async () => {
     if (!selectedStaff || selectedDates.length === 0) return;
 
     const newEntries: AvailabilityEntry[] = selectedDates.map((date) => ({
@@ -401,39 +545,69 @@ export default function StaffPage() {
       notes: availabilityNotes,
     }));
 
-    const updatedStaff = staff.map((s) => {
-      if (s.id === selectedStaff.id) {
-        const existingDates = new Set(newEntries.map((e) => e.date));
-        const filtered = (s.availability || []).filter((a) => !existingDates.has(a.date));
-        return {
-          ...s,
-          availability: [...filtered, ...newEntries].sort((a, b) => a.date.localeCompare(b.date)),
-        };
-      }
-      return s;
-    });
+    try {
+      await staffService.addAvailability(selectedStaff.id, newEntries);
 
-    setStaff(updatedStaff);
-    setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
-    setSelectedDates([]);
-    setAvailabilityNotes("");
+      const updatedStaff = staff.map((s) => {
+        if (s.id === selectedStaff.id) {
+          const existingDates = new Set(newEntries.map((e) => e.date));
+          const filtered = (s.availability || []).filter((a) => !existingDates.has(a.date));
+          return {
+            ...s,
+            availability: [...filtered, ...newEntries].sort((a, b) => a.date.localeCompare(b.date)),
+          };
+        }
+        return s;
+      });
+
+      setStaff(updatedStaff);
+      setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
+      setSelectedDates([]);
+      setAvailabilityNotes("");
+      toast({
+        title: "Availability added",
+        description: `Added ${newEntries.length} availability entries`,
+      });
+    } catch (error) {
+      console.error("Error adding availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to add availability",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteAvailability = (staffId: string, date: string) => {
-    const updatedStaff = staff.map((s) => {
-      if (s.id === staffId) {
-        return {
-          ...s,
-          availability: (s.availability || []).filter((a) => a.date !== date),
-        };
-      }
-      return s;
-    });
-    setStaff(updatedStaff);
-    setSelectedStaff(updatedStaff.find((s) => s.id === staffId) || null);
+  const handleDeleteAvailability = async (staffId: string, date: string) => {
+    try {
+      await staffService.deleteAvailability(staffId, date);
+
+      const updatedStaff = staff.map((s) => {
+        if (s.id === staffId) {
+          return {
+            ...s,
+            availability: (s.availability || []).filter((a) => a.date !== date),
+          };
+        }
+        return s;
+      });
+      setStaff(updatedStaff);
+      setSelectedStaff(updatedStaff.find((s) => s.id === staffId) || null);
+      toast({
+        title: "Entry deleted",
+        description: "Availability entry removed",
+      });
+    } catch (error) {
+      console.error("Error deleting availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete availability",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleApplyPattern = () => {
+  const handleApplyPattern = async () => {
     if (!selectedStaff) return;
 
     const entries: AvailabilityEntry[] = [];
@@ -453,21 +627,36 @@ export default function StaffPage() {
 
     if (entries.length === 0) return;
 
-    const updatedStaff = staff.map((s) => {
-      if (s.id === selectedStaff.id) {
-        const existingDates = new Set(entries.map((e) => e.date));
-        const filtered = (s.availability || []).filter((a) => !existingDates.has(a.date));
-        return {
-          ...s,
-          availability: [...filtered, ...entries].sort((a, b) => a.date.localeCompare(b.date)),
-        };
-      }
-      return s;
-    });
+    try {
+      await staffService.addAvailability(selectedStaff.id, entries);
 
-    setStaff(updatedStaff);
-    setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
-    setPatternNotes("");
+      const updatedStaff = staff.map((s) => {
+        if (s.id === selectedStaff.id) {
+          const existingDates = new Set(entries.map((e) => e.date));
+          const filtered = (s.availability || []).filter((a) => !existingDates.has(a.date));
+          return {
+            ...s,
+            availability: [...filtered, ...entries].sort((a, b) => a.date.localeCompare(b.date)),
+          };
+        }
+        return s;
+      });
+
+      setStaff(updatedStaff);
+      setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
+      setPatternNotes("");
+      toast({
+        title: "Pattern applied",
+        description: `Added ${entries.length} recurring entries`,
+      });
+    } catch (error) {
+      console.error("Error applying pattern:", error);
+      toast({
+        title: "Error",
+        description: "Failed to apply pattern",
+        variant: "destructive",
+      });
+    }
   };
 
   const getAvailabilityColor = (type: AvailabilityType) => {
