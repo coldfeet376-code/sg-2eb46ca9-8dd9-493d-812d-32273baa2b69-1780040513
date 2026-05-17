@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SEO } from "@/components/SEO";
 import { useAudit } from "@/contexts/AuditContext";
+import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, AlertCircle, Repeat, Clock, Edit, X } from "lucide-react";
@@ -26,7 +27,6 @@ const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "F
 const SHIFT_STARTS: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
 
 export default function StaffPage() {
-  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [name, setName] = useState("");
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
   const [shiftStart, setShiftStart] = useState<ShiftStart>("06:00");
@@ -39,7 +39,6 @@ export default function StaffPage() {
   const [availabilityNotes, setAvailabilityNotes] = useState("");
   const [excelImport, setExcelImport] = useState("");
   const [csvFileName, setCsvFileName] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
   // Batch availability state
@@ -68,60 +67,47 @@ export default function StaffPage() {
   });
   const [patternNotes, setPatternNotes] = useState("");
 
-  // Load staff from Supabase on mount
-  useEffect(() => {
-    loadStaff();
-  }, []);
-
-  const loadStaff = async () => {
-    try {
-      const data = await staffService.getAllStaff();
-      setStaff(data);
-    } catch (error) {
-      console.error("Error loading staff:", error);
-      toast({
-        title: "Error loading staff",
-        description: "Failed to load staff from database",
-        variant: "destructive",
-      });
-    }
-  };
+  // React Query hooks - cached data
+  const { data: staff = [], isLoading: staffLoading } = useStaff();
+  const addStaffMutation = useAddStaff();
+  const updateStaffMutation = useUpdateStaff();
+  const deleteStaffMutation = useDeleteStaff();
 
   const handleAddStaff = async () => {
     if (!name.trim() || selectedTasks.length === 0) return;
 
-    setIsLoading(true);
-    try {
-      const newStaff = await staffService.addStaff({
+    addStaffMutation.mutate(
+      {
         name: name.trim(),
         trainedTasks: selectedTasks,
         shiftStart,
-      });
-
-      setStaff([...staff, newStaff]);
-      addAuditEntry({
-        user: "System",
-        action: "created",
-        entity: "staff",
-        entityId: newStaff.id,
-        details: `Added staff member: ${newStaff.name}`,
-      });
-      setName("");
-      setSelectedTasks([]);
-      toast({
-        title: "Staff added",
-        description: `${newStaff.name} has been added successfully`,
-      });
-    } catch (error) {
-      console.error("Error adding staff:", error);
-      toast({
-        title: "Error",
-        description: "Failed to add staff member",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+      },
+      {
+        onSuccess: (newStaff) => {
+          addAuditEntry({
+            user: "System",
+            action: "created",
+            entity: "staff",
+            entityId: newStaff.id,
+            details: `Added staff member: ${newStaff.name}`,
+          });
+          setName("");
+          setSelectedTasks([]);
+          toast({
+            title: "Staff added",
+            description: `${newStaff.name} has been added successfully`,
+          });
+        },
+        onError: (error) => {
+          console.error("Error adding staff:", error);
+          toast({
+            title: "Error",
+            description: "Failed to add staff member",
+            variant: "destructive",
+          });
+        },
+      }
+    );
   };
 
   const handleEditStaff = (member: StaffMember) => {
@@ -141,46 +127,40 @@ export default function StaffPage() {
   const handleSaveEdit = async () => {
     if (!editingStaffId || !editName.trim() || editTasks.length === 0) return;
 
-    try {
-      await staffService.updateStaff(editingStaffId, {
-        name: editName.trim(),
-        trainedTasks: editTasks,
-        shiftStart: editShift,
-      });
-
-      const updatedStaff = staff.map((s) => {
-        if (s.id === editingStaffId) {
-          return {
-            ...s,
-            name: editName.trim(),
-            trainedTasks: editTasks,
-            shiftStart: editShift,
-          };
-        }
-        return s;
-      });
-
-      setStaff(updatedStaff);
-      addAuditEntry({
-        user: "System",
-        action: "updated",
-        entity: "staff",
-        entityId: editingStaffId,
-        details: `Updated staff member: ${editName.trim()}`,
-      });
-      setEditingStaffId(null);
-      toast({
-        title: "Staff updated",
-        description: "Changes saved successfully",
-      });
-    } catch (error) {
-      console.error("Error updating staff:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update staff member",
-        variant: "destructive",
-      });
-    }
+    updateStaffMutation.mutate(
+      {
+        id: editingStaffId,
+        data: {
+          name: editName.trim(),
+          trainedTasks: editTasks,
+          shiftStart: editShift,
+        },
+      },
+      {
+        onSuccess: () => {
+          addAuditEntry({
+            user: "System",
+            action: "updated",
+            entity: "staff",
+            entityId: editingStaffId,
+            details: `Updated staff member: ${editName.trim()}`,
+          });
+          setEditingStaffId(null);
+          toast({
+            title: "Staff updated",
+            description: "Changes saved successfully",
+          });
+        },
+        onError: (error) => {
+          console.error("Error updating staff:", error);
+          toast({
+            title: "Error",
+            description: "Failed to update staff member",
+            variant: "destructive",
+          });
+        },
+      }
+    );
   };
 
   // Quick action handlers
@@ -210,14 +190,6 @@ export default function StaffPage() {
         return s;
       });
 
-      setStaff(updatedStaff);
-      addAuditEntry({
-        user: "System",
-        action: "created",
-        entity: "availability",
-        entityId: staffId,
-        details: `Marked sick for today`,
-      });
       toast({
         title: "Marked sick",
         description: "Staff member marked as sick for today",
@@ -259,14 +231,6 @@ export default function StaffPage() {
         return s;
       });
 
-      setStaff(updatedStaff);
-      addAuditEntry({
-        user: "System",
-        action: "created",
-        entity: "availability",
-        entityId: staffId,
-        details: `Added rest day for tomorrow`,
-      });
       toast({
         title: "Rest day added",
         description: "Rest day added for tomorrow",
@@ -315,21 +279,6 @@ export default function StaffPage() {
         return s;
       });
 
-      setStaff(updatedStaff);
-      addAuditEntry({
-        user: "System",
-        action: "created",
-        entity: "availability",
-        entityId: "batch",
-        details: `Added ${dates.length} days for ${selectedStaffIds.length} staff`,
-      });
-
-      // Reset batch form
-      setSelectedStaffIds([]);
-      setDateFrom(undefined);
-      setDateTo(undefined);
-      setAvailabilityNotes("");
-      setBatchMode(false);
       toast({
         title: "Batch availability added",
         description: `Added ${dates.length} days for ${selectedStaffIds.length} staff members`,
@@ -361,34 +310,32 @@ export default function StaffPage() {
   const handleDeleteStaff = async (id: string) => {
     const staffMember = staff.find(s => s.id === id);
     
-    setIsLoading(true);
-    try {
-      await staffService.deleteStaff(id);
-      setStaff(staff.filter((s) => s.id !== id));
-      if (staffMember) {
-        addAuditEntry({
-          user: "System",
-          action: "deleted",
-          entity: "staff",
-          entityId: id,
-          details: `Deleted staff member: ${staffMember.name}`,
+    deleteStaffMutation.mutate(id, {
+      onSuccess: () => {
+        if (staffMember) {
+          addAuditEntry({
+            user: "System",
+            action: "deleted",
+            entity: "staff",
+            entityId: id,
+            details: `Deleted staff member: ${staffMember.name}`,
+          });
+        }
+        toast({
+          title: "Staff deleted",
+          description: `${staffMember?.name} has been removed`,
         });
-      }
-      toast({
-        title: "Staff deleted",
-        description: `${staffMember?.name} has been removed`,
-      });
-      setDeleteConfirmId(null);
-    } catch (error) {
-      console.error("Error deleting staff:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete staff member",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+        setDeleteConfirmId(null);
+      },
+      onError: (error) => {
+        console.error("Error deleting staff:", error);
+        toast({
+          title: "Error",
+          description: "Failed to delete staff member",
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   const handleTaskToggle = (task: Task) => {
@@ -438,10 +385,6 @@ export default function StaffPage() {
     if (staffData.length > 0) {
       try {
         await staffService.bulkImportStaff(staffData);
-        await loadStaff(); // Reload all staff from database
-        setBulkInput("");
-        setBulkSuccess(true);
-        setTimeout(() => setBulkSuccess(false), 3000);
         toast({
           title: "Import successful",
           description: `Imported ${staffData.length} staff members`,
@@ -526,10 +469,6 @@ export default function StaffPage() {
           }
           return s;
         });
-        setStaff(updatedStaff);
-        setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
-        setExcelImport("");
-        setCsvFileName("");
         toast({
           title: "Import successful",
           description: `Imported ${newAvailability.length} availability entries`,
@@ -569,10 +508,6 @@ export default function StaffPage() {
         return s;
       });
 
-      setStaff(updatedStaff);
-      setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
-      setSelectedDates([]);
-      setAvailabilityNotes("");
       toast({
         title: "Availability added",
         description: `Added ${newEntries.length} availability entries`,
@@ -600,8 +535,6 @@ export default function StaffPage() {
         }
         return s;
       });
-      setStaff(updatedStaff);
-      setSelectedStaff(updatedStaff.find((s) => s.id === staffId) || null);
       toast({
         title: "Entry deleted",
         description: "Availability entry removed",
@@ -651,9 +584,6 @@ export default function StaffPage() {
         return s;
       });
 
-      setStaff(updatedStaff);
-      setSelectedStaff(updatedStaff.find((s) => s.id === selectedStaff.id) || null);
-      setPatternNotes("");
       toast({
         title: "Pattern applied",
         description: `Added ${entries.length} recurring entries`,
@@ -763,9 +693,9 @@ export default function StaffPage() {
                   </Select>
                 </div>
 
-                <Button onClick={handleAddStaff} className="rounded-lg shadow-sm hover:shadow-md transition-smooth" disabled={isLoading || !name.trim() || selectedTasks.length === 0}>
+                <Button onClick={handleAddStaff} className="rounded-lg shadow-sm hover:shadow-md transition-smooth" disabled={addStaffMutation.isPending || !name.trim() || selectedTasks.length === 0}>
                   <Plus className="h-4 w-4 mr-2" />
-                  <span className="font-mono text-xs">{isLoading ? "Adding..." : "Add Staff"}</span>
+                  <span className="font-mono text-xs">{addStaffMutation.isPending ? "Adding..." : "Add Staff"}</span>
                 </Button>
               </CardContent>
             </Card>
@@ -1017,7 +947,7 @@ export default function StaffPage() {
                                     size="sm"
                                     onClick={() => setDeleteConfirmId(member.id)}
                                     className="text-destructive h-8 w-8 p-0"
-                                    disabled={isLoading}
+                                    disabled={deleteStaffMutation.isPending}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -1037,16 +967,16 @@ export default function StaffPage() {
                                         variant="outline"
                                         size="sm"
                                         onClick={() => handleDeleteStaff(member.id)}
-                                        disabled={isLoading}
+                                        disabled={deleteStaffMutation.isPending}
                                         className="rounded-lg text-destructive hover:text-destructive"
                                       >
-                                        {isLoading ? "Deleting..." : "Confirm Delete"}
+                                        {deleteStaffMutation.isPending ? "Deleting..." : "Confirm Delete"}
                                       </Button>
                                       <Button
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setDeleteConfirmId(null)}
-                                        disabled={isLoading}
+                                        disabled={deleteStaffMutation.isPending}
                                         className="rounded-lg"
                                       >
                                         Cancel

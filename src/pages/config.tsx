@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SEO } from "@/components/SEO";
-import { supabase } from "@/integrations/supabase/client";
+import { useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
 import { useToast } from "@/hooks/use-toast";
 import { Save, Upload, Trash2, AlertCircle, FileText } from "lucide-react";
 
@@ -26,7 +26,18 @@ interface ConfigTemplate {
 }
 
 export default function ConfigPage() {
-  const [taskConfig, setTaskConfig] = useState<TaskConfig>({
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [templates, setTemplates] = useState<ConfigTemplate[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const { toast } = useToast();
+
+  // React Query hooks - cached data
+  const { data: taskConfig, isLoading } = useTaskConfig();
+  const updateConfigMutation = useUpdateTaskConfig();
+  
+  // Local editable state
+  const [editableConfig, setEditableConfig] = useState<TaskConfig>({
     Frozen: [0, 0, 0, 0, 0, 0, 0],
     Milk: [0, 0, 0, 0, 0, 0, 0],
     TWI: [0, 0, 0, 0, 0, 0, 0],
@@ -34,101 +45,46 @@ export default function ConfigPage() {
     Outbound: [0, 0, 0, 0, 0, 0, 0],
     Marshaling: [0, 0, 0, 0, 0, 0, 0],
   });
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [templates, setTemplates] = useState<ConfigTemplate[]>([]);
-  const [templateName, setTemplateName] = useState("");
-  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
 
   useEffect(() => {
-    loadTaskConfig();
     const savedTemplates = localStorage.getItem("warehouse-config-templates");
     if (savedTemplates) {
       setTemplates(JSON.parse(savedTemplates));
     }
   }, []);
 
-  const loadTaskConfig = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("task_config")
-        .select("*");
-
-      if (error) {
-        console.error("Error fetching task config:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load task configuration",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const config: TaskConfig = {};
-        data.forEach((row) => {
-          config[row.task] = [
-            row.sunday,
-            row.monday,
-            row.tuesday,
-            row.wednesday,
-            row.thursday,
-            row.friday,
-            row.saturday,
-          ];
-        });
-        setTaskConfig(config);
-      }
-    } catch (error) {
-      console.error("Error loading task config:", error);
+  // Sync taskConfig from React Query to local editable state
+  useEffect(() => {
+    if (taskConfig) {
+      setEditableConfig(taskConfig);
     }
-  };
+  }, [taskConfig]);
 
   const handleConfigChange = (task: string, dayIndex: number, value: string) => {
-    const newConfig = { ...taskConfig };
+    const newConfig = { ...editableConfig };
     newConfig[task][dayIndex] = parseInt(value) || 0;
-    setTaskConfig(newConfig);
+    setEditableConfig(newConfig);
   };
 
   const handleSaveConfig = async () => {
-    setIsLoading(true);
-    try {
-      // Update each task in the database
-      for (const task of TASKS) {
-        const { error } = await supabase
-          .from("task_config")
-          .update({
-            sunday: taskConfig[task][0],
-            monday: taskConfig[task][1],
-            tuesday: taskConfig[task][2],
-            wednesday: taskConfig[task][3],
-            thursday: taskConfig[task][4],
-            friday: taskConfig[task][5],
-            saturday: taskConfig[task][6],
-            updated_at: new Date().toISOString(),
-          })
-          .eq("task", task);
-
-        if (error) throw error;
-      }
-
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-      toast({
-        title: "Configuration saved",
-        description: "Task requirements updated successfully",
-      });
-    } catch (error) {
-      console.error("Error saving task config:", error);
-      toast({
-        title: "Error",
-        description: "Failed to save configuration",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
+    updateConfigMutation.mutate(editableConfig, {
+      onSuccess: () => {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+        toast({
+          title: "Configuration saved",
+          description: "Task requirements updated successfully",
+        });
+      },
+      onError: (error) => {
+        console.error("Error saving task config:", error);
+        toast({
+          title: "Error",
+          description: "Failed to save configuration",
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   const handleSaveTemplate = () => {
@@ -137,7 +93,7 @@ export default function ConfigPage() {
     const newTemplate: ConfigTemplate = {
       id: Date.now().toString(),
       name: templateName.trim(),
-      config: { ...taskConfig },
+      config: { ...editableConfig },
       createdAt: Date.now(),
     };
 
@@ -154,7 +110,7 @@ export default function ConfigPage() {
   const handleLoadTemplate = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (template) {
-      setTaskConfig(template.config);
+      setEditableConfig(template.config);
       setSelectedTemplate(templateId);
       toast({
         title: "Template loaded",
@@ -230,10 +186,10 @@ export default function ConfigPage() {
                                 type="number"
                                 min="0"
                                 max="99"
-                                value={taskConfig[task][dayIdx]}
+                                value={editableConfig[task][dayIdx]}
                                 onChange={(e) => handleConfigChange(task, dayIdx, e.target.value)}
                                 className="w-16 text-center font-mono text-sm rounded-lg"
-                                disabled={isLoading}
+                                disabled={updateConfigMutation.isPending || isLoading}
                               />
                             </td>
                           ))}
@@ -247,11 +203,11 @@ export default function ConfigPage() {
                   <Button 
                     onClick={handleSaveConfig} 
                     className="rounded-lg shadow-sm hover:shadow-md transition-smooth"
-                    disabled={isLoading}
+                    disabled={updateConfigMutation.isPending || isLoading}
                   >
                     <Save className="h-4 w-4 mr-2" />
                     <span className="font-mono text-xs">
-                      {isLoading ? "Saving..." : "Save Configuration"}
+                      {updateConfigMutation.isPending ? "Saving..." : "Save Configuration"}
                     </span>
                   </Button>
                 </div>
