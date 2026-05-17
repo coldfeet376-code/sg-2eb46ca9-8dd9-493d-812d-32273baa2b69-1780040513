@@ -30,15 +30,32 @@ export function generateWeeklyRota({
   // Track what task each staff member did on each date
   const staffTasksByDate: Record<string, Record<string, Task>> = {};
   
-  // NEW: Track Inbound assignments for Frozen-trained staff (target: 2 per week)
-  const frozenStaffInboundCount: Record<string, number> = {};
+  // NEW: Track Inbound assignments for 06:00 shift staff based on working days
+  const earlyShiftInboundCount: Record<string, number> = {};
+  const earlyShiftWorkingDays: Record<string, number> = {};
   
   staff.forEach((s) => {
     staffAssignmentCounts[s.id] = 0;
     staffTasksByDate[s.id] = {};
-    // Initialize counter for Frozen-trained staff
-    if (s.trainedTasks.includes("Frozen")) {
-      frozenStaffInboundCount[s.id] = 0;
+    
+    // For 06:00 shift staff, calculate working days in the week
+    if (s.shiftStart === "06:00") {
+      earlyShiftInboundCount[s.id] = 0;
+      
+      // Count working days (days without rest/holiday/sick)
+      let workingDays = 0;
+      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+        const currentDate = new Date(weekStart);
+        currentDate.setDate(currentDate.getDate() + dayIndex);
+        const dateStr = currentDate.toISOString().split("T")[0];
+        
+        const availability = s.availability?.find((a) => a.date === dateStr);
+        if (!availability || availability.type === "available") {
+          workingDays++;
+        }
+      }
+      
+      earlyShiftWorkingDays[s.id] = workingDays;
     }
   });
 
@@ -53,7 +70,23 @@ export function generateWeeklyRota({
       
       // NEW: Count existing Inbound assignments for Frozen-trained staff
       if (a.task === "Inbound" && staffMember?.trainedTasks.includes("Frozen")) {
-        frozenStaffInboundCount[staffId] = (frozenStaffInboundCount[staffId] || 0) + 1;
+        earlyShiftInboundCount[staffId] = (earlyShiftInboundCount[staffId] || 0) + 1;
+      }
+    }
+  });
+
+  // Count existing locked assignments and populate task history
+  lockedAssignments.forEach((a) => {
+    // Fallback to finding staffId by name for backward compatibility with older locked assignments
+    const staffMember = staff.find((s) => s.name === a.staffName);
+    const staffId = a.staffId || staffMember?.id;
+    if (staffId) {
+      staffAssignmentCounts[staffId] = (staffAssignmentCounts[staffId] || 0) + 1;
+      staffTasksByDate[staffId][a.date] = a.task as Task;
+      
+      // NEW: Count existing Inbound assignments for 06:00 shift staff
+      if (a.task === "Inbound" && staffMember?.shiftStart === "06:00") {
+        earlyShiftInboundCount[staffId] = (earlyShiftInboundCount[staffId] || 0) + 1;
       }
     }
   });
@@ -161,24 +194,32 @@ export function generateWeeklyRota({
         return aShiftIndex - bShiftIndex;
       });
 
-      // NEW: Special sorting for Inbound task - prioritize Frozen-trained staff
+      // NEW: Special sorting for Inbound task - prioritize 06:00 shift staff based on working days
       let finalSorted = sorted;
       if (task === "Inbound") {
         finalSorted = sorted.sort((a, b) => {
-          const aIsFrozenTrained = a.trainedTasks.includes("Frozen");
-          const bIsFrozenTrained = b.trainedTasks.includes("Frozen");
+          const aIsEarlyShift = a.shiftStart === "06:00";
+          const bIsEarlyShift = b.shiftStart === "06:00";
           
-          // Get current Inbound count for Frozen-trained staff (target: 2 per week)
-          const aInboundCount = frozenStaffInboundCount[a.id] || 0;
-          const bInboundCount = frozenStaffInboundCount[b.id] || 0;
+          // Get current Inbound count and working days for 06:00 shift staff
+          const aInboundCount = earlyShiftInboundCount[a.id] || 0;
+          const bInboundCount = earlyShiftInboundCount[b.id] || 0;
+          const aWorkingDays = earlyShiftWorkingDays[a.id] || 0;
+          const bWorkingDays = earlyShiftWorkingDays[b.id] || 0;
           
-          // Priority 1: Frozen-trained staff who haven't reached 2 Inbound assignments yet
-          if (aIsFrozenTrained && !bIsFrozenTrained && aInboundCount < 2) return -1;
-          if (!aIsFrozenTrained && bIsFrozenTrained && bInboundCount < 2) return 1;
+          // Determine target Inbound assignments: 5-day workers get 2, 3-day workers get 1
+          const aTarget = aWorkingDays >= 5 ? 2 : 1;
+          const bTarget = bWorkingDays >= 5 ? 2 : 1;
           
-          // Priority 2: Among Frozen-trained staff, prefer those with fewer Inbound assignments
-          if (aIsFrozenTrained && bIsFrozenTrained) {
-            if (aInboundCount !== bInboundCount) return aInboundCount - bInboundCount;
+          // Priority 1: 06:00 shift staff who haven't reached their target yet
+          if (aIsEarlyShift && !bIsEarlyShift && aInboundCount < aTarget) return -1;
+          if (!aIsEarlyShift && bIsEarlyShift && bInboundCount < bTarget) return 1;
+          
+          // Priority 2: Among 06:00 shift staff, prefer those furthest from their target
+          if (aIsEarlyShift && bIsEarlyShift) {
+            const aRemaining = aTarget - aInboundCount;
+            const bRemaining = bTarget - bInboundCount;
+            if (aRemaining !== bRemaining) return bRemaining - aRemaining; // Higher remaining gets priority
           }
           
           // Otherwise maintain existing sort order
@@ -216,6 +257,15 @@ export function generateWeeklyRota({
         // NEW: Track Inbound assignments for Frozen-trained staff
         if (task === "Inbound" && selectedStaff.trainedTasks.includes("Frozen")) {
           frozenStaffInboundCount[selectedStaff.id] = (frozenStaffInboundCount[selectedStaff.id] || 0) + 1;
+        }
+
+        staffAssignmentCounts[selectedStaff.id]++;
+        // Track what task this staff member did on this date
+        staffTasksByDate[selectedStaff.id][dateStr] = task;
+        
+        // NEW: Track Inbound assignments for 06:00 shift staff
+        if (task === "Inbound" && selectedStaff.shiftStart === "06:00") {
+          earlyShiftInboundCount[selectedStaff.id] = (earlyShiftInboundCount[selectedStaff.id] || 0) + 1;
         }
       }
     }
