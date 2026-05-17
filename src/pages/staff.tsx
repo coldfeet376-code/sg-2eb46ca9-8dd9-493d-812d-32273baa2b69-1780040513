@@ -57,6 +57,9 @@ export default function StaffPage() {
   
   // Dropdown state for day selection
   const [openDayDropdown, setOpenDayDropdown] = useState<{ staffId: string; date: string } | null>(null);
+  
+  // Loading state for specific cell being updated
+  const [loadingCell, setLoadingCell] = useState<{ staffId: string; date: string } | null>(null);
 
   // React Query hooks
   const { data: staff = [], isLoading: staffLoading } = useStaff();
@@ -219,16 +222,30 @@ export default function StaffPage() {
   };
 
   const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
-    // Close dropdown immediately for better UX
+    // Close dropdown and show loading
     setOpenDayDropdown(null);
+    setLoadingCell({ staffId, date: dateStr });
     
     try {
-      console.log("🔄 Updating availability:", { staffId, dateStr, type });
+      // Find staff name for better feedback
+      const staffMember = staff.find(s => s.id === staffId);
+      const staffName = staffMember?.name || "Staff";
+      
+      // Format date for display (e.g., "Sat 17 May")
+      const dateObj = new Date(dateStr + "T12:00:00");
+      const dateDisplay = dateObj.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
       
       if (type === "clear") {
         // Remove availability
         await staffService.deleteAvailability(staffId, dateStr);
-        console.log("✅ Deleted from database");
+        
+        // Force immediate refetch
+        await queryClient.refetchQueries({ queryKey: ["staff"] });
+        
+        toast({
+          title: "✓ Cleared",
+          description: `${staffName} - ${dateDisplay} marked as WORKING`,
+        });
       } else {
         // Add or update (UPSERT)
         await staffService.addAvailability(staffId, [{
@@ -236,26 +253,27 @@ export default function StaffPage() {
           type: type,
           notes: `Marked as ${type}`,
         }]);
-        console.log("✅ Saved to database:", type);
+        
+        // Force immediate refetch
+        await queryClient.refetchQueries({ queryKey: ["staff"] });
+        
+        const typeLabel = type.toUpperCase();
+        toast({
+          title: `✓ Saved ${typeLabel}`,
+          description: `${staffName} - ${dateDisplay} = ${typeLabel}`,
+        });
       }
       
-      // Force refetch and wait for it to complete
-      console.log("🔄 Invalidating cache and refetching...");
-      await queryClient.refetchQueries({ queryKey: ["staff"] });
-      console.log("✅ Cache refreshed");
-      
-      toast({
-        title: type === "clear" ? "Cleared" : "Updated",
-        description: type === "clear" ? "Day marked as working" : `Day marked as ${type}`,
-      });
-      
     } catch (error) {
-      console.error("❌ Error updating availability:", error);
+      console.error("Error updating availability:", error);
       toast({
-        title: "Error",
-        description: "Failed to update availability",
+        title: "❌ Database Error",
+        description: `Failed to save. Error: ${error instanceof Error ? error.message : "Unknown"}`,
         variant: "destructive",
       });
+    } finally {
+      // Clear loading state
+      setLoadingCell(null);
     }
   };
 
@@ -587,6 +605,7 @@ export default function StaffPage() {
                                     const availType = getAvailabilityForDate(member, date);
                                     const dateStr = date.toISOString().split("T")[0];
                                     const isOpen = openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr;
+                                    const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
                                     
                                     return (
                                       <DropdownMenu key={idx} open={isOpen} onOpenChange={(open) => {
@@ -598,12 +617,14 @@ export default function StaffPage() {
                                       }}>
                                         <DropdownMenuTrigger asChild>
                                           <button
+                                            disabled={isLoading}
                                             className={cn(
                                               "aspect-square rounded-lg border-2 transition-all font-mono text-xs font-bold flex items-center justify-center",
-                                              getDayColor(availType)
+                                              getDayColor(availType),
+                                              isLoading && "opacity-50 cursor-wait animate-pulse"
                                             )}
                                           >
-                                            {getDayLabel(availType)}
+                                            {isLoading ? "..." : getDayLabel(availType)}
                                           </button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="center" className="w-40">
