@@ -239,8 +239,11 @@ export default function StaffPage() {
         // Remove availability
         await staffService.deleteAvailability(staffId, dateStr);
         
-        // Force immediate refetch
+        // Force immediate refetch and wait for it to complete
         await queryClient.refetchQueries({ queryKey: ["staff"] });
+        
+        // Small delay to ensure UI has fully re-rendered with new data
+        await new Promise(resolve => setTimeout(resolve, 200));
         
         toast({
           title: "✓ Cleared",
@@ -254,8 +257,11 @@ export default function StaffPage() {
           notes: `Marked as ${type}`,
         }]);
         
-        // Force immediate refetch
+        // Force immediate refetch and wait for it to complete
         await queryClient.refetchQueries({ queryKey: ["staff"] });
+        
+        // Small delay to ensure UI has fully re-rendered with new data
+        await new Promise(resolve => setTimeout(resolve, 200));
         
         const typeLabel = type.toUpperCase();
         toast({
@@ -272,7 +278,7 @@ export default function StaffPage() {
         variant: "destructive",
       });
     } finally {
-      // Clear loading state
+      // Clear loading state after everything completes
       setLoadingCell(null);
     }
   };
