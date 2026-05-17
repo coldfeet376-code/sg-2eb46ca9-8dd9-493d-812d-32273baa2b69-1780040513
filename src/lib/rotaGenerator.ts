@@ -30,9 +30,16 @@ export function generateWeeklyRota({
   // Track what task each staff member did on each date
   const staffTasksByDate: Record<string, Record<string, Task>> = {};
   
+  // NEW: Track Inbound assignments for Frozen-trained staff (target: 2 per week)
+  const frozenStaffInboundCount: Record<string, number> = {};
+  
   staff.forEach((s) => {
     staffAssignmentCounts[s.id] = 0;
     staffTasksByDate[s.id] = {};
+    // Initialize counter for Frozen-trained staff
+    if (s.trainedTasks.includes("Frozen")) {
+      frozenStaffInboundCount[s.id] = 0;
+    }
   });
 
   // Count existing locked assignments and populate task history
@@ -43,6 +50,11 @@ export function generateWeeklyRota({
     if (staffId) {
       staffAssignmentCounts[staffId] = (staffAssignmentCounts[staffId] || 0) + 1;
       staffTasksByDate[staffId][a.date] = a.task as Task;
+      
+      // NEW: Count existing Inbound assignments for Frozen-trained staff
+      if (a.task === "Inbound" && staffMember?.trainedTasks.includes("Frozen")) {
+        frozenStaffInboundCount[staffId] = (frozenStaffInboundCount[staffId] || 0) + 1;
+      }
     }
   });
 
@@ -149,9 +161,48 @@ export function generateWeeklyRota({
         return aShiftIndex - bShiftIndex;
       });
 
+      // NEW: Special sorting for Inbound task - prioritize Frozen-trained staff
+      let finalSorted = sorted;
+      if (task === "Inbound") {
+        finalSorted = sorted.sort((a, b) => {
+          const aIsFrozenTrained = a.trainedTasks.includes("Frozen");
+          const bIsFrozenTrained = b.trainedTasks.includes("Frozen");
+          
+          // Get current Inbound count for Frozen-trained staff (target: 2 per week)
+          const aInboundCount = frozenStaffInboundCount[a.id] || 0;
+          const bInboundCount = frozenStaffInboundCount[b.id] || 0;
+          
+          // Priority 1: Frozen-trained staff who haven't reached 2 Inbound assignments yet
+          if (aIsFrozenTrained && !bIsFrozenTrained && aInboundCount < 2) return -1;
+          if (!aIsFrozenTrained && bIsFrozenTrained && bInboundCount < 2) return 1;
+          
+          // Priority 2: Among Frozen-trained staff, prefer those with fewer Inbound assignments
+          if (aIsFrozenTrained && bIsFrozenTrained) {
+            if (aInboundCount !== bInboundCount) return aInboundCount - bInboundCount;
+          }
+          
+          // Otherwise maintain existing sort order
+          // Check consecutive task constraint
+          const aPrevTask = staffTasksByDate[a.id]?.[prevDateStr];
+          const bPrevTask = staffTasksByDate[b.id]?.[prevDateStr];
+          if (aPrevTask === task && bPrevTask !== task) return 1;
+          if (aPrevTask !== task && bPrevTask === task) return -1;
+          
+          // Fairness
+          const aCount = staffAssignmentCounts[a.id] || 0;
+          const bCount = staffAssignmentCounts[b.id] || 0;
+          if (aCount !== bCount) return aCount - bCount;
+          
+          // Shift priority
+          const aShiftIndex = shiftOrder.indexOf(a.shift);
+          const bShiftIndex = shiftOrder.indexOf(b.shift);
+          return aShiftIndex - bShiftIndex;
+        });
+      }
+
       // Assign the needed staff
-      for (let i = 0; i < Math.min(needed, sorted.length); i++) {
-        const selectedStaff = sorted[i];
+      for (let i = 0; i < Math.min(needed, finalSorted.length); i++) {
+        const selectedStaff = finalSorted[i];
         assignments.push({
           staffId: selectedStaff.id,
           staffName: selectedStaff.name,
@@ -161,6 +212,11 @@ export function generateWeeklyRota({
         staffAssignmentCounts[selectedStaff.id]++;
         // Track what task this staff member did on this date
         staffTasksByDate[selectedStaff.id][dateStr] = task;
+        
+        // NEW: Track Inbound assignments for Frozen-trained staff
+        if (task === "Inbound" && selectedStaff.trainedTasks.includes("Frozen")) {
+          frozenStaffInboundCount[selectedStaff.id] = (frozenStaffInboundCount[selectedStaff.id] || 0) + 1;
+        }
       }
     }
   }
