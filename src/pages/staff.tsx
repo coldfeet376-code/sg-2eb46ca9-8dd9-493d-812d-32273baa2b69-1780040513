@@ -219,31 +219,38 @@ export default function StaffPage() {
   };
 
   const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
+    // Close dropdown immediately for better UX
+    setOpenDayDropdown(null);
+    
     try {
+      console.log("🔄 Updating availability:", { staffId, dateStr, type });
+      
       if (type === "clear") {
         // Remove availability
         await staffService.deleteAvailability(staffId, dateStr);
-        await queryClient.invalidateQueries({ queryKey: ["staff"] });
-        toast({
-          title: "Cleared",
-          description: "Day marked as working",
-        });
+        console.log("✅ Deleted from database");
       } else {
-        // Add or update
+        // Add or update (UPSERT)
         await staffService.addAvailability(staffId, [{
           date: dateStr,
           type: type,
           notes: `Marked as ${type}`,
         }]);
-        await queryClient.invalidateQueries({ queryKey: ["staff"] });
-        toast({
-          title: "Updated",
-          description: `Day marked as ${type}`,
-        });
+        console.log("✅ Saved to database:", type);
       }
-      setOpenDayDropdown(null);
+      
+      // Force refetch and wait for it to complete
+      console.log("🔄 Invalidating cache and refetching...");
+      await queryClient.refetchQueries({ queryKey: ["staff"] });
+      console.log("✅ Cache refreshed");
+      
+      toast({
+        title: type === "clear" ? "Cleared" : "Updated",
+        description: type === "clear" ? "Day marked as working" : `Day marked as ${type}`,
+      });
+      
     } catch (error) {
-      console.error("Error updating availability:", error);
+      console.error("❌ Error updating availability:", error);
       toast({
         title: "Error",
         description: "Failed to update availability",
