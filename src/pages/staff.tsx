@@ -214,11 +214,49 @@ export default function StaffPage() {
       const newSet = new Set(prev);
       if (newSet.has(staffId)) {
         newSet.delete(staffId);
+        // Close any open dropdowns for this staff when collapsing
+        if (openDayDropdown?.staffId === staffId) {
+          setOpenDayDropdown(null);
+        }
       } else {
         newSet.add(staffId);
       }
       return newSet;
     });
+  };
+
+  const clearAllAvailability = async (staffId: string, staffName: string) => {
+    try {
+      const staffMember = staff.find(s => s.id === staffId);
+      if (!staffMember?.availability || staffMember.availability.length === 0) {
+        toast({
+          title: "No data to clear",
+          description: `${staffName} has no availability data`,
+        });
+        return;
+      }
+
+      // Delete all availability entries
+      for (const entry of staffMember.availability) {
+        await staffService.deleteAvailability(staffId, entry.date);
+      }
+
+      // Refresh data
+      await queryClient.refetchQueries({ queryKey: ["staff"] });
+      
+      toast({
+        title: "✓ All Cleared",
+        description: `Removed ${staffMember.availability.length} availability entries for ${staffName}`,
+      });
+      
+    } catch (error) {
+      console.error("Error clearing availability:", error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to clear availability data",
+        variant: "destructive",
+      });
+    }
   };
 
   const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
@@ -594,8 +632,19 @@ export default function StaffPage() {
                           <CollapsibleContent>
                             <CardContent className="pt-0">
                               <div className="space-y-2">
-                                <div className="text-xs font-mono text-muted-foreground mb-2">
-                                  Click any day to set availability
+                                <div className="flex items-center justify-between mb-3">
+                                  <div className="text-xs font-mono text-muted-foreground">
+                                    Click any day to set availability
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => clearAllAvailability(member.id, member.name)}
+                                    className="h-7 text-xs font-mono text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  >
+                                    <X className="h-3 w-3 mr-1" />
+                                    Clear All
+                                  </Button>
                                 </div>
                                 {/* Day of week labels */}
                                 <div className="grid grid-cols-7 gap-1 mb-1">
