@@ -68,23 +68,7 @@ export function generateWeeklyRota({
       staffAssignmentCounts[staffId] = (staffAssignmentCounts[staffId] || 0) + 1;
       staffTasksByDate[staffId][a.date] = a.task as Task;
       
-      // NEW: Count existing Inbound assignments for Frozen-trained staff
-      if (a.task === "Inbound" && staffMember?.trainedTasks.includes("Frozen")) {
-        earlyShiftInboundCount[staffId] = (earlyShiftInboundCount[staffId] || 0) + 1;
-      }
-    }
-  });
-
-  // Count existing locked assignments and populate task history
-  lockedAssignments.forEach((a) => {
-    // Fallback to finding staffId by name for backward compatibility with older locked assignments
-    const staffMember = staff.find((s) => s.name === a.staffName);
-    const staffId = a.staffId || staffMember?.id;
-    if (staffId) {
-      staffAssignmentCounts[staffId] = (staffAssignmentCounts[staffId] || 0) + 1;
-      staffTasksByDate[staffId][a.date] = a.task as Task;
-      
-      // NEW: Count existing Inbound assignments for 06:00 shift staff
+      // Count existing Inbound assignments for 06:00 shift staff
       if (a.task === "Inbound" && staffMember?.shiftStart === "06:00") {
         earlyShiftInboundCount[staffId] = (earlyShiftInboundCount[staffId] || 0) + 1;
       }
@@ -250,20 +234,12 @@ export function generateWeeklyRota({
           task: task,
           date: dateStr,
         });
+        
         staffAssignmentCounts[selectedStaff.id]++;
         // Track what task this staff member did on this date
         staffTasksByDate[selectedStaff.id][dateStr] = task;
         
-        // NEW: Track Inbound assignments for Frozen-trained staff
-        if (task === "Inbound" && selectedStaff.trainedTasks.includes("Frozen")) {
-          frozenStaffInboundCount[selectedStaff.id] = (frozenStaffInboundCount[selectedStaff.id] || 0) + 1;
-        }
-
-        staffAssignmentCounts[selectedStaff.id]++;
-        // Track what task this staff member did on this date
-        staffTasksByDate[selectedStaff.id][dateStr] = task;
-        
-        // NEW: Track Inbound assignments for 06:00 shift staff
+        // Track Inbound assignments for 06:00 shift staff
         if (task === "Inbound" && selectedStaff.shiftStart === "06:00") {
           earlyShiftInboundCount[selectedStaff.id] = (earlyShiftInboundCount[selectedStaff.id] || 0) + 1;
         }
