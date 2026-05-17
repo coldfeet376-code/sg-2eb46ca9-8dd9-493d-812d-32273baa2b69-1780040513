@@ -13,7 +13,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SEO } from "@/components/SEO";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { useNotifications } from "@/contexts/NotificationContext";
-import type { StaffMember, Assignment, Task } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import type { StaffMember, Assignment, Task, ShiftStart } from "@/types";
 import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw } from "lucide-react";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
@@ -59,53 +60,67 @@ export default function Home() {
   const { addNotification } = useNotifications();
 
   useEffect(() => {
-    // Load staff and config
-    const savedStaff = localStorage.getItem("warehouse-staff");
+    // Load staff from Supabase
+    loadStaff();
+    
+    // Load config and locked assignments from localStorage
     const savedConfig = localStorage.getItem("warehouse-task-config");
     const savedLocked = localStorage.getItem("warehouse-locked-assignments");
     const savedHistory = localStorage.getItem("warehouse-rota-history");
     
-    if (savedStaff) {
-      setStaff(JSON.parse(savedStaff));
-    }
     if (savedConfig) {
       setTaskConfig(JSON.parse(savedConfig));
     }
     if (savedLocked) {
       const parsed = JSON.parse(savedLocked);
-      // Backward compatibility: ensure all locked assignments have staffId
-      const compatible = parsed.map((lock: any) => {
-        if (!lock.staffId && lock.staffName) {
-          // Find staff by name and add staffId
-          const staffMember = staff.find(s => s.name === lock.staffName);
-          return {
-            ...lock,
-            staffId: staffMember?.id || `temp-${Date.now()}`
-          };
-        }
-        return lock;
-      });
-      setLockedAssignments(compatible);
+      setLockedAssignments(parsed);
     }
     if (savedHistory) {
       const parsed = JSON.parse(savedHistory);
-      // Backward compatibility for history snapshots
-      const compatible = parsed.map((snapshot: any) => ({
-        ...snapshot,
-        lockedAssignments: (snapshot.lockedAssignments || []).map((lock: any) => {
-          if (!lock.staffId && lock.staffName) {
-            const staffMember = staff.find(s => s.name === lock.staffName);
-            return {
-              ...lock,
-              staffId: staffMember?.id || `temp-${Date.now()}`
-            };
-          }
-          return lock;
-        })
-      }));
-      setHistory(compatible);
+      setHistory(parsed);
     }
   }, []);
+
+  const loadStaff = async () => {
+    try {
+      const { data: staffData, error: staffError } = await supabase
+        .from("staff")
+        .select("*")
+        .order("name");
+
+      if (staffError) {
+        console.error("Error fetching staff:", staffError);
+        return;
+      }
+
+      const { data: availabilityData, error: availError } = await supabase
+        .from("availability")
+        .select("*");
+
+      if (availError) {
+        console.error("Error fetching availability:", availError);
+        return;
+      }
+
+      const staffMembers: StaffMember[] = (staffData || []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        trainedTasks: (s.trained_tasks || []) as Task[],
+        shiftStart: (s.shift_start || "06:00") as ShiftStart,
+        availability: (availabilityData || [])
+          .filter((a) => a.staff_id === s.id)
+          .map((a) => ({
+            date: a.date,
+            type: a.type as "rest" | "holiday" | "sick" | "available",
+            notes: a.notes || undefined,
+          })),
+      }));
+
+      setStaff(staffMembers);
+    } catch (error) {
+      console.error("Error loading staff:", error);
+    }
+  };
 
   useEffect(() => {
     // Save locked assignments
