@@ -434,23 +434,65 @@ export default function StaffPage() {
     const lines = excelImport.trim().split("\n");
     const newAvailability: AvailabilityEntry[] = [];
 
-    lines.forEach((line) => {
-      const parts = line.split(",").map((p) => p.trim());
+    lines.forEach((line, index) => {
+      const parts = line.split(/,|\t/).map((p) => p.trim());
       if (parts.length < 2) return;
 
       const dateStr = parts[0];
-      const type = parts[1].toLowerCase();
-      const notes = parts[2] || "";
+      const statusStr = parts[1].toLowerCase();
+      const typeLabel = parts[2] || "";
 
-      const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return;
+      // Skip header row if present
+      if (index === 0 && (dateStr.toLowerCase().includes('date') || statusStr.toLowerCase().includes('status'))) {
+        return;
+      }
 
-      if (!["rest", "holiday", "sick", "available"].includes(type)) return;
+      // Parse DD/MM/YYYY format
+      let parsedDate: Date | null = null;
+      
+      // Try DD/MM/YYYY format first
+      const ddmmyyyyMatch = dateStr.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      if (ddmmyyyyMatch) {
+        const day = parseInt(ddmmyyyyMatch[1], 10);
+        const month = parseInt(ddmmyyyyMatch[2], 10) - 1; // Month is 0-indexed
+        const year = parseInt(ddmmyyyyMatch[3], 10);
+        parsedDate = new Date(year, month, day);
+      } else {
+        // Fallback to standard Date parsing (YYYY-MM-DD)
+        parsedDate = new Date(dateStr);
+      }
+
+      if (!parsedDate || isNaN(parsedDate.getTime())) return;
+
+      // Map status to availability type
+      // "working" → skip (don't store)
+      // "rest" → rest day
+      // "holiday" → holiday
+      // "sick" → sick
+      let availType: AvailabilityType | null = null;
+      
+      if (statusStr === "rest") {
+        availType = "rest";
+      } else if (statusStr === "holiday") {
+        availType = "holiday";
+      } else if (statusStr === "sick") {
+        availType = "sick";
+      } else if (statusStr === "working") {
+        // Skip working days - we only store exceptions
+        return;
+      } else if (statusStr === "available") {
+        availType = "available";
+      } else {
+        // Unknown status, skip
+        return;
+      }
+
+      if (!availType) return;
 
       newAvailability.push({
-        date: date.toISOString().split("T")[0],
-        type: type as AvailabilityType,
-        notes,
+        date: parsedDate.toISOString().split("T")[0],
+        type: availType,
+        notes: typeLabel || `Imported ${availType}`,
       });
     });
 
@@ -1052,6 +1094,17 @@ export default function StaffPage() {
                                               <p className="text-muted-foreground">2026-05-20,rest,Weekly rest</p>
                                               <p className="text-muted-foreground">2026-05-25,holiday,Bank holiday</p>
                                               <p className="mt-2 text-xs">Types: rest, holiday, sick</p>
+                                            </div>
+
+                                            <div className="text-xs font-mono bg-muted p-3 rounded-lg space-y-1">
+                                              <p className="font-semibold">Supported Formats:</p>
+                                              <p className="text-muted-foreground mt-2">Format 1 (Your Rota):</p>
+                                              <p className="text-muted-foreground">28/12/2025,rest,REST</p>
+                                              <p className="text-muted-foreground">29/12/2025,working,IN</p>
+                                              <p className="text-muted-foreground">30/12/2025,holiday,Holiday</p>
+                                              <p className="text-muted-foreground mt-2">Format 2 (Standard):</p>
+                                              <p className="text-muted-foreground">2026-05-20,rest,Weekly rest</p>
+                                              <p className="mt-2 text-xs">Status: rest, holiday, sick, working (working=skipped)</p>
                                             </div>
 
                                             <div className="space-y-2">
