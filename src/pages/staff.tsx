@@ -671,7 +671,7 @@ export default function StaffPage() {
     }
   };
 
-  const handleClearAllAvailability = async (staffId: string) => {
+  const handleClearStaffAvailability = async (staffId: string) => {
     const staffMember = staff.find(s => s.id === staffId);
     if (!staffMember || !staffMember.availability || staffMember.availability.length === 0) {
       toast({
@@ -692,6 +692,14 @@ export default function StaffPage() {
       });
       
       setClearAllConfirm(null);
+      
+      // Update local state by re-triggering query or manual update
+      const updatedStaff = staff.map((s) => {
+        if (s.id === staffId) {
+          return { ...s, availability: [] };
+        }
+        return s;
+      });
       
     } catch (error) {
       console.error("Error clearing availability:", error);
@@ -1291,7 +1299,7 @@ export default function StaffPage() {
                                                   <Button
                                                     variant="destructive"
                                                     size="sm"
-                                                    onClick={() => handleClearAllAvailability(selectedStaff.id)}
+                                                    onClick={() => handleClearStaffAvailability(selectedStaff.id)}
                                                     className="rounded-lg"
                                                   >
                                                     <span className="font-mono text-xs">Confirm</span>
