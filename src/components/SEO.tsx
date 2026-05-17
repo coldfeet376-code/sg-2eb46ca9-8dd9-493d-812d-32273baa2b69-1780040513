@@ -16,6 +16,7 @@ export function SEOElements({
 }: SEOProps) {
   return (
     <>
+      <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
       <title>{title}</title>
       <meta name="description" content={description} />
       <link rel="icon" href="/favicon.ico" />
