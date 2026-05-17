@@ -471,7 +471,7 @@ export default function StaffPage() {
     }
   };
 
-  const toggleTaskTraining = async (staffId: string, task: string) => {
+  const toggleTaskTraining = async (staffId: string, task: Task) => {
     try {
       const staffMember = staff.find(s => s.id === staffId);
       if (!staffMember) return;
@@ -789,6 +789,76 @@ export default function StaffPage() {
                                     <X className="h-3 w-3 mr-1" />
                                     Clear All Availability
                                   </Button>
+                                </div>
+
+                                {/* Calendar grid */}
+                                <div className="grid grid-cols-7 gap-2" key={`${member.id}-${renderKey}`}>
+                                  {weekDates.map((date, idx) => {
+                                    const availType = getAvailabilityForDate(member, date);
+                                    const dateStr = date.toISOString().split("T")[0];
+                                    const isOpen = openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr;
+                                    const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
+                                    
+                                    return (
+                                      <Popover key={`${idx}-${renderKey}`} open={isOpen} onOpenChange={(open) => {
+                                        if (open) {
+                                          setOpenDayDropdown({ staffId: member.id, date: dateStr });
+                                        } else if (openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr) {
+                                          setOpenDayDropdown(null);
+                                        }
+                                      }}>
+                                        <PopoverTrigger asChild>
+                                          <button
+                                            disabled={isLoading}
+                                            className={cn(
+                                              "aspect-square rounded-lg border-2 transition-all font-mono text-sm font-bold flex items-center justify-center min-h-[48px] hover:scale-105",
+                                              getDayColor(availType),
+                                              isLoading && "opacity-50 cursor-wait animate-pulse"
+                                            )}
+                                          >
+                                            {isLoading ? "..." : getDayLabel(availType)}
+                                          </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent align="center" className="w-56 p-2">
+                                          <div className="space-y-1">
+                                            <button
+                                              onClick={() => setDayAvailability(member.id, dateStr, "rest")}
+                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-blue-500/10 transition-colors font-mono text-sm"
+                                            >
+                                              <span className="w-8 h-8 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center shrink-0">R</span>
+                                              <span className="font-semibold">Rest Day</span>
+                                            </button>
+                                            <button
+                                              onClick={() => setDayAvailability(member.id, dateStr, "holiday")}
+                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-purple-500/10 transition-colors font-mono text-sm"
+                                            >
+                                              <span className="w-8 h-8 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center shrink-0">H</span>
+                                              <span className="font-semibold">Holiday</span>
+                                            </button>
+                                            <button
+                                              onClick={() => setDayAvailability(member.id, dateStr, "sick")}
+                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-red-500/10 transition-colors font-mono text-sm"
+                                            >
+                                              <span className="w-8 h-8 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center shrink-0">S</span>
+                                              <span className="font-semibold">Sick Leave</span>
+                                            </button>
+                                            {availType !== null && (
+                                              <>
+                                                <div className="border-t my-2"></div>
+                                                <button
+                                                  onClick={() => setDayAvailability(member.id, dateStr, "clear")}
+                                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors font-mono text-sm text-muted-foreground"
+                                                >
+                                                  <X className="h-5 w-5 shrink-0" />
+                                                  <span className="font-semibold">Clear (Working)</span>
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
+                                    );
+                                  })}
                                 </div>
 
                                 {/* Training Assignment Section */}
