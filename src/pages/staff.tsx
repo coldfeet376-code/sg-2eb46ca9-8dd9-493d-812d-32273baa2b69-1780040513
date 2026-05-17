@@ -46,6 +46,7 @@ export default function StaffPage() {
   const [selectedStaffIds, setSelectedStaffIds] = useState<string[]>([]);
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
+  const [clearAllConfirm, setClearAllConfirm] = useState<string | null>(null);
   
   const { addAuditEntry } = useAudit();
   const { toast } = useToast();
@@ -290,6 +291,35 @@ export default function StaffPage() {
         description: "Failed to add batch availability",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleClearAllAvailability = async () => {
+    if (!clearAllConfirm) return;
+
+    try {
+      for (const staffId of selectedStaffIds) {
+        const staffMember = staff.find((s) => s.id === staffId);
+        if (staffMember && staffMember.availability) {
+          for (const entry of staffMember.availability) {
+            await staffService.deleteAvailability(staffId, entry.date);
+          }
+        }
+      }
+
+      toast({
+        title: "Availability cleared",
+        description: "All availability entries for selected staff have been removed",
+      });
+    } catch (error) {
+      console.error("Error clearing availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to clear availability",
+        variant: "destructive",
+      });
+    } finally {
+      setClearAllConfirm(null);
     }
   };
 
@@ -636,6 +666,38 @@ export default function StaffPage() {
       toast({
         title: "Error",
         description: "Failed to delete availability",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleClearAllAvailability = async (staffId: string) => {
+    const staffMember = staff.find(s => s.id === staffId);
+    if (!staffMember || !staffMember.availability || staffMember.availability.length === 0) {
+      toast({
+        title: "No data",
+        description: "No availability entries to clear",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Delete all availability entries for this staff member
+      await staffService.clearAllAvailability(staffId);
+
+      toast({
+        title: "All entries cleared",
+        description: `Removed ${staffMember.availability.length} availability entries for ${staffMember.name}`,
+      });
+      
+      setClearAllConfirm(null);
+      
+    } catch (error) {
+      console.error("Error clearing availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to clear availability data",
         variant: "destructive",
       });
     }
@@ -1220,10 +1282,50 @@ export default function StaffPage() {
 
                                         {selectedStaff && selectedStaff.availability && selectedStaff.availability.length > 0 && (
                                           <Card className="shadow-sm">
-                                            <CardHeader className="pb-3">
-                                              <CardTitle className="font-condensed text-sm">Current Entries ({selectedStaff.availability.length})</CardTitle>
+                                            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                                              <CardTitle className="font-condensed text-sm">
+                                                Current Entries ({selectedStaff.availability.length})
+                                              </CardTitle>
+                                              {clearAllConfirm === selectedStaff.id ? (
+                                                <div className="flex gap-2">
+                                                  <Button
+                                                    variant="destructive"
+                                                    size="sm"
+                                                    onClick={() => handleClearAllAvailability(selectedStaff.id)}
+                                                    className="rounded-lg"
+                                                  >
+                                                    <span className="font-mono text-xs">Confirm</span>
+                                                  </Button>
+                                                  <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setClearAllConfirm(null)}
+                                                    className="rounded-lg"
+                                                  >
+                                                    <span className="font-mono text-xs">Cancel</span>
+                                                  </Button>
+                                                </div>
+                                              ) : (
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  onClick={() => setClearAllConfirm(selectedStaff.id)}
+                                                  className="text-destructive hover:text-destructive rounded-lg"
+                                                >
+                                                  <Trash2 className="h-3.5 w-3.5 mr-2" />
+                                                  <span className="font-mono text-xs">Clear All</span>
+                                                </Button>
+                                              )}
                                             </CardHeader>
                                             <CardContent>
+                                              {clearAllConfirm === selectedStaff.id && (
+                                                <Alert className="mb-3 bg-destructive/10 border-destructive">
+                                                  <AlertCircle className="h-4 w-4 text-destructive" />
+                                                  <AlertDescription className="text-sm text-destructive font-mono">
+                                                    Delete all {selectedStaff.availability.length} availability entries? This cannot be undone.
+                                                  </AlertDescription>
+                                                </Alert>
+                                              )}
                                               <ScrollArea className="h-48">
                                                 <div className="space-y-2">
                                                   {selectedStaff.availability
