@@ -22,7 +22,6 @@ import { Users, Upload, Plus, Trash2, Calendar as Calendar2, FileSpreadsheet, Al
 import * as XLSX from "xlsx";
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
