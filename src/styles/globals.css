@@ -42,6 +42,20 @@
     
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
+    
+    /* Task Type Colors */
+    --task-frozen: 199 89% 48%;
+    --task-frozen-foreground: 0 0% 100%;
+    --task-milk: 280 65% 60%;
+    --task-milk-foreground: 0 0% 100%;
+    --task-twi: 340 82% 52%;
+    --task-twi-foreground: 0 0% 100%;
+    --task-inbound: 142 71% 45%;
+    --task-inbound-foreground: 0 0% 100%;
+    --task-outbound: 38 92% 50%;
+    --task-outbound-foreground: 220 15% 15%;
+    --task-marshaling: 262 83% 58%;
+    --task-marshaling-foreground: 0 0% 100%;
   }
 
   .dark {

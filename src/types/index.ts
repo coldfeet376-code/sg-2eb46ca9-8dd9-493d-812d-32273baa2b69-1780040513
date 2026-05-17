@@ -4,6 +4,8 @@ export type AvailabilityType = "available" | "rest" | "holiday" | "sick";
 
 export type ShiftStart = "06:00" | "08:30" | "09:00" | "09:30" | "10:00" | "11:00";
 
+export type ShiftPattern = "Early" | "Late" | "All";
+
 export interface AvailabilityEntry {
   date: string; // ISO date string
   type: AvailabilityType;
@@ -31,6 +33,7 @@ export interface Assignment {
   staffName: string;
   task: Task;
   date: string; // ISO date string
+  shiftPattern?: ShiftPattern;
 }
 
 export interface WeekRota {
@@ -51,4 +54,24 @@ export interface ShiftSwap {
   reviewedAt?: number;
   reviewedBy?: string;
   notes?: string;
+}
+
+export interface RotaBackup {
+  id: string;
+  weekStart: string;
+  assignments: Assignment[];
+  lockedAssignments: Assignment[];
+  createdAt: string;
+  createdBy?: string;
+}
+
+export interface FairnessMetrics {
+  overallScore: number; // 0-100, higher is more fair
+  staffWorkload: {
+    staffId: string;
+    staffName: string;
+    totalAssignments: number;
+    taskBreakdown: Record<Task, number>;
+  }[];
+  standardDeviation: number;
 }
