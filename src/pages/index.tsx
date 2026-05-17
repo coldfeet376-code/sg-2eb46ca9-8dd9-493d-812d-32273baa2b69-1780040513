@@ -42,6 +42,10 @@ interface CoverageGap {
   gap: number;
 }
 
+interface TaskConfig {
+  [task: string]: number[];
+}
+
 export default function Home() {
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
   const [assignments, setAssignments] = useState<Assignment[]>([]);
