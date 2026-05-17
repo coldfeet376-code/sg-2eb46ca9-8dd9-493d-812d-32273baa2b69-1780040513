@@ -130,7 +130,7 @@ export default function StaffPage() {
     updateStaffMutation.mutate(
       {
         id: editingStaffId,
-        data: {
+        updates: {
           name: editName.trim(),
           trainedTasks: editTasks,
           shiftStart: editShift,
