@@ -198,12 +198,26 @@ export default function Home() {
   };
 
   const generateRota = () => {
-    if (!staff.length || !taskConfig || isGenerating) return;
+    console.log("Generate button clicked", { 
+      staffLength: staff.length, 
+      hasTaskConfig: !!taskConfig,
+      isGenerating 
+    });
+    
+    if (!staff.length || !taskConfig) {
+      console.warn("Cannot generate rota:", { 
+        reason: !staff.length ? "No staff" : "No task config" 
+      });
+      return;
+    }
 
     setIsGenerating(true);
     
+    console.log("Starting rota generation...");
+    
     // Check for coverage gaps first
     const gaps = checkCoverageGaps();
+    console.log("Coverage gaps found:", gaps.length);
 
     // Always generate the rota
     const newAssignments = generateWeeklyRota({
@@ -212,6 +226,9 @@ export default function Home() {
       weekStart,
       lockedAssignments,
     });
+    
+    console.log("Generated assignments:", newAssignments.length);
+    
     setAssignments(newAssignments);
     saveSnapshot(newAssignments);
 
@@ -251,6 +268,7 @@ export default function Home() {
       });
     }
     
+    console.log("Rota generation complete");
     setIsGenerating(false);
   };
 
