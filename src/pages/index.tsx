@@ -368,6 +368,21 @@ export default function Home() {
     );
   };
 
+  const lockAll = () => {
+    // Lock all current week assignments
+    const allLocks: Assignment[] = assignments.map(a => ({
+      ...a,
+      staffId: a.staffId || staff.find(s => s.name === a.staffName)?.id || `temp-${Date.now()}`
+    }));
+    
+    setLockedAssignments(allLocks);
+    addNotification({
+      staffName: "System",
+      message: `Locked all ${allLocks.length} assignments for this week`,
+      type: "info",
+    });
+  };
+
   const unlockAll = () => {
     setLockedAssignments([]);
     addNotification({
@@ -1104,29 +1119,31 @@ export default function Home() {
                     </ScrollArea>
                   </SheetContent>
                 </Sheet>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={generateRota}
-                  disabled={!staff.length || !taskConfig || staffLoading || configLoading}
-                  className="gap-2 ml-2 rounded-lg"
-                  data-tour="generate-button"
-                >
-                  <RefreshCw className={`h-4 w-4 ${staffLoading || configLoading ? 'animate-spin' : ''}`} />
-                  <span className="font-mono text-xs">
-                    {staffLoading || configLoading ? "Loading..." : "Generate Rota"}
-                  </span>
-                </Button>
-                {lockedAssignments.length > 0 && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setShowUnlockConfirm(true)}
-                    className="gap-2 rounded-lg text-warning hover:text-warning"
-                  >
-                    <Unlock className="h-4 w-4" />
-                    <span className="font-mono text-xs">Unlock All ({getLockedCount()})</span>
-                  </Button>
+                {assignments.length > 0 && (
+                  <>
+                    {lockedAssignments.length < assignments.length && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={lockAll}
+                        className="gap-2 rounded-lg text-primary hover:text-primary"
+                      >
+                        <Lock className="h-4 w-4" />
+                        <span className="font-mono text-xs">Lock All</span>
+                      </Button>
+                    )}
+                    {lockedAssignments.length > 0 && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setShowUnlockConfirm(true)}
+                        className="gap-2 rounded-lg text-warning hover:text-warning"
+                      >
+                        <Unlock className="h-4 w-4" />
+                        <span className="font-mono text-xs">Unlock All ({getLockedCount()})</span>
+                      </Button>
+                    )}
+                  </>
                 )}
               </>
             )}
