@@ -99,6 +99,30 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // Load saved assignments for the current week
+    const savedAssignments = localStorage.getItem("warehouse-assignments");
+    if (savedAssignments) {
+      const parsed = JSON.parse(savedAssignments);
+      const weekStartStr = weekStart.toISOString().split("T")[0];
+      
+      // Filter assignments for current week
+      const weekAssignments = parsed.filter((a: Assignment) => {
+        const assignmentDate = new Date(a.date);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 7);
+        return assignmentDate >= weekStart && assignmentDate < weekEnd;
+      });
+      
+      setAssignments(weekAssignments);
+    }
+  }, [weekStart]);
+
+  useEffect(() => {
+    // Save assignments whenever they change
+    localStorage.setItem("warehouse-assignments", JSON.stringify(assignments));
+  }, [assignments]);
+
+  useEffect(() => {
     // Save locked assignments
     localStorage.setItem("warehouse-locked-assignments", JSON.stringify(lockedAssignments));
   }, [lockedAssignments]);
@@ -107,13 +131,6 @@ export default function Home() {
     // Save history
     localStorage.setItem("warehouse-rota-history", JSON.stringify(history));
   }, [history]);
-
-  useEffect(() => {
-    // Generate rota when data is available
-    if (staff.length > 0 && taskConfig && !staffLoading && !configLoading) {
-      generateRota();
-    }
-  }, [staff, taskConfig, weekStart, staffLoading, configLoading]);
 
   useEffect(() => {
     // Calculate fairness metrics when assignments change
