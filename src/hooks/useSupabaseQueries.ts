@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { StaffMember, Task, ShiftStart } from "@/types";
+import type { StaffMember, Task, ShiftStart, ShiftPattern } from "@/types";
 
 interface TaskConfig {
   [task: string]: number[];
@@ -53,7 +53,7 @@ export function useStaff() {
         name: s.name,
         trainedTasks: (s.trained_tasks || []) as Task[],
         shiftStart: (s.shift_start || "06:00") as ShiftStart,
-        shiftPattern: s.shift_pattern || "All",
+        shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
         availability: (availabilityData || [])
           .filter((a) => a.staff_id === s.id)
           .map((a) => ({
@@ -124,7 +124,7 @@ export function useAddStaff() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (staff: Omit<StaffMember, "id" | "availability"> & { shiftPattern?: string }) => {
+    mutationFn: async (staff: Omit<StaffMember, "id" | "availability"> & { shiftPattern?: ShiftPattern }) => {
       const { data, error } = await supabase
         .from("staff")
         .insert({
@@ -149,7 +149,7 @@ export function useUpdateStaff() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<StaffMember> & { shiftPattern?: string } }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<StaffMember> & { shiftPattern?: ShiftPattern } }) => {
       const { error } = await supabase
         .from("staff")
         .update({

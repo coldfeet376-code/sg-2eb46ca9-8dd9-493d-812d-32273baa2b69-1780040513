@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { StaffMember, AvailabilityEntry, Task, ShiftStart } from "@/types";
+import type { StaffMember, AvailabilityEntry, Task, ShiftStart, ShiftPattern } from "@/types";
 
 export const staffService = {
   // Fetch all staff members with their availability
@@ -28,7 +28,7 @@ export const staffService = {
       name: s.name,
       trainedTasks: (s.trained_tasks || []) as Task[],
       shiftStart: (s.shift_start || "06:00") as ShiftStart,
-      shiftPattern: s.shift_pattern || "All",
+      shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
       availability: (availabilityData || [])
         .filter((a) => a.staff_id === s.id)
         .map((a) => ({
@@ -64,7 +64,7 @@ export const staffService = {
       name: data.name,
       trainedTasks: (data.trained_tasks || []) as Task[],
       shiftStart: (data.shift_start || "06:00") as ShiftStart,
-      shiftPattern: data.shift_pattern || "All",
+      shiftPattern: (data.shift_pattern || "All") as ShiftPattern,
       availability: [],
     };
   },
