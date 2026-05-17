@@ -3,6 +3,7 @@ import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SEO } from "@/components/SEO";
+import { Badge } from "@/components/ui/badge";
 import type { StaffMember, Assignment, Task } from "@/types";
 import { Users, Calendar, Clock, TrendingUp, AlertCircle, Download, Trash2, BarChart3, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -153,7 +154,7 @@ export default function AnalyticsPage() {
     });
     
     // Count assignments
-    rotaHistory.forEach(week => {
+    history.forEach(week => {
       week.assignments.forEach(assignment => {
         const staffMember = staff.find(s => s.name === assignment.staffName);
         if (staffMember) {
@@ -220,7 +221,7 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {staff.length === 0 || rotaHistory.length === 0 ? (
+            {staff.length === 0 || history.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <BarChart3 className="h-10 w-10 mx-auto mb-3 opacity-20" />
                 <p className="text-sm font-mono">No assignment data yet</p>
@@ -379,7 +380,7 @@ export default function AnalyticsPage() {
           <Card className="shadow-sm card-hover">
             <CardHeader className="pb-3">
               <CardTitle className="font-condensed text-sm flex items-center gap-2">
-                <Calendar2 className="h-4 w-4 text-primary" />
+                <Calendar className="h-4 w-4 text-primary" />
                 Active Staff
               </CardTitle>
             </CardHeader>
