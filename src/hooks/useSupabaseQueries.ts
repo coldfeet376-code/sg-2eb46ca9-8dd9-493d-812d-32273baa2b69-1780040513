@@ -11,18 +11,42 @@ export function useStaff() {
   return useQuery({
     queryKey: ["staff"],
     queryFn: async () => {
+      console.log("🔍 Starting staff query...");
+      
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
         .select("*")
         .order("name");
 
-      if (staffError) throw staffError;
+      console.log("📊 Staff query result:", { 
+        staffCount: staffData?.length || 0, 
+        error: staffError?.message,
+        staffData: staffData?.slice(0, 2) // Log first 2 for debugging
+      });
+
+      if (staffError) {
+        console.error("❌ Staff query error:", staffError);
+        throw staffError;
+      }
+
+      if (!staffData || staffData.length === 0) {
+        console.warn("⚠️ No staff data returned from database");
+        return [];
+      }
 
       const { data: availabilityData, error: availError } = await supabase
         .from("availability")
         .select("*");
 
-      if (availError) throw availError;
+      console.log("📅 Availability query result:", {
+        availCount: availabilityData?.length || 0,
+        error: availError?.message
+      });
+
+      if (availError) {
+        console.error("❌ Availability query error:", availError);
+        throw availError;
+      }
 
       const staffMembers: StaffMember[] = (staffData || []).map((s) => ({
         id: s.id,
@@ -38,8 +62,11 @@ export function useStaff() {
           })),
       }));
 
+      console.log("✅ Staff members mapped:", staffMembers.length);
       return staffMembers;
     },
+    retry: 1,
+    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
   });
 }
 
@@ -48,13 +75,27 @@ export function useTaskConfig() {
   return useQuery({
     queryKey: ["taskConfig"],
     queryFn: async () => {
+      console.log("🔍 Starting task config query...");
+      
       const { data, error } = await supabase
         .from("task_config")
         .select("*");
 
-      if (error) throw error;
+      console.log("📊 Task config query result:", {
+        rowCount: data?.length || 0,
+        error: error?.message,
+        tasks: data?.map(d => d.task) || []
+      });
 
-      if (!data || data.length === 0) return null;
+      if (error) {
+        console.error("❌ Task config query error:", error);
+        throw error;
+      }
+
+      if (!data || data.length === 0) {
+        console.warn("⚠️ No task config data returned from database");
+        return null;
+      }
 
       const config: TaskConfig = {};
       data.forEach((row) => {
@@ -69,8 +110,11 @@ export function useTaskConfig() {
         ];
       });
 
+      console.log("✅ Task config mapped:", Object.keys(config));
       return config;
     },
+    retry: 1,
+    staleTime: 1000 * 60 * 5,
   });
 }
 
