@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { SEO } from "@/components/SEO";
 import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
@@ -53,6 +54,9 @@ export default function StaffPage() {
   
   // Expanded staff IDs for collapsible sections
   const [expandedStaffIds, setExpandedStaffIds] = useState<Set<string>>(new Set());
+  
+  // Dropdown state for day selection
+  const [openDayDropdown, setOpenDayDropdown] = useState<{ staffId: string; date: string } | null>(null);
 
   // React Query hooks
   const { data: staff = [], isLoading: staffLoading } = useStaff();
@@ -214,46 +218,37 @@ export default function StaffPage() {
     });
   };
 
-  const handleDayClick = async (staffId: string, date: Date, currentType: AvailabilityType | null) => {
-    const dateStr = date.toISOString().split("T")[0];
-    
-    // Cycle through: null -> rest -> holiday -> sick -> null
-    let newType: AvailabilityType | null = null;
-    if (currentType === null) {
-      newType = "rest";
-    } else if (currentType === "rest") {
-      newType = "holiday";
-    } else if (currentType === "holiday") {
-      newType = "sick";
-    } else {
-      // sick -> null (remove)
-      try {
+  const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
+    try {
+      if (type === "clear") {
+        // Remove availability
         await staffService.deleteAvailability(staffId, dateStr);
         await queryClient.invalidateQueries({ queryKey: ["staff"] });
         toast({
           title: "Cleared",
           description: "Day marked as working",
         });
-      } catch (error) {
-        console.error("Error removing availability:", error);
+      } else {
+        // Add or update
+        await staffService.addAvailability(staffId, [{
+          date: dateStr,
+          type: type,
+          notes: `Marked as ${type}`,
+        }]);
+        await queryClient.invalidateQueries({ queryKey: ["staff"] });
+        toast({
+          title: "Updated",
+          description: `Day marked as ${type}`,
+        });
       }
-      return;
-    }
-
-    // Add or update
-    try {
-      await staffService.addAvailability(staffId, [{
-        date: dateStr,
-        type: newType,
-        notes: `Marked as ${newType}`,
-      }]);
-      await queryClient.invalidateQueries({ queryKey: ["staff"] });
-      toast({
-        title: "Updated",
-        description: `Day marked as ${newType}`,
-      });
+      setOpenDayDropdown(null);
     } catch (error) {
       console.error("Error updating availability:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update availability",
+        variant: "destructive",
+      });
     }
   };
 
@@ -273,12 +268,22 @@ export default function StaffPage() {
   };
 
   const getDayColor = (type: AvailabilityType | null) => {
-    if (!type) return "bg-background hover:bg-muted/50";
+    if (!type) return "bg-background hover:bg-muted border-muted-foreground/20";
     switch (type) {
-      case "rest": return "bg-blue-100 hover:bg-blue-200 border-blue-400 text-blue-900";
-      case "holiday": return "bg-purple-100 hover:bg-purple-200 border-purple-400 text-purple-900";
-      case "sick": return "bg-red-100 hover:bg-red-200 border-red-400 text-red-900";
-      default: return "bg-green-100 hover:bg-green-200 border-green-400 text-green-900";
+      case "rest": return "bg-blue-500 hover:bg-blue-600 border-blue-600 text-white";
+      case "holiday": return "bg-purple-500 hover:bg-purple-600 border-purple-600 text-white";
+      case "sick": return "bg-red-500 hover:bg-red-600 border-red-600 text-white";
+      default: return "bg-green-500 hover:bg-green-600 border-green-600 text-white";
+    }
+  };
+
+  const getDayLabel = (type: AvailabilityType | null) => {
+    if (!type) return "—";
+    switch (type) {
+      case "rest": return "R";
+      case "holiday": return "H";
+      case "sick": return "S";
+      default: return "A";
     }
   };
 
@@ -559,7 +564,7 @@ export default function StaffPage() {
                             <CardContent className="pt-0">
                               <div className="space-y-2">
                                 <div className="text-xs font-mono text-muted-foreground mb-2">
-                                  Click days to cycle: Working → Rest → Holiday → Sick → Working
+                                  Click any day to set availability
                                 </div>
                                 {/* Day of week labels */}
                                 <div className="grid grid-cols-7 gap-1 mb-1">
@@ -573,25 +578,79 @@ export default function StaffPage() {
                                 <div className="grid grid-cols-7 gap-1">
                                   {weekDates.map((date, idx) => {
                                     const availType = getAvailabilityForDate(member, date);
+                                    const dateStr = date.toISOString().split("T")[0];
+                                    const isOpen = openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr;
+                                    
                                     return (
-                                      <button
-                                        key={idx}
-                                        onClick={() => handleDayClick(member.id, date, availType)}
-                                        className={cn(
-                                          "aspect-square rounded-lg border-2 transition-all font-mono text-xs font-semibold",
-                                          getDayColor(availType)
-                                        )}
-                                      >
-                                        {availType ? availType.substring(0, 1).toUpperCase() : "—"}
-                                      </button>
+                                      <DropdownMenu key={idx} open={isOpen} onOpenChange={(open) => {
+                                        if (open) {
+                                          setOpenDayDropdown({ staffId: member.id, date: dateStr });
+                                        } else {
+                                          setOpenDayDropdown(null);
+                                        }
+                                      }}>
+                                        <DropdownMenuTrigger asChild>
+                                          <button
+                                            className={cn(
+                                              "aspect-square rounded-lg border-2 transition-all font-mono text-xs font-bold flex items-center justify-center",
+                                              getDayColor(availType)
+                                            )}
+                                          >
+                                            {getDayLabel(availType)}
+                                          </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="center" className="w-40">
+                                          <DropdownMenuItem
+                                            onClick={() => setDayAvailability(member.id, dateStr, "rest")}
+                                            className="font-mono text-xs"
+                                          >
+                                            <span className="w-3 h-3 rounded bg-blue-500 mr-2"></span>
+                                            Rest Day
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={() => setDayAvailability(member.id, dateStr, "holiday")}
+                                            className="font-mono text-xs"
+                                          >
+                                            <span className="w-3 h-3 rounded bg-purple-500 mr-2"></span>
+                                            Holiday
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={() => setDayAvailability(member.id, dateStr, "sick")}
+                                            className="font-mono text-xs"
+                                          >
+                                            <span className="w-3 h-3 rounded bg-red-500 mr-2"></span>
+                                            Sick Leave
+                                          </DropdownMenuItem>
+                                          {availType && (
+                                            <DropdownMenuItem
+                                              onClick={() => setDayAvailability(member.id, dateStr, "clear")}
+                                              className="font-mono text-xs text-muted-foreground"
+                                            >
+                                              Clear (Working)
+                                            </DropdownMenuItem>
+                                          )}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
                                     );
                                   })}
                                 </div>
-                                <div className="flex gap-2 text-[10px] font-mono mt-2 flex-wrap">
-                                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-background border-2"></span>Working</span>
-                                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-100 border-2 border-blue-400"></span>Rest</span>
-                                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-100 border-2 border-purple-400"></span>Holiday</span>
-                                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-100 border-2 border-red-400"></span>Sick</span>
+                                <div className="flex gap-3 text-[10px] font-mono mt-3 flex-wrap">
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-4 h-4 rounded border-2 bg-background text-[8px] flex items-center justify-center">—</span>
+                                    Working
+                                  </span>
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-4 h-4 rounded bg-blue-500 text-white text-[8px] font-bold flex items-center justify-center">R</span>
+                                    Rest
+                                  </span>
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-4 h-4 rounded bg-purple-500 text-white text-[8px] font-bold flex items-center justify-center">H</span>
+                                    Holiday
+                                  </span>
+                                  <span className="flex items-center gap-1.5">
+                                    <span className="w-4 h-4 rounded bg-red-500 text-white text-[8px] font-bold flex items-center justify-center">S</span>
+                                    Sick
+                                  </span>
                                 </div>
                               </div>
                             </CardContent>
