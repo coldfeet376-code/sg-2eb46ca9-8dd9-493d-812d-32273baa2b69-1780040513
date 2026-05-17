@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SEO } from "@/components/SEO";
 import { useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
 import { useToast } from "@/hooks/use-toast";
-import { Save, Upload, Trash2, AlertCircle, FileText } from "lucide-react";
+import { Save, Upload, Trash2, AlertCircle, FileText, RefreshCw, CheckCircle } from "lucide-react";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
@@ -137,182 +137,150 @@ export default function ConfigPage() {
 
   return (
     <Layout>
-      <SEO title="Task Configuration - Warehouse Rota" description="Configure daily task requirements" />
-
-      <div className="space-y-6">
-        <div>
-          <h1 className="font-condensed text-3xl font-bold tracking-tight">Task Configuration</h1>
-          <p className="text-sm text-muted-foreground font-mono mt-1">
-            Set staff requirements for each task per day
+      <SEO
+        title="Task Configuration - Warehouse Rota"
+        description="Configure daily task requirements for warehouse operations"
+      />
+      
+      <div className="space-y-8">
+        <div className="space-y-3">
+          <h1 className="font-condensed text-3xl font-bold tracking-tight">
+            Task Configuration
+          </h1>
+          <p className="text-base text-muted-foreground font-mono">
+            Set how many staff you need for each task on each day of the week
           </p>
+          <div className="flex flex-wrap gap-2 text-xs font-mono text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-primary"></div>
+              Enter 0 if task not needed that day
+            </span>
+            <span className="flex items-center gap-1.5">
+              <div className="w-3 h-3 rounded-full bg-accent"></div>
+              Numbers show staff count required
+            </span>
+          </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
-            <Card className="shadow-sm hover:shadow-md transition-smooth">
-              <CardHeader>
-                <CardTitle className="font-condensed text-xl">Daily Requirements</CardTitle>
-                <CardDescription className="font-mono text-xs">
-                  Enter the number of staff needed for each task on each day
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50 rounded-tl-lg">
-                          Task
-                        </th>
-                        {DAYS.map((day, i) => (
-                          <th 
-                            key={i} 
-                            className={`text-center p-3 font-mono text-xs font-medium bg-muted/50 ${i === 6 ? 'rounded-tr-lg' : ''}`}
-                          >
+        {error && (
+          <Alert className="bg-destructive/10 border-destructive">
+            <AlertCircle className="h-5 w-5 text-destructive" />
+            <div className="flex-1">
+              <h3 className="font-condensed font-semibold text-destructive mb-2">
+                Error Loading Configuration
+              </h3>
+              <p className="text-sm text-destructive/90 font-mono">
+                {error.message}
+              </p>
+            </div>
+          </Alert>
+        )}
+
+        <Card className="shadow-sm hover:shadow-md transition-smooth">
+          <CardHeader className="pb-6">
+            <CardTitle className="font-condensed text-2xl">Weekly Task Requirements</CardTitle>
+            <CardDescription className="font-mono text-sm mt-2">
+              Configure staff needed for each warehouse task across the week (Saturday - Friday)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-8">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50 rounded-tl-lg">
+                        Task
+                      </th>
+                      {DAYS.map((day, dayIndex) => (
+                        <div key={dayIndex} className="space-y-2">
+                          <label className="text-sm font-mono font-semibold text-foreground flex items-center justify-center">
                             {day}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {TASKS.map((task) => (
-                        <tr key={task} className="border-b border-border hover:bg-muted/30 transition-smooth">
-                          <td className="p-3 font-condensed text-sm font-semibold">
-                            {task}
-                          </td>
-                          {DAYS.map((_, dayIdx) => (
-                            <td key={dayIdx} className="p-2 text-center">
-                              <Input
-                                type="number"
-                                min="0"
-                                max="99"
-                                value={editableConfig[task][dayIdx]}
-                                onChange={(e) => handleConfigChange(task, dayIdx, e.target.value)}
-                                className="w-16 text-center font-mono text-sm rounded-lg"
-                                disabled={updateConfigMutation.isPending || isLoading}
-                              />
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="mt-6 flex gap-3">
-                  <Button 
-                    onClick={handleSaveConfig} 
-                    className="rounded-lg shadow-sm hover:shadow-md transition-smooth"
-                    disabled={updateConfigMutation.isPending || isLoading}
-                  >
-                    <Save className="h-4 w-4 mr-2" />
-                    <span className="font-mono text-xs">
-                      {updateConfigMutation.isPending ? "Saving..." : "Save Configuration"}
-                    </span>
-                  </Button>
-                </div>
-
-                {saveSuccess && (
-                  <Alert className="mt-4 bg-green-50 border-green-200">
-                    <AlertCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="font-mono text-xs text-green-800">
-                      Configuration saved successfully!
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="space-y-6">
-            <Card className="shadow-sm hover:shadow-md transition-smooth">
-              <CardHeader>
-                <CardTitle className="font-condensed text-lg flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Templates
-                </CardTitle>
-                <CardDescription className="font-mono text-xs">
-                  Save and load configuration templates
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="font-mono text-xs">Save Current as Template</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      value={templateName}
-                      onChange={(e) => setTemplateName(e.target.value)}
-                      placeholder="Template name..."
-                      className="rounded-lg font-mono text-xs"
-                    />
-                    <Button
-                      onClick={handleSaveTemplate}
-                      disabled={!templateName.trim()}
-                      size="sm"
-                      className="rounded-lg"
-                    >
-                      <Save className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-
-                {templates.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="font-mono text-xs">Load Template</Label>
-                    <Select value={selectedTemplate} onValueChange={handleLoadTemplate}>
-                      <SelectTrigger className="rounded-lg font-mono text-xs">
-                        <SelectValue placeholder="Select template..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {templates.map(template => (
-                          <SelectItem key={template.id} value={template.id} className="font-mono text-xs">
-                            {template.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-
-                {templates.length > 0 && (
-                  <div className="space-y-2">
-                    <Label className="font-mono text-xs">Saved Templates ({templates.length})</Label>
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {templates.map(template => (
-                        <div
-                          key={template.id}
-                          className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/50 transition-smooth"
-                        >
-                          <div className="flex-1">
-                            <p className="font-mono text-xs font-semibold">{template.name}</p>
-                            <p className="font-mono text-[10px] text-muted-foreground mt-1">
-                              {new Date(template.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDeleteTemplate(template.id)}
-                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                          </label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="20"
+                            value={config[task][dayIndex] || 0}
+                            onChange={(e) => updateConfig(task, dayIndex, parseInt(e.target.value) || 0)}
+                            className="font-mono text-base text-center tabular-nums h-12 border-2 focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-sm"
+                          />
                         </div>
                       ))}
-                    </div>
-                  </div>
-                )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {TASKS.map((task) => (
+                      <tr key={task} className="border-b border-border hover:bg-muted/30 transition-smooth">
+                        <td className="p-3 font-condensed text-sm font-semibold">
+                          {task}
+                        </td>
+                        {DAYS.map((day, dayIndex) => (
+                          <div key={dayIndex} className="space-y-1.5">
+                            <label className="text-xs font-mono font-medium text-muted-foreground">
+                              {day}
+                            </label>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="20"
+                              value={config[task][dayIndex] || 0}
+                              onChange={(e) => updateConfig(task, dayIndex, parseInt(e.target.value) || 0)}
+                              className="font-mono text-sm text-center tabular-nums"
+                            />
+                          </div>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-                {templates.length === 0 && (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <FileText className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                    <p className="text-xs font-mono">No templates saved yet</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+              <div className="flex justify-between items-center gap-4 pt-4 border-t">
+                <div className="text-sm font-mono text-muted-foreground">
+                  {hasChanges ? (
+                    <span className="text-warning flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" />
+                      You have unsaved changes
+                    </span>
+                  ) : (
+                    <span className="text-success flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4" />
+                      All changes saved
+                    </span>
+                  )}
+                </div>
+                <Button
+                  onClick={handleSave}
+                  disabled={saving || !hasChanges}
+                  size="lg"
+                  className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base px-8"
+                >
+                  {saving ? (
+                    <>
+                      <RefreshCw className="h-5 w-5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-5 w-5" />
+                      <span>Save Configuration</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {saveSuccess && (
+                <Alert className="mt-4 bg-green-50 border-green-200">
+                  <AlertCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="font-mono text-xs text-green-800">
+                    Configuration saved successfully!
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </Layout>
   );

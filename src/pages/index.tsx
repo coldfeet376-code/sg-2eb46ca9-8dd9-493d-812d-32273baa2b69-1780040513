@@ -1307,7 +1307,7 @@ export default function Home() {
                     <tbody>
                       {TASKS.map((task) => (
                         <tr key={task} className="border-b border-border hover:bg-muted/30 transition-smooth">
-                          <td className="p-3 font-condensed text-sm font-semibold">
+                          <td className="p-4 font-condensed text-sm font-semibold bg-muted/30">
                             {task}
                           </td>
                           {DAYS.map((_, dayIdx) => {
@@ -1316,9 +1316,9 @@ export default function Home() {
                             return (
                               <td 
                                 key={dayIdx} 
-                                className="p-3 text-center align-top"
+                                className="p-4 text-center align-top"
                               >
-                                <div className="space-y-1.5">
+                                <div className="space-y-2">
                                   {/* Assigned staff */}
                                   {dayAssignments.length > 0 && dayAssignments.map((assignment, idx) => {
                                     const locked = isAssignmentLocked(task, dayIdx, assignment.staffName);
@@ -1327,23 +1327,23 @@ export default function Home() {
                                       <button
                                         key={idx}
                                         onClick={() => toggleLockAssignment(task, dayIdx, assignment.staffName)}
-                                        className={`text-xs font-mono px-3 py-1.5 rounded-lg transition-smooth cursor-pointer group relative no-print w-full ${
+                                        className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all cursor-pointer group relative no-print w-full shadow-sm hover:shadow-md ${
                                           locked 
-                                            ? 'bg-warning/20 text-warning-foreground border-2 border-warning hover:bg-warning/30 locked-assignment' 
-                                            : 'bg-primary/10 text-primary hover:bg-primary/20 border-2 border-transparent hover:border-primary/30'
+                                            ? 'bg-warning/20 text-warning-foreground border-2 border-warning hover:bg-warning/30 hover:scale-105 locked-assignment' 
+                                            : 'bg-primary/10 text-primary hover:bg-primary/15 border-2 border-primary/20 hover:border-primary/40 hover:scale-105'
                                         }`}
                                       >
-                                        <div className="flex flex-col items-center gap-0.5">
-                                          <span className="flex items-center gap-1.5">
+                                        <div className="flex flex-col items-center gap-1">
+                                          <span className="flex items-center gap-2 font-semibold">
                                             {locked ? (
-                                              <Lock className="h-3 w-3 no-print" />
+                                              <Lock className="h-3.5 w-3.5 no-print" />
                                             ) : (
-                                              <Unlock className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity no-print" />
+                                              <Unlock className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity no-print" />
                                             )}
                                             {assignment.staffName}
                                           </span>
                                           {availability && availability.type !== 'available' && (
-                                            <span className={`text-[9px] px-1.5 py-0.5 rounded border ${availability.color}`}>
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-md border font-medium ${availability.color}`}>
                                               {availability.label}
                                             </span>
                                           )}
@@ -1356,14 +1356,14 @@ export default function Home() {
                                   {showUnavailableStaff && unavailableStaff.map((unavailable, idx) => (
                                     <div
                                       key={`unavail-${idx}`}
-                                      className="text-xs font-mono px-3 py-1.5 rounded-lg opacity-40 no-print"
+                                      className="text-xs font-mono px-4 py-2.5 rounded-lg opacity-50 no-print border-2 border-dashed border-muted-foreground/20 bg-muted/20"
                                       title={`${unavailable.name} - ${unavailable.reason}`}
                                     >
-                                      <div className="flex flex-col items-center gap-0.5">
-                                        <span className="line-through text-muted-foreground">
+                                      <div className="flex flex-col items-center gap-1">
+                                        <span className="line-through text-muted-foreground font-medium">
                                           {unavailable.name}
                                         </span>
-                                        <span className={`text-[9px] px-1.5 py-0.5 rounded border ${unavailable.color}`}>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-md border ${unavailable.color}`}>
                                           {unavailable.reason}
                                         </span>
                                       </div>
