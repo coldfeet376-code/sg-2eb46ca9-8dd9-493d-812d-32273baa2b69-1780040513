@@ -276,17 +276,6 @@ export default function StaffPage() {
       if (type === "clear") {
         // Remove availability
         await staffService.deleteAvailability(staffId, dateStr);
-        
-        // Force immediate refetch and wait for it to complete
-        await queryClient.refetchQueries({ queryKey: ["staff"] });
-        
-        // Small delay to ensure UI has fully re-rendered with new data
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
-        toast({
-          title: "✓ Cleared",
-          description: `${staffName} - ${dateDisplay} marked as WORKING`,
-        });
       } else {
         // Add or update (UPSERT)
         await staffService.addAvailability(staffId, [{
@@ -294,13 +283,22 @@ export default function StaffPage() {
           type: type,
           notes: `Marked as ${type}`,
         }]);
-        
-        // Force immediate refetch and wait for it to complete
-        await queryClient.refetchQueries({ queryKey: ["staff"] });
-        
-        // Small delay to ensure UI has fully re-rendered with new data
-        await new Promise(resolve => setTimeout(resolve, 200));
-        
+      }
+      
+      // AGGRESSIVE CACHE REFRESH - invalidate, refetch, and wait
+      await queryClient.invalidateQueries({ queryKey: ["staff"] });
+      await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
+      
+      // Wait 500ms for cache to fully settle
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Show success toast
+      if (type === "clear") {
+        toast({
+          title: "✓ Cleared",
+          description: `${staffName} - ${dateDisplay} marked as WORKING`,
+        });
+      } else {
         const typeLabel = type.toUpperCase();
         toast({
           title: `✓ Saved ${typeLabel}`,
@@ -495,7 +493,7 @@ export default function StaffPage() {
                 <p className="text-xs font-mono mt-1">Add staff above to get started</p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {staff
                   .filter((member) => filterShift === "all" || member.shiftStart === filterShift)
                   .map((member) => {
@@ -506,15 +504,15 @@ export default function StaffPage() {
                     return (
                       <Collapsible key={member.id} open={isExpanded} onOpenChange={() => toggleStaffExpanded(member.id)}>
                         <Card className="shadow-sm border-l-4 border-l-primary/20">
-                          <CardHeader className="pb-3">
+                          <CardHeader className="pb-4 px-6 pt-5">
                             <div className="flex items-center justify-between">
                               <CollapsibleTrigger asChild>
                                 <Button variant="ghost" className="flex-1 justify-start p-0 h-auto hover:bg-transparent">
-                                  <div className="flex items-center gap-3 w-full">
-                                    <ChevronDown className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-180")} />
+                                  <div className="flex items-center gap-4 w-full">
+                                    <ChevronDown className={cn("h-5 w-5 transition-transform", isExpanded && "rotate-180")} />
                                     <div className="flex-1 text-left">
-                                      <div className="flex items-center gap-2 mb-1">
-                                        <h3 className="font-condensed font-semibold text-base">{member.name}</h3>
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <h3 className="font-condensed font-semibold text-lg">{member.name}</h3>
                                         {member.shiftStart && (
                                           <Badge variant="secondary" className="font-mono text-xs">
                                             <Clock className="h-3 w-3 mr-1" />
@@ -522,14 +520,14 @@ export default function StaffPage() {
                                           </Badge>
                                         )}
                                       </div>
-                                      <div className="flex flex-wrap gap-1.5">
+                                      <div className="flex flex-wrap gap-2">
                                         {member.trainedTasks.map((task) => (
-                                          <Badge key={task} variant="outline" className="font-mono text-[10px]">
+                                          <Badge key={task} variant="outline" className="font-mono text-xs px-2.5 py-0.5">
                                             {task}
                                           </Badge>
                                         ))}
                                       </div>
-                                      <div className="flex gap-3 mt-2 text-xs font-mono">
+                                      <div className="flex gap-4 mt-3 text-xs font-mono">
                                         <span className="text-blue-600">Rest: {stats.rest}</span>
                                         <span className="text-purple-600">Holiday: {stats.holiday}</span>
                                         <span className="text-red-600">Sick: {stats.sick}</span>
@@ -630,9 +628,9 @@ export default function StaffPage() {
                           </CardHeader>
 
                           <CollapsibleContent>
-                            <CardContent className="pt-0">
-                              <div className="space-y-2">
-                                <div className="flex items-center justify-between mb-3">
+                            <CardContent className="pt-2 px-6 pb-6">
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between mb-4">
                                   <div className="text-xs font-mono text-muted-foreground">
                                     Click any day to set availability
                                   </div>
@@ -647,15 +645,15 @@ export default function StaffPage() {
                                   </Button>
                                 </div>
                                 {/* Day of week labels */}
-                                <div className="grid grid-cols-7 gap-1 mb-1">
+                                <div className="grid grid-cols-7 gap-2 mb-2">
                                   {["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"].map((day, idx) => (
-                                    <div key={idx} className="text-center font-mono text-[10px] text-muted-foreground font-semibold">
+                                    <div key={idx} className="text-center font-mono text-xs text-muted-foreground font-semibold">
                                       {day}
                                     </div>
                                   ))}
                                 </div>
                                 {/* Calendar grid */}
-                                <div className="grid grid-cols-7 gap-1">
+                                <div className="grid grid-cols-7 gap-2">
                                   {weekDates.map((date, idx) => {
                                     const availType = getAvailabilityForDate(member, date);
                                     const dateStr = date.toISOString().split("T")[0];
@@ -674,7 +672,7 @@ export default function StaffPage() {
                                           <button
                                             disabled={isLoading}
                                             className={cn(
-                                              "aspect-square rounded-lg border-2 transition-all font-mono text-xs font-bold flex items-center justify-center",
+                                              "aspect-square rounded-lg border-2 transition-all font-mono text-sm font-bold flex items-center justify-center min-h-[48px]",
                                               getDayColor(availType),
                                               isLoading && "opacity-50 cursor-wait animate-pulse"
                                             )}
@@ -717,9 +715,9 @@ export default function StaffPage() {
                                     );
                                   })}
                                 </div>
-                                <div className="flex gap-3 text-[10px] font-mono mt-3 flex-wrap">
-                                  <span className="flex items-center gap-1.5">
-                                    <span className="w-4 h-4 rounded border-2 bg-background text-[8px] flex items-center justify-center">—</span>
+                                <div className="flex gap-4 text-xs font-mono mt-4 flex-wrap">
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-5 h-5 rounded border-2 bg-background text-[10px] flex items-center justify-center">—</span>
                                     Working
                                   </span>
                                   <span className="flex items-center gap-1.5">
