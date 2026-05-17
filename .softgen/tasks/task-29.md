@@ -1,6 +1,6 @@
 ---
 title: Task Rotation Fairness Metrics
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [analytics, fairness, metrics]
