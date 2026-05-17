@@ -104,6 +104,48 @@ export type Database = {
         }
         Relationships: []
       }
+      task_config: {
+        Row: {
+          created_at: string | null
+          friday: number
+          id: string
+          monday: number
+          saturday: number
+          sunday: number
+          task: string
+          thursday: number
+          tuesday: number
+          updated_at: string | null
+          wednesday: number
+        }
+        Insert: {
+          created_at?: string | null
+          friday?: number
+          id?: string
+          monday?: number
+          saturday?: number
+          sunday?: number
+          task: string
+          thursday?: number
+          tuesday?: number
+          updated_at?: string | null
+          wednesday?: number
+        }
+        Update: {
+          created_at?: string | null
+          friday?: number
+          id?: string
+          monday?: number
+          saturday?: number
+          sunday?: number
+          task?: string
+          thursday?: number
+          tuesday?: number
+          updated_at?: string | null
+          wednesday?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

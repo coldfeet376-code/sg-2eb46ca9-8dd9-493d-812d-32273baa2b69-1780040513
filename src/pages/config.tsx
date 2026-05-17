@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SEO } from "@/components/SEO";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { Save, Upload, Trash2, AlertCircle, FileText } from "lucide-react";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -36,18 +38,52 @@ export default function ConfigPage() {
   const [templates, setTemplates] = useState<ConfigTemplate[]>([]);
   const [templateName, setTemplateName] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
-    const savedConfig = localStorage.getItem("warehouse-task-config");
+    loadTaskConfig();
     const savedTemplates = localStorage.getItem("warehouse-config-templates");
-    
-    if (savedConfig) {
-      setTaskConfig(JSON.parse(savedConfig));
-    }
     if (savedTemplates) {
       setTemplates(JSON.parse(savedTemplates));
     }
   }, []);
+
+  const loadTaskConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("task_config")
+        .select("*");
+
+      if (error) {
+        console.error("Error fetching task config:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load task configuration",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const config: TaskConfig = {};
+        data.forEach((row) => {
+          config[row.task] = [
+            row.sunday,
+            row.monday,
+            row.tuesday,
+            row.wednesday,
+            row.thursday,
+            row.friday,
+            row.saturday,
+          ];
+        });
+        setTaskConfig(config);
+      }
+    } catch (error) {
+      console.error("Error loading task config:", error);
+    }
+  };
 
   const handleConfigChange = (task: string, dayIndex: number, value: string) => {
     const newConfig = { ...taskConfig };
@@ -55,10 +91,44 @@ export default function ConfigPage() {
     setTaskConfig(newConfig);
   };
 
-  const handleSaveConfig = () => {
-    localStorage.setItem("warehouse-task-config", JSON.stringify(taskConfig));
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+  const handleSaveConfig = async () => {
+    setIsLoading(true);
+    try {
+      // Update each task in the database
+      for (const task of TASKS) {
+        const { error } = await supabase
+          .from("task_config")
+          .update({
+            sunday: taskConfig[task][0],
+            monday: taskConfig[task][1],
+            tuesday: taskConfig[task][2],
+            wednesday: taskConfig[task][3],
+            thursday: taskConfig[task][4],
+            friday: taskConfig[task][5],
+            saturday: taskConfig[task][6],
+            updated_at: new Date().toISOString(),
+          })
+          .eq("task", task);
+
+        if (error) throw error;
+      }
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      toast({
+        title: "Configuration saved",
+        description: "Task requirements updated successfully",
+      });
+    } catch (error) {
+      console.error("Error saving task config:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save configuration",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSaveTemplate = () => {
@@ -75,6 +145,10 @@ export default function ConfigPage() {
     setTemplates(updatedTemplates);
     localStorage.setItem("warehouse-config-templates", JSON.stringify(updatedTemplates));
     setTemplateName("");
+    toast({
+      title: "Template saved",
+      description: `Template "${newTemplate.name}" saved successfully`,
+    });
   };
 
   const handleLoadTemplate = (templateId: string) => {
@@ -82,15 +156,26 @@ export default function ConfigPage() {
     if (template) {
       setTaskConfig(template.config);
       setSelectedTemplate(templateId);
+      toast({
+        title: "Template loaded",
+        description: `Loaded template "${template.name}"`,
+      });
     }
   };
 
   const handleDeleteTemplate = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
     const updatedTemplates = templates.filter(t => t.id !== templateId);
     setTemplates(updatedTemplates);
     localStorage.setItem("warehouse-config-templates", JSON.stringify(updatedTemplates));
     if (selectedTemplate === templateId) {
       setSelectedTemplate("");
+    }
+    if (template) {
+      toast({
+        title: "Template deleted",
+        description: `Template "${template.name}" removed`,
+      });
     }
   };
 
@@ -148,6 +233,7 @@ export default function ConfigPage() {
                                 value={taskConfig[task][dayIdx]}
                                 onChange={(e) => handleConfigChange(task, dayIdx, e.target.value)}
                                 className="w-16 text-center font-mono text-sm rounded-lg"
+                                disabled={isLoading}
                               />
                             </td>
                           ))}
@@ -161,9 +247,12 @@ export default function ConfigPage() {
                   <Button 
                     onClick={handleSaveConfig} 
                     className="rounded-lg shadow-sm hover:shadow-md transition-smooth"
+                    disabled={isLoading}
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    <span className="font-mono text-xs">Save Configuration</span>
+                    <span className="font-mono text-xs">
+                      {isLoading ? "Saving..." : "Save Configuration"}
+                    </span>
                   </Button>
                 </div>
 

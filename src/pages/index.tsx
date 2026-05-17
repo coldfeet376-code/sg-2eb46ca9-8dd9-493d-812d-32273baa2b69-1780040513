@@ -60,17 +60,14 @@ export default function Home() {
   const { addNotification } = useNotifications();
 
   useEffect(() => {
-    // Load staff from Supabase
+    // Load staff and task config from Supabase
     loadStaff();
+    loadTaskConfig();
     
-    // Load config and locked assignments from localStorage
-    const savedConfig = localStorage.getItem("warehouse-task-config");
+    // Load locked assignments and history from localStorage
     const savedLocked = localStorage.getItem("warehouse-locked-assignments");
     const savedHistory = localStorage.getItem("warehouse-rota-history");
     
-    if (savedConfig) {
-      setTaskConfig(JSON.parse(savedConfig));
-    }
     if (savedLocked) {
       const parsed = JSON.parse(savedLocked);
       setLockedAssignments(parsed);
@@ -119,6 +116,37 @@ export default function Home() {
       setStaff(staffMembers);
     } catch (error) {
       console.error("Error loading staff:", error);
+    }
+  };
+
+  const loadTaskConfig = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("task_config")
+        .select("*");
+
+      if (error) {
+        console.error("Error fetching task config:", error);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const config: TaskConfig = {};
+        data.forEach((row) => {
+          config[row.task] = [
+            row.sunday,
+            row.monday,
+            row.tuesday,
+            row.wednesday,
+            row.thursday,
+            row.friday,
+            row.saturday,
+          ];
+        });
+        setTaskConfig(config);
+      }
+    } catch (error) {
+      console.error("Error loading task config:", error);
     }
   };
 
