@@ -48,6 +48,7 @@ export default function StaffPage() {
   const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
   const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   const [clearAllConfirm, setClearAllConfirm] = useState<string | null>(null);
+  const [isImportSheetOpen, setIsImportSheetOpen] = useState(false);
   
   const { addAuditEntry } = useAudit();
   const { toast } = useToast();
@@ -608,6 +609,9 @@ export default function StaffPage() {
       // Clear the import field after success
       setExcelImport("");
       setCsvFileName("");
+      
+      // Close the import sheet
+      setIsImportSheetOpen(false);
       
       // Reset selected staff to force re-read from cache
       const staffId = selectedStaff.id;
@@ -1211,12 +1215,15 @@ export default function StaffPage() {
                                     <Edit className="h-4 w-4 mr-2" />
                                     <span className="font-mono text-xs">Edit Skills</span>
                                   </Button>
-                                  <Sheet>
+                                  <Sheet open={isImportSheetOpen} onOpenChange={setIsImportSheetOpen}>
                                     <SheetTrigger asChild>
                                       <Button
                                         variant="default"
                                         size="sm"
-                                        onClick={() => setSelectedStaff(member)}
+                                        onClick={() => {
+                                          setSelectedStaff(member);
+                                          setIsImportSheetOpen(true);
+                                        }}
                                         className="rounded-lg"
                                       >
                                         <FileSpreadsheet className="h-4 w-4 mr-2" />
