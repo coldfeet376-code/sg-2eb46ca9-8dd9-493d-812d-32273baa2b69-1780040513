@@ -1010,6 +1010,18 @@ export default function Home() {
               </SelectContent>
             </Select>
 
+            {/* Generate Rota Button - Prominent position */}
+            {viewMode === "week" && staff.length > 0 && taskConfig && (
+              <Button
+                onClick={generateRota}
+                size="lg"
+                className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base bg-accent hover:bg-accent/90 text-accent-foreground"
+              >
+                <Zap className="h-5 w-5" />
+                <span>Generate Rota</span>
+              </Button>
+            )}
+
             {viewMode === "year" && (
               <Select value={selectedYear.toString()} onValueChange={handleYearChange}>
                 <SelectTrigger className="w-24 font-mono text-xs rounded-lg">
@@ -1027,18 +1039,6 @@ export default function Home() {
 
             {viewMode === "week" && (
               <>
-                {/* Generate Rota Button - Always visible when staff exists */}
-                {staff.length > 0 && (
-                  <Button
-                    onClick={generateRota}
-                    size="lg"
-                    className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base"
-                  >
-                    <Zap className="h-5 w-5" />
-                    <span className="font-mono">Generate Rota</span>
-                  </Button>
-                )}
-                
                 <Button variant="outline" size="sm" onClick={handlePrevWeek} className="rounded-lg">
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
