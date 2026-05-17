@@ -90,8 +90,8 @@ export const rotaService = {
     return (data || []).map(b => ({
       id: b.id,
       weekStart: b.week_start,
-      assignments: b.assignments as Assignment[],
-      lockedAssignments: b.locked_assignments as Assignment[],
+      assignments: b.assignments as unknown as Assignment[],
+      lockedAssignments: b.locked_assignments as unknown as Assignment[],
       createdAt: b.created_at,
       createdBy: b.created_by || undefined
     }));
