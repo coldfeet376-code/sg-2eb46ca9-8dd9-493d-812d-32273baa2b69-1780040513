@@ -952,11 +952,23 @@ export default function StaffPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label className="font-mono text-xs">From Date</Label>
-                          <Calendar mode="single" selected={dateFrom} onSelect={setDateFrom} className="rounded-lg border" />
+                          <Calendar 
+                            mode="single" 
+                            selected={dateFrom} 
+                            onSelect={setDateFrom} 
+                            toDate={new Date(2027, 11, 31)}
+                            className="rounded-lg border" 
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label className="font-mono text-xs">To Date</Label>
-                          <Calendar mode="single" selected={dateTo} onSelect={setDateTo} className="rounded-lg border" />
+                          <Calendar 
+                            mode="single" 
+                            selected={dateTo} 
+                            onSelect={setDateTo} 
+                            toDate={new Date(2027, 11, 31)}
+                            className="rounded-lg border" 
+                          />
                         </div>
                       </div>
 
@@ -1118,13 +1130,11 @@ export default function StaffPage() {
                                       </Badge>
                                     ))}
                                   </div>
-                                  {(stats.rest > 0 || stats.holiday > 0 || stats.sick > 0) && (
-                                    <div className="flex gap-3 mt-2 text-sm font-mono">
-                                      {stats.rest > 0 && <span className="text-blue-600">Rest: {stats.rest}</span>}
-                                      {stats.holiday > 0 && <span className="text-purple-600">Holiday: {stats.holiday}</span>}
-                                      {stats.sick > 0 && <span className="text-red-600">Sick: {stats.sick}</span>}
-                                    </div>
-                                  )}
+                                  <div className="flex gap-3 mt-2 text-sm font-mono">
+                                    <span className="text-blue-600">Rest: {stats.rest}</span>
+                                    <span className="text-purple-600">Holiday: {stats.holiday}</span>
+                                    <span className="text-red-600">Sick: {stats.sick}</span>
+                                  </div>
                                 </div>
                                 
                                 {!batchMode && (

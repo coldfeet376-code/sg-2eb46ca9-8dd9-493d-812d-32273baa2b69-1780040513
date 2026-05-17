@@ -1001,7 +1001,7 @@ export default function Home() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[2024, 2025, 2026, 2027, 2028].map(year => (
+                  {[2024, 2025, 2026, 2027].map(year => (
                     <SelectItem key={year} value={year.toString()} className="font-mono text-xs">
                       {year}
                     </SelectItem>
