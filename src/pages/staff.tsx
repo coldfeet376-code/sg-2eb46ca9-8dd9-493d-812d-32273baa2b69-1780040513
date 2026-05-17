@@ -60,6 +60,9 @@ export default function StaffPage() {
   
   // Loading state for specific cell being updated
   const [loadingCell, setLoadingCell] = useState<{ staffId: string; date: string } | null>(null);
+  
+  // Force re-render key - increments after successful cache updates
+  const [renderKey, setRenderKey] = useState(0);
 
   // React Query hooks
   const { data: staff = [], isLoading: staffLoading } = useStaff();
@@ -244,6 +247,9 @@ export default function StaffPage() {
       // Refresh data
       await queryClient.refetchQueries({ queryKey: ["staff"] });
       
+      // Force re-render
+      setRenderKey(prev => prev + 1);
+      
       toast({
         title: "✓ All Cleared",
         description: `Removed ${staffMember.availability.length} availability entries for ${staffName}`,
@@ -291,6 +297,9 @@ export default function StaffPage() {
       
       // Wait 500ms for cache to fully settle
       await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Force component re-render to show updated data
+      setRenderKey(prev => prev + 1);
       
       // Show success toast
       if (type === "clear") {
@@ -653,7 +662,7 @@ export default function StaffPage() {
                                   ))}
                                 </div>
                                 {/* Calendar grid */}
-                                <div className="grid grid-cols-7 gap-2">
+                                <div className="grid grid-cols-7 gap-2" key={`${member.id}-${renderKey}`}>
                                   {weekDates.map((date, idx) => {
                                     const availType = getAvailabilityForDate(member, date);
                                     const dateStr = date.toISOString().split("T")[0];
@@ -661,7 +670,7 @@ export default function StaffPage() {
                                     const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
                                     
                                     return (
-                                      <DropdownMenu key={idx} open={isOpen} onOpenChange={(open) => {
+                                      <DropdownMenu key={`${idx}-${renderKey}`} open={isOpen} onOpenChange={(open) => {
                                         if (open) {
                                           setOpenDayDropdown({ staffId: member.id, date: dateStr });
                                         } else {
