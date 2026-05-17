@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SEO } from "@/components/SEO";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { useNotifications } from "@/contexts/NotificationContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useStaff, useTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart } from "@/types";
 import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw } from "lucide-react";
 
@@ -49,8 +49,6 @@ interface TaskConfig {
 export default function Home() {
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [staff, setStaff] = useState<StaffMember[]>([]);
-  const [taskConfig, setTaskConfig] = useState<any>(null);
   const [viewMode, setViewMode] = useState<"week" | "year">("week");
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [yearRotas, setYearRotas] = useState<Map<string, Assignment[]>>(new Map());
@@ -63,11 +61,11 @@ export default function Home() {
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const { addNotification } = useNotifications();
 
+  // React Query hooks - cached data
+  const { data: staff = [], isLoading: staffLoading } = useStaff();
+  const { data: taskConfig, isLoading: configLoading } = useTaskConfig();
+
   useEffect(() => {
-    // Load staff and task config from Supabase
-    loadStaff();
-    loadTaskConfig();
-    
     // Load locked assignments and history from localStorage
     const savedLocked = localStorage.getItem("warehouse-locked-assignments");
     const savedHistory = localStorage.getItem("warehouse-rota-history");
@@ -166,14 +164,14 @@ export default function Home() {
 
   useEffect(() => {
     // Generate rota when data is available
-    if (staff.length > 0 && taskConfig) {
+    if (staff.length > 0 && taskConfig && !staffLoading && !configLoading) {
       if (viewMode === "week") {
         generateRota();
       } else {
         generateYearRota();
       }
     }
-  }, [staff, taskConfig, weekStart, viewMode, selectedYear]);
+  }, [staff, taskConfig, weekStart, viewMode, selectedYear, staffLoading, configLoading]);
 
   const checkCoverageGaps = (): CoverageGap[] => {
     if (!staff.length || !taskConfig) return [];
@@ -1164,12 +1162,14 @@ export default function Home() {
                   variant="outline" 
                   size="sm" 
                   onClick={generateRota}
-                  disabled={!staff.length || !taskConfig}
+                  disabled={!staff.length || !taskConfig || staffLoading || configLoading}
                   className="gap-2 ml-2 rounded-lg"
                   data-tour="generate-button"
                 >
-                  <RefreshCw className="h-4 w-4" />
-                  <span className="font-mono text-xs">Generate Rota</span>
+                  <RefreshCw className={`h-4 w-4 ${staffLoading || configLoading ? 'animate-spin' : ''}`} />
+                  <span className="font-mono text-xs">
+                    {staffLoading || configLoading ? "Loading..." : "Generate Rota"}
+                  </span>
                 </Button>
                 {lockedAssignments.length > 0 && (
                   <Button 
