@@ -59,8 +59,8 @@ export const rotaService = {
       .from("rota_backups")
       .insert({
         week_start: weekStart,
-        assignments: assignments,
-        locked_assignments: lockedAssignments,
+        assignments: assignments as any,
+        locked_assignments: lockedAssignments as any,
         created_by: "system"
       });
 
@@ -80,7 +80,7 @@ export const rotaService = {
       query = query.eq("week_start", weekStart);
     }
 
-    const { data, error } = query;
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching backups:", error);

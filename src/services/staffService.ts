@@ -28,6 +28,7 @@ export const staffService = {
       name: s.name,
       trainedTasks: (s.trained_tasks || []) as Task[],
       shiftStart: (s.shift_start || "06:00") as ShiftStart,
+      shiftPattern: s.shift_pattern || "All",
       availability: (availabilityData || [])
         .filter((a) => a.staff_id === s.id)
         .map((a) => ({
@@ -41,13 +42,14 @@ export const staffService = {
   },
 
   // Add new staff member
-  async addStaff(staff: Omit<StaffMember, "id" | "availability">): Promise<StaffMember> {
+  async addStaff(staff: Omit<StaffMember, "id" | "availability"> & { shiftPattern?: string }): Promise<StaffMember> {
     const { data, error } = await supabase
       .from("staff")
       .insert({
         name: staff.name,
         trained_tasks: staff.trainedTasks,
         shift_start: staff.shiftStart,
+        shift_pattern: staff.shiftPattern || "All",
       })
       .select()
       .single();
@@ -62,6 +64,7 @@ export const staffService = {
       name: data.name,
       trainedTasks: (data.trained_tasks || []) as Task[],
       shiftStart: (data.shift_start || "06:00") as ShiftStart,
+      shiftPattern: data.shift_pattern || "All",
       availability: [],
     };
   },
@@ -69,12 +72,13 @@ export const staffService = {
   // Update staff member
   async updateStaff(
     id: string,
-    updates: Partial<Omit<StaffMember, "id" | "availability">>
+    updates: Partial<Omit<StaffMember, "id" | "availability">> & { shiftPattern?: string }
   ): Promise<void> {
     const updateData: any = {};
     if (updates.name !== undefined) updateData.name = updates.name;
     if (updates.trainedTasks !== undefined) updateData.trained_tasks = updates.trainedTasks;
     if (updates.shiftStart !== undefined) updateData.shift_start = updates.shiftStart;
+    if (updates.shiftPattern !== undefined) updateData.shift_pattern = updates.shiftPattern;
     updateData.updated_at = new Date().toISOString();
 
     const { error } = await supabase.from("staff").update(updateData).eq("id", id);
@@ -150,12 +154,14 @@ export const staffService = {
       name: string;
       trainedTasks: string[];
       shiftStart?: string;
+      shiftPattern?: string;
     }>
   ): Promise<void> {
     const insertData = staffData.map((s) => ({
       name: s.name,
       trained_tasks: s.trainedTasks,
       shift_start: s.shiftStart || "06:00",
+      shift_pattern: s.shiftPattern || "All",
     }));
 
     const { error } = await supabase.from("staff").insert(insertData);

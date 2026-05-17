@@ -53,6 +53,7 @@ export function useStaff() {
         name: s.name,
         trainedTasks: (s.trained_tasks || []) as Task[],
         shiftStart: (s.shift_start || "06:00") as ShiftStart,
+        shiftPattern: s.shift_pattern || "All",
         availability: (availabilityData || [])
           .filter((a) => a.staff_id === s.id)
           .map((a) => ({
@@ -123,13 +124,14 @@ export function useAddStaff() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (staff: Omit<StaffMember, "id" | "availability">) => {
+    mutationFn: async (staff: Omit<StaffMember, "id" | "availability"> & { shiftPattern?: string }) => {
       const { data, error } = await supabase
         .from("staff")
         .insert({
           name: staff.name,
           trained_tasks: staff.trainedTasks,
           shift_start: staff.shiftStart,
+          shift_pattern: staff.shiftPattern || "All",
         })
         .select()
         .single();
@@ -147,13 +149,14 @@ export function useUpdateStaff() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<StaffMember> }) => {
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<StaffMember> & { shiftPattern?: string } }) => {
       const { error } = await supabase
         .from("staff")
         .update({
           name: updates.name,
           trained_tasks: updates.trainedTasks,
           shift_start: updates.shiftStart,
+          shift_pattern: updates.shiftPattern,
         })
         .eq("id", id);
 

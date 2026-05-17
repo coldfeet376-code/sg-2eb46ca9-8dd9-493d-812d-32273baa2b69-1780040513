@@ -34,6 +34,7 @@ export default function StaffPage() {
   const [name, setName] = useState("");
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
   const [shiftStart, setShiftStart] = useState<ShiftStart>("06:00");
+  const [shiftPattern, setShiftPattern] = useState<"Early" | "Late" | "All">("All");
   const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
@@ -57,6 +58,7 @@ export default function StaffPage() {
   const [editName, setEditName] = useState("");
   const [editTasks, setEditTasks] = useState<Task[]>([]);
   const [editShift, setEditShift] = useState<ShiftStart>("06:00");
+  const [editShiftPattern, setEditShiftPattern] = useState<"Early" | "Late" | "All">("All");
   
   // Expanded staff IDs for collapsible sections
   const [expandedStaffIds, setExpandedStaffIds] = useState<Set<string>>(new Set());
@@ -116,7 +118,8 @@ export default function StaffPage() {
         name: name.trim(),
         trainedTasks: selectedTasks,
         shiftStart,
-      },
+        shiftPattern,
+      } as any,
       {
         onSuccess: (newStaff) => {
           addAuditEntry({
@@ -128,6 +131,7 @@ export default function StaffPage() {
           });
           setName("");
           setSelectedTasks([]);
+          setShiftPattern("All");
           toast({
             title: "Staff added",
             description: `${newStaff.name} has been added successfully`,
@@ -142,6 +146,7 @@ export default function StaffPage() {
     setEditName(member.name);
     setEditTasks([...member.trainedTasks]);
     setEditShift(member.shiftStart || "06:00");
+    setEditShiftPattern((member as any).shiftPattern || "All");
   };
 
   const handleCancelEdit = () => {
@@ -149,6 +154,7 @@ export default function StaffPage() {
     setEditName("");
     setEditTasks([]);
     setEditShift("06:00");
+    setEditShiftPattern("All");
   };
 
   const handleSaveEdit = async () => {
@@ -161,7 +167,8 @@ export default function StaffPage() {
           name: editName.trim(),
           trainedTasks: editTasks,
           shiftStart: editShift,
-        },
+          shiftPattern: editShiftPattern,
+        } as any,
       },
       {
         onSuccess: () => {
@@ -569,9 +576,9 @@ export default function StaffPage() {
                 Shift Pattern
               </label>
               <Select
-                value={(shiftStart as any).shiftPattern || "All"}
+                value={shiftPattern}
                 onValueChange={(value) =>
-                  setShiftStart({ ...shiftStart, shiftPattern: value } as any)
+                  setShiftPattern(value as any)
                 }
               >
                 <SelectTrigger className="rounded-lg">
@@ -794,9 +801,9 @@ export default function StaffPage() {
                                     Shift Pattern
                                   </label>
                                   <Select
-                                    value={(editShift as any).shiftPattern || "All"}
+                                    value={editShiftPattern}
                                     onValueChange={(value) =>
-                                      setEditShift({ ...editShift, shiftPattern: value } as any)
+                                      setEditShiftPattern(value as any)
                                     }
                                   >
                                     <SelectTrigger className="rounded-lg">
