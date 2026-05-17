@@ -1184,43 +1184,43 @@ export default function Home() {
           <>
             <Card className="shadow-sm hover:shadow-md transition-smooth page-break-inside-avoid" data-tour="rota-table">
               <CardHeader className="no-print">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="font-condensed text-xl">Current Week Schedule</CardTitle>
-                    <CardDescription className="font-mono text-xs">
-                      Click assignments to lock/unlock them during regeneration
-                    </CardDescription>
-                  </div>
-                  <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <CardTitle className="font-condensed text-xl">Current Week Schedule</CardTitle>
+                      <CardDescription className="font-mono text-xs">
+                        Click assignments to lock/unlock them during regeneration
+                      </CardDescription>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => setShowUnavailableStaff(!showUnavailableStaff)}
-                      className="gap-2 rounded-lg font-mono text-xs"
+                      className="gap-2 rounded-lg font-mono text-xs shrink-0"
                     >
-                      {showUnavailableStaff ? "Hide" : "Show"} Unavailable Staff
+                      {showUnavailableStaff ? "Hide" : "Show"} Unavailable
                     </Button>
-                    <div className="flex flex-wrap gap-2 text-[10px] font-mono">
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span>Available</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <span>Rest Day</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                        <span>Holiday</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                        <span>Sick</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Lock className="w-3 h-3 text-warning" />
-                        <span>Locked</span>
-                      </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 text-[10px] font-mono">
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                      <span>Available</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                      <span>Rest Day</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                      <span>Holiday</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                      <span>Sick</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-warning" />
+                      <span>Locked</span>
                     </div>
                   </div>
                 </div>
