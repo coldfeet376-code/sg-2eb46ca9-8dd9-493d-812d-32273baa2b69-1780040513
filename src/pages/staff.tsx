@@ -561,6 +561,15 @@ export default function StaffPage() {
                                 <div className="text-xs font-mono text-muted-foreground mb-2">
                                   Click days to cycle: Working → Rest → Holiday → Sick → Working
                                 </div>
+                                {/* Day of week labels */}
+                                <div className="grid grid-cols-7 gap-1 mb-1">
+                                  {["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"].map((day, idx) => (
+                                    <div key={idx} className="text-center font-mono text-[10px] text-muted-foreground font-semibold">
+                                      {day}
+                                    </div>
+                                  ))}
+                                </div>
+                                {/* Calendar grid */}
                                 <div className="grid grid-cols-7 gap-1">
                                   {weekDates.map((date, idx) => {
                                     const availType = getAvailabilityForDate(member, date);
