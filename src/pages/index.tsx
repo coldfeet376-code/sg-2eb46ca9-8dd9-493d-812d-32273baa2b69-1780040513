@@ -200,12 +200,8 @@ export default function Home() {
 
     // Check for coverage gaps first
     const gaps = checkCoverageGaps();
-    if (gaps.length > 0) {
-      setCoverageGaps(gaps);
-      setShowCoverageWarning(true);
-      return; // Don't generate if gaps exist
-    }
 
+    // Always generate the rota
     const newAssignments = generateWeeklyRota({
       staff,
       taskConfig,
@@ -215,24 +211,35 @@ export default function Home() {
     setAssignments(newAssignments);
     saveSnapshot(newAssignments);
 
-    // Generate notifications for each staff member
-    const staffAssignments = new Map<string, Assignment[]>();
-    newAssignments.forEach(assignment => {
-      if (!staffAssignments.has(assignment.staffName)) {
-        staffAssignments.set(assignment.staffName, []);
-      }
-      staffAssignments.get(assignment.staffName)?.push(assignment);
-    });
-
-    staffAssignments.forEach((assignments, staffName) => {
-      const taskList = [...new Set(assignments.map(a => a.task))].join(", ");
+    // Show coverage gap warning as notification if gaps exist
+    if (gaps.length > 0) {
+      setCoverageGaps(gaps);
+      setShowCoverageWarning(true);
       addNotification({
-        staffName,
-        message: `New assignments: ${taskList}`,
-        type: "assignment",
-        weekStart: weekStart.toISOString(),
+        staffName: "System",
+        message: `Rota generated with ${gaps.length} coverage gap(s) - review warnings`,
+        type: "info",
       });
-    });
+    } else {
+      // Generate notifications for each staff member when no gaps
+      const staffAssignments = new Map<string, Assignment[]>();
+      newAssignments.forEach(assignment => {
+        if (!staffAssignments.has(assignment.staffName)) {
+          staffAssignments.set(assignment.staffName, []);
+        }
+        staffAssignments.get(assignment.staffName)?.push(assignment);
+      });
+
+      staffAssignments.forEach((assignments, staffName) => {
+        const taskList = [...new Set(assignments.map(a => a.task))].join(", ");
+        addNotification({
+          staffName,
+          message: `New assignments: ${taskList}`,
+          type: "assignment",
+          weekStart: weekStart.toISOString(),
+        });
+      });
+    }
   };
 
   const forceGenerateRota = () => {
@@ -910,18 +917,18 @@ export default function Home() {
       <div className="space-y-6">
         {/* Coverage Warning Modal */}
         {showCoverageWarning && coverageGaps.length > 0 && (
-          <Alert className="bg-destructive/10 border-destructive">
-            <AlertCircle className="h-5 w-5 text-destructive" />
+          <Alert className="bg-warning/10 border-warning">
+            <AlertCircle className="h-5 w-5 text-warning" />
             <div className="flex-1">
-              <h3 className="font-condensed font-semibold text-destructive mb-2">
+              <h3 className="font-condensed font-semibold text-warning mb-2">
                 Coverage Gaps Detected
               </h3>
-              <p className="text-sm text-destructive/90 mb-3">
+              <p className="text-sm text-warning/90 mb-3">
                 {coverageGaps.length} instance(s) where staff availability is insufficient for task requirements:
               </p>
               <div className="space-y-2 max-h-64 overflow-y-auto">
                 {coverageGaps.map((gap, idx) => (
-                  <div key={idx} className="text-xs font-mono bg-destructive/5 p-2 rounded border border-destructive/20">
+                  <div key={idx} className="text-xs font-mono bg-warning/5 p-2 rounded border border-warning/20">
                     <span className="font-semibold">{gap.task}</span> on{" "}
                     {new Date(gap.date).toLocaleDateString("en-GB", {
                       weekday: "short",
@@ -930,7 +937,7 @@ export default function Home() {
                     })}
                     : Need <span className="font-semibold">{gap.required}</span>, only{" "}
                     <span className="font-semibold">{gap.available}</span> available (
-                    <span className="text-destructive font-semibold">-{gap.gap}</span> gap)
+                    <span className="text-warning font-semibold">-{gap.gap}</span> gap)
                   </div>
                 ))}
               </div>
@@ -941,15 +948,7 @@ export default function Home() {
                   onClick={() => setShowCoverageWarning(false)}
                   className="rounded-lg"
                 >
-                  Cancel
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={forceGenerateRota}
-                  className="rounded-lg"
-                >
-                  Generate Anyway
+                  Dismiss
                 </Button>
               </div>
             </div>
