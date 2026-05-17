@@ -564,6 +564,30 @@ export default function StaffPage() {
               </Select>
             </div>
 
+            <div className="grid gap-2">
+              <label className="text-sm font-condensed font-semibold">
+                Shift Pattern
+              </label>
+              <Select
+                value={(shiftStart as any).shiftPattern || "All"}
+                onValueChange={(value) =>
+                  setShiftStart({ ...shiftStart, shiftPattern: value } as any)
+                }
+              >
+                <SelectTrigger className="rounded-lg">
+                  <SelectValue placeholder="Select shift pattern" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Day (Full Shift)</SelectItem>
+                  <SelectItem value="Early">Early Shift</SelectItem>
+                  <SelectItem value="Late">Late Shift</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground font-mono">
+                Staff work pattern - affects scheduling
+              </p>
+            </div>
+
             <Button onClick={handleAddStaff} className="rounded-lg shadow-sm hover:shadow-md transition-smooth" disabled={addStaffMutation.isPending || !name.trim() || selectedTasks.length === 0}>
               <Plus className="h-4 w-4 mr-2" />
               <span className="font-mono text-xs">{addStaffMutation.isPending ? "Adding..." : "Add Staff"}</span>
@@ -764,6 +788,29 @@ export default function StaffPage() {
                                       ))}
                                     </SelectContent>
                                   </Select>
+                                </div>
+                                <div className="grid gap-2">
+                                  <label className="text-sm font-condensed font-semibold">
+                                    Shift Pattern
+                                  </label>
+                                  <Select
+                                    value={(editShift as any).shiftPattern || "All"}
+                                    onValueChange={(value) =>
+                                      setEditShift({ ...editShift, shiftPattern: value } as any)
+                                    }
+                                  >
+                                    <SelectTrigger className="rounded-lg">
+                                      <SelectValue placeholder="Select shift pattern" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="All">All Day (Full Shift)</SelectItem>
+                                      <SelectItem value="Early">Early Shift</SelectItem>
+                                      <SelectItem value="Late">Late Shift</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <p className="text-xs text-muted-foreground font-mono">
+                                    Staff work pattern - affects scheduling
+                                  </p>
                                 </div>
                                 <div className="flex gap-2">
                                   <Button onClick={handleSaveEdit} className="flex-1 rounded-lg">Save</Button>

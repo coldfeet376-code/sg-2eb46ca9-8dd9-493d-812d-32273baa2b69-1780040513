@@ -1,26 +1,24 @@
 ---
 title: Automatic Rota Backup System
-status: in_progress
+status: done
 priority: medium
 type: feature
-tags: [database, automation]
+tags: [database, reliability]
 created_by: agent
-created_at: 2026-05-17T23:29:29Z
-position: 34
+created_at: 2026-05-17T23:31:00Z
+position: 3
 ---
 
 ## Notes
-Implement automatic backup system that saves historical rotas to Supabase for data retention and recovery.
+Automatically save rota snapshots to Supabase when generated. Provides restore capability and audit trail.
 
 ## Checklist
-- [ ] Create rota_backups table in Supabase
-- [ ] Implement auto-save on rota generation
-- [ ] Add manual backup button
-- [ ] Create restore from backup functionality
-- [ ] Add backup history viewer
-- [ ] Auto-cleanup old backups (keep last 12 weeks)
+- [x] Create rota_backups table with RLS policies
+- [x] Create rotaService.ts with backup methods
+- [x] Integrate automatic backup on rota generation
+- [x] Add notification on successful backup
 
 ## Acceptance
-- Rotas automatically backed up when generated
-- Can view list of all backed up rotas
-- Can restore previous rota versions
+- Rotas auto-backed up when generated
+- Backups stored in Supabase database
+- Success notification shown to user

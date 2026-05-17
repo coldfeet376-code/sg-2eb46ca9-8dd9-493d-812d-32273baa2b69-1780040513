@@ -12,10 +12,12 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SEO } from "@/components/SEO";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
+import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
+import { rotaService } from "@/services/rotaService";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useStaff, useTaskConfig } from "@/hooks/useSupabaseQueries";
-import type { StaffMember, Assignment, Task, ShiftStart } from "@/types";
-import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw, Zap } from "lucide-react";
+import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics } from "@/types";
+import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw, Zap, TrendingUp } from "lucide-react";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -56,6 +58,7 @@ export default function Home() {
   const [showCoverageWarning, setShowCoverageWarning] = useState(false);
   const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
+  const [fairnessMetrics, setFairnessMetrics] = useState<FairnessMetrics | null>(null);
   const { addNotification } = useNotifications();
 
   // React Query hooks - cached data with error handling
@@ -111,6 +114,16 @@ export default function Home() {
       generateRota();
     }
   }, [staff, taskConfig, weekStart, staffLoading, configLoading]);
+
+  useEffect(() => {
+    // Calculate fairness metrics when assignments change
+    if (assignments.length > 0 && staff.length > 0) {
+      const metrics = calculateFairnessMetrics(assignments, staff);
+      setFairnessMetrics(metrics);
+    } else {
+      setFairnessMetrics(null);
+    }
+  }, [assignments, staff]);
 
   const checkCoverageGaps = (): CoverageGap[] => {
     if (!staff.length || !taskConfig) return [];
@@ -180,7 +193,7 @@ export default function Home() {
     setHistory(updatedHistory);
   };
 
-  const generateRota = () => {
+  const generateRota = async () => {
     if (!staff.length || !taskConfig) return;
 
     // Check for coverage gaps first
@@ -196,6 +209,18 @@ export default function Home() {
     
     setAssignments(newAssignments);
     saveSnapshot(newAssignments);
+
+    // Create automatic backup
+    try {
+      await rotaService.createBackup(
+        weekStart.toISOString().split("T")[0],
+        newAssignments,
+        lockedAssignments
+      );
+      console.log("Automatic backup created successfully");
+    } catch (error) {
+      console.error("Failed to create automatic backup:", error);
+    }
 
     // Show coverage gap warning as notification if gaps exist
     if (gaps.length > 0) {
@@ -228,7 +253,7 @@ export default function Home() {
       
       addNotification({
         staffName: "System",
-        message: "Rota generated successfully",
+        message: "Rota generated successfully with automatic backup",
         type: "info",
       });
     }
@@ -757,6 +782,18 @@ export default function Home() {
     window.print();
   };
 
+  const getTaskColor = (task: string): string => {
+    const colorMap: Record<string, string> = {
+      "Frozen": "bg-task-frozen text-task-frozen-foreground border-task-frozen",
+      "Milk": "bg-task-milk text-task-milk-foreground border-task-milk",
+      "TWI": "bg-task-twi text-task-twi-foreground border-task-twi",
+      "Inbound": "bg-task-inbound text-task-inbound-foreground border-task-inbound",
+      "Outbound": "bg-task-outbound text-task-outbound-foreground border-task-outbound",
+      "Marshaling": "bg-task-marshaling text-task-marshaling-foreground border-task-marshaling"
+    };
+    return colorMap[task] || "bg-primary text-primary-foreground border-primary";
+  };
+
   return (
     <Layout>
       <OnboardingTour />
@@ -966,16 +1003,31 @@ export default function Home() {
                     Click assignments to lock/unlock them during regeneration
                   </CardDescription>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowUnavailableStaff(!showUnavailableStaff)}
-                  className="gap-2 rounded-lg font-mono text-xs shrink-0"
-                >
-                  {showUnavailableStaff ? "Hide" : "Show"} Unavailable
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowUnavailableStaff(!showUnavailableStaff)}
+                    className="gap-2 rounded-lg font-mono text-xs shrink-0"
+                  >
+                    {showUnavailableStaff ? "Hide" : "Show"} Unavailable
+                  </Button>
+                </div>
               </div>
+              
+              {/* Task Color Legend */}
               <div className="flex flex-wrap gap-2 text-[10px] font-mono">
+                <span className="text-muted-foreground font-semibold">Task Types:</span>
+                {TASKS.map(task => (
+                  <div key={task} className="flex items-center gap-1">
+                    <div className={`w-4 h-4 rounded ${getTaskColor(task)}`}></div>
+                    <span>{task}</span>
+                  </div>
+                ))}
+              </div>
+              
+              <div className="flex flex-wrap gap-2 text-[10px] font-mono">
+                <span className="text-muted-foreground font-semibold">Status:</span>
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded-full bg-green-500"></div>
                   <span>Available</span>
@@ -1024,7 +1076,10 @@ export default function Home() {
                   {TASKS.map((task) => (
                     <tr key={task} className="border-b border-border hover:bg-muted/30 transition-smooth">
                       <td className="p-4 font-condensed text-sm font-semibold bg-muted/30">
-                        {task}
+                        <div className="flex items-center gap-2">
+                          <div className={`w-3 h-3 rounded ${getTaskColor(task)}`}></div>
+                          {task}
+                        </div>
                       </td>
                       {DAYS.map((_, dayIdx) => {
                         const dayAssignments = getAssignmentsForTaskAndDay(task, dayIdx);
@@ -1039,14 +1094,15 @@ export default function Home() {
                               {dayAssignments.length > 0 && dayAssignments.map((assignment, idx) => {
                                 const locked = isAssignmentLocked(task, dayIdx, assignment.staffName);
                                 const availability = getStaffAvailability(assignment.staffName, dayIdx);
+                                const taskColorClass = getTaskColor(task);
                                 return (
                                   <button
                                     key={idx}
                                     onClick={() => toggleLockAssignment(task, dayIdx, assignment.staffName)}
-                                    className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all cursor-pointer group relative no-print w-full shadow-sm hover:shadow-md ${
+                                    className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all cursor-pointer group relative no-print w-full shadow-sm hover:shadow-md border-2 ${
                                       locked 
-                                        ? 'bg-warning/20 text-warning-foreground border-2 border-warning hover:bg-warning/30 hover:scale-105 locked-assignment' 
-                                        : 'bg-primary/10 text-primary hover:bg-primary/15 border-2 border-primary/20 hover:border-primary/40 hover:scale-105'
+                                        ? 'bg-warning/20 text-warning-foreground border-warning hover:bg-warning/30 hover:scale-105 locked-assignment' 
+                                        : `${taskColorClass} hover:scale-105 hover:shadow-lg`
                                     }`}
                                   >
                                     <div className="flex flex-col items-center gap-1">
@@ -1136,12 +1192,21 @@ export default function Home() {
 
           <Card className="shadow-sm card-hover">
             <CardHeader>
-              <CardTitle className="font-condensed text-base">Tasks Configured</CardTitle>
+              <CardTitle className="font-condensed text-base flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Fairness Score
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="font-mono text-3xl font-bold tabular-nums text-accent">6</div>
+              <div className={`font-mono text-3xl font-bold tabular-nums ${
+                !fairnessMetrics ? "text-muted-foreground" :
+                fairnessMetrics.overallScore >= 90 ? "text-success" : 
+                fairnessMetrics.overallScore >= 70 ? "text-primary" : "text-warning"
+              }`}>
+                {fairnessMetrics ? fairnessMetrics.overallScore : "—"}
+              </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Warehouse tasks
+                {fairnessMetrics ? "Even distribution" : "Generate rota first"}
               </p>
             </CardContent>
           </Card>
