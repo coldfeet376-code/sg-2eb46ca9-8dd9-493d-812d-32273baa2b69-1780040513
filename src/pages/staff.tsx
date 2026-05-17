@@ -248,54 +248,6 @@ export default function StaffPage() {
     );
   };
 
-  // Annual rota handler
-  const handleSetupAnnualRota = () => {
-    if (!editingStaffId) return;
-
-    const dates: Date[] = [];
-    const current = new Date(annualStartDate);
-    const end = new Date(annualEndDate);
-
-    // Generate all dates matching the selected day of week
-    while (current <= end) {
-      if (current.getDay() === annualRestDay) {
-        dates.push(new Date(current));
-      }
-      current.setDate(current.getDate() + 1);
-    }
-
-    const updatedStaff = staff.map((s) => {
-      if (s.id === editingStaffId) {
-        const newEntries: AvailabilityEntry[] = dates.map((date) => ({
-          date: date.toISOString().split("T")[0],
-          type: "rest",
-          notes: `Annual rest day (${DAYS_OF_WEEK[annualRestDay]})`,
-        }));
-        
-        // Merge with existing availability, avoid duplicates
-        const existingDates = new Set(s.availability?.map(a => a.date) || []);
-        const uniqueNewEntries = newEntries.filter(e => !existingDates.has(e.date));
-        
-        return {
-          ...s,
-          availability: [...(s.availability || []), ...uniqueNewEntries],
-        };
-      }
-      return s;
-    });
-
-    setStaff(updatedStaff);
-    addAuditEntry({
-      user: "System",
-      action: "created",
-      entity: "availability",
-      entityId: editingStaffId,
-      details: `Set up annual rota: ${dates.length} ${DAYS_OF_WEEK[annualRestDay]}s`,
-    });
-
-    setShowAnnualRota(false);
-  };
-
   const handleEditTaskToggle = (task: Task) => {
     if (editTasks.includes(task)) {
       setEditTasks(editTasks.filter((t) => t !== task));
