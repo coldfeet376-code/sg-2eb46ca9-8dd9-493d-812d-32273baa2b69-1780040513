@@ -429,21 +429,44 @@ export default function StaffPage() {
   };
 
   const handleAvailabilityImport = async () => {
-    if (!selectedStaff || !excelImport.trim()) return;
+    if (!selectedStaff || !excelImport.trim()) {
+      toast({
+        title: "No data",
+        description: "Please paste or upload CSV data first",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const lines = excelImport.trim().split("\n");
     const newAvailability: AvailabilityEntry[] = [];
+    const errors: string[] = [];
+    let headerSkipped = false;
+    let workingDaysSkipped = 0;
+
+    console.log("🔍 Parsing CSV - Total lines:", lines.length);
 
     lines.forEach((line, index) => {
+      // Skip empty lines
+      if (!line.trim()) return;
+
       const parts = line.split(/,|\t/).map((p) => p.trim());
-      if (parts.length < 2) return;
+      
+      if (parts.length < 2) {
+        errors.push(`Line ${index + 1}: Not enough columns (need at least Date,Type)`);
+        return;
+      }
 
       const dateStr = parts[0];
       const statusStr = parts[1].toLowerCase();
       const typeLabel = parts[2] || "";
 
+      console.log(`Line ${index + 1}: Date="${dateStr}", Status="${statusStr}"`);
+
       // Skip header row if present
-      if (index === 0 && (dateStr.toLowerCase().includes('date') || statusStr.toLowerCase().includes('status'))) {
+      if (index === 0 && (dateStr.toLowerCase().includes('date') || statusStr.toLowerCase().includes('type') || statusStr.toLowerCase().includes('status'))) {
+        headerSkipped = true;
+        console.log("✓ Skipped header row");
         return;
       }
 
@@ -457,18 +480,22 @@ export default function StaffPage() {
         const month = parseInt(ddmmyyyyMatch[2], 10) - 1; // Month is 0-indexed
         const year = parseInt(ddmmyyyyMatch[3], 10);
         parsedDate = new Date(year, month, day);
+        console.log(`  Parsed DD/MM/YYYY: ${day}/${month + 1}/${year} → ${parsedDate.toISOString().split('T')[0]}`);
       } else {
         // Fallback to standard Date parsing (YYYY-MM-DD)
-        parsedDate = new Date(dateStr);
+        parsedDate = new Date(dateStr + "T00:00:00");
+        if (!isNaN(parsedDate.getTime())) {
+          console.log(`  Parsed YYYY-MM-DD: ${dateStr} → ${parsedDate.toISOString().split('T')[0]}`);
+        }
       }
 
-      if (!parsedDate || isNaN(parsedDate.getTime())) return;
+      if (!parsedDate || isNaN(parsedDate.getTime())) {
+        errors.push(`Line ${index + 1}: Invalid date format "${dateStr}"`);
+        console.error(`✗ Invalid date: "${dateStr}"`);
+        return;
+      }
 
       // Map status to availability type
-      // "working" → skip (don't store)
-      // "rest" → rest day
-      // "holiday" → holiday
-      // "sick" → sick
       let availType: AvailabilityType | null = null;
       
       if (statusStr === "rest") {
@@ -479,50 +506,73 @@ export default function StaffPage() {
         availType = "sick";
       } else if (statusStr === "working") {
         // Skip working days - we only store exceptions
+        workingDaysSkipped++;
+        console.log(`  ⊘ Skipped "working" day`);
         return;
       } else if (statusStr === "available") {
         availType = "available";
       } else {
-        // Unknown status, skip
+        errors.push(`Line ${index + 1}: Unknown status "${statusStr}"`);
+        console.error(`✗ Unknown status: "${statusStr}"`);
         return;
       }
 
       if (!availType) return;
 
-      newAvailability.push({
+      const entry: AvailabilityEntry = {
         date: parsedDate.toISOString().split("T")[0],
         type: availType,
         notes: typeLabel || `Imported ${availType}`,
-      });
+      };
+
+      newAvailability.push(entry);
+      console.log(`  ✓ Added ${availType} entry for ${entry.date}`);
     });
 
-    if (newAvailability.length > 0) {
-      try {
-        await staffService.addAvailability(selectedStaff.id, newAvailability);
+    console.log("📊 Parse complete:", {
+      totalLines: lines.length,
+      headerSkipped,
+      workingDaysSkipped,
+      successfulEntries: newAvailability.length,
+      errors: errors.length,
+    });
 
-        const updatedStaff = staff.map((s) => {
-          if (s.id === selectedStaff.id) {
-            const existingDates = new Set(s.availability?.map((a) => a.date) || []);
-            const filtered = newAvailability.filter((a) => !existingDates.has(a.date));
-            return {
-              ...s,
-              availability: [...(s.availability || []), ...filtered],
-            };
-          }
-          return s;
-        });
-        toast({
-          title: "Import successful",
-          description: `Imported ${newAvailability.length} availability entries`,
-        });
-      } catch (error) {
-        console.error("Error importing availability:", error);
-        toast({
-          title: "Error",
-          description: "Failed to import availability",
-          variant: "destructive",
-        });
-      }
+    // Show detailed feedback
+    if (newAvailability.length === 0) {
+      const errorSummary = errors.length > 0 
+        ? errors.slice(0, 3).join("\n") + (errors.length > 3 ? `\n...and ${errors.length - 3} more` : "")
+        : "No valid entries found. All rows were either 'working' days or failed to parse.";
+      
+      toast({
+        title: "Import failed",
+        description: `Processed ${lines.length} lines, found 0 valid entries.\n${workingDaysSkipped} working days skipped (expected).\n${errors.length > 0 ? `Errors: ${errorSummary}` : ""}`,
+        variant: "destructive",
+      });
+      
+      console.error("Import failed - no valid entries");
+      return;
+    }
+
+    // Import successful entries
+    try {
+      await staffService.addAvailability(selectedStaff.id, newAvailability);
+
+      toast({
+        title: "Import successful",
+        description: `✓ Imported ${newAvailability.length} entries\n⊘ Skipped ${workingDaysSkipped} working days\n${errors.length > 0 ? `⚠️ ${errors.length} errors` : ""}`,
+      });
+      
+      // Clear the import field after success
+      setExcelImport("");
+      setCsvFileName("");
+      
+    } catch (error) {
+      console.error("Error importing availability:", error);
+      toast({
+        title: "Database error",
+        description: `Parsed ${newAvailability.length} entries but failed to save to database.`,
+        variant: "destructive",
+      });
     }
   };
 
