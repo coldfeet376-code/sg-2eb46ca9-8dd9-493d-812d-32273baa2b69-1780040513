@@ -61,10 +61,6 @@ export default function Home() {
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const { addNotification } = useNotifications();
 
-  // React Query hooks - cached data
-  const { data: staff = [], isLoading: staffLoading } = useStaff();
-  const { data: taskConfig, isLoading: configLoading } = useTaskConfig();
-
   // React Query hooks - cached data with error handling
   const { data: staff = [], isLoading: staffLoading, error: staffError } = useStaff();
   const { data: taskConfig, isLoading: configLoading, error: configError } = useTaskConfig();
@@ -1453,7 +1449,7 @@ export default function Home() {
           renderYearView()
         )}
 
-        {staff.length === 0 && (
+        {staff.length === 0 && !staffLoading && !staffError && (
           <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm no-print">
             <p className="text-sm font-mono text-warning-foreground">
               No staff members configured. Visit the <Link href="/staff" className="underline font-semibold hover:text-warning transition-smooth">Staff page</Link> to add employees.
@@ -1461,7 +1457,7 @@ export default function Home() {
           </div>
         )}
 
-        {!taskConfig && staff.length > 0 && (
+        {!taskConfig && !configLoading && !configError && staff.length > 0 && (
           <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm no-print">
             <p className="text-sm font-mono text-warning-foreground">
               No task configuration found. Visit the <Link href="/config" className="underline font-semibold hover:text-warning transition-smooth">Config page</Link> to set up daily task requirements.
@@ -1501,22 +1497,6 @@ export default function Home() {
               </p>
             </div>
           </Alert>
-        )}
-
-        {staff.length === 0 && !staffLoading && !staffError && (
-          <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm no-print">
-            <p className="text-sm font-mono text-warning-foreground">
-              No staff members configured. Visit the <Link href="/staff" className="underline font-semibold hover:text-warning transition-smooth">Staff page</Link> to add employees.
-            </p>
-          </div>
-        )}
-
-        {!taskConfig && !configLoading && !configError && staff.length > 0 && (
-          <div className="bg-warning/10 border border-warning rounded-lg p-4 shadow-sm no-print">
-            <p className="text-sm font-mono text-warning-foreground">
-              No task configuration found. Visit the <Link href="/config" className="underline font-semibold hover:text-warning transition-smooth">Config page</Link> to set up daily task requirements.
-            </p>
-          </div>
         )}
       </div>
     </Layout>
