@@ -15,7 +15,7 @@ import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useStaff, useTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart } from "@/types";
-import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw } from "lucide-react";
+import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw, Zap } from "lucide-react";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -1121,6 +1121,30 @@ export default function Home() {
                 </Sheet>
                 {assignments.length > 0 && (
                   <>
+                    {/* Generate Rota Button - Always visible when config exists */}
+                    {taskConfig && (
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={generateRota}
+                          disabled={staff.length === 0}
+                          size="lg"
+                          className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base"
+                        >
+                          {staff.length === 0 ? (
+                            <>
+                              <RefreshCw className="h-5 w-5 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="h-5 w-5" />
+                              Generate Rota
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+
                     {lockedAssignments.length < assignments.length && (
                       <Button 
                         variant="outline" 
