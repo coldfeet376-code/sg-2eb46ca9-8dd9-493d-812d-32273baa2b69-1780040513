@@ -476,12 +476,12 @@ export default function StaffPage() {
       const staffMember = staff.find(s => s.id === staffId);
       if (!staffMember) return;
 
-      const currentTasks = staffMember.trained_tasks || [];
+      const currentTasks = staffMember.trainedTasks || [];
       const newTasks = currentTasks.includes(task)
         ? currentTasks.filter(t => t !== task)
         : [...currentTasks, task];
 
-      await staffService.updateStaff(staffId, { trained_tasks: newTasks });
+      await staffService.updateStaff(staffId, { trainedTasks: newTasks });
       
       await queryClient.invalidateQueries({ queryKey: ["staff"] });
       await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
@@ -799,7 +799,7 @@ export default function StaffPage() {
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
                                     {TASKS.map(task => {
-                                      const isTrained = member.trained_tasks?.includes(task);
+                                      const isTrained = member.trainedTasks?.includes(task);
                                       return (
                                         <Button
                                           key={task}
