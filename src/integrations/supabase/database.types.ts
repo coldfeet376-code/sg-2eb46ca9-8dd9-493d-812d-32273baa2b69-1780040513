@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -90,6 +90,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      managers: {
+        Row: {
+          can_admin: boolean
+          can_floor: boolean
+          can_intake: boolean
+          can_out_loading: boolean
+          created_at: string | null
+          id: string
+          name: string
+          preferred_shift: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          can_admin?: boolean
+          can_floor?: boolean
+          can_intake?: boolean
+          can_out_loading?: boolean
+          created_at?: string | null
+          id?: string
+          name: string
+          preferred_shift?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          can_admin?: boolean
+          can_floor?: boolean
+          can_intake?: boolean
+          can_out_loading?: boolean
+          created_at?: string | null
+          id?: string
+          name?: string
+          preferred_shift?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
