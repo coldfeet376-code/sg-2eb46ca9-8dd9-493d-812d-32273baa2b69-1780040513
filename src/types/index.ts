@@ -1,8 +1,12 @@
 export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Outbound" | "Marshaling";
 
+export type ManagerDuty = "Intake" | "Out-loading" | "Admin" | "Floor";
+
 export type AvailabilityType = "available" | "rest" | "holiday" | "sick";
 
 export type ShiftStart = "06:00" | "08:30" | "09:00" | "09:30" | "10:00" | "11:00";
+
+export type ManagerShiftStart = "06:00" | "08:00";
 
 export type ShiftPattern = "Early" | "Late" | "All";
 
@@ -35,6 +39,14 @@ export interface Assignment {
   task: Task;
   date: string; // ISO date string
   shiftPattern?: ShiftPattern;
+}
+
+export interface ManagerAssignment {
+  managerId: string;
+  managerName: string;
+  duty: ManagerDuty;
+  shiftStart: ManagerShiftStart;
+  date: string; // ISO date string
 }
 
 export interface WeekRota {
