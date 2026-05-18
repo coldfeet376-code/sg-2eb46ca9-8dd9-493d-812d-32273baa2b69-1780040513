@@ -16,9 +16,9 @@ interface ManagerFormProps {
     can_out_loading: boolean;
     can_admin: boolean;
     can_floor: boolean;
-    recurring_rest_days: string;
+    recurring_rest_days: number[];
   };
-  onInputChange: (field: keyof Manager, value: string | boolean) => void;
+  onInputChange: (field: keyof Manager, value: string | boolean | number[]) => void;
   onSubmit: () => void;
   onCancel: () => void;
 }
@@ -76,13 +76,23 @@ export function ManagerForm({
         </Label>
         <Input
           id="recurring-rest"
-          value={formData.recurring_rest_days}
-          onChange={(e) => onInputChange("recurring_rest_days", e.target.value)}
-          placeholder="e.g., Sun,Mon or leave empty"
+          value={formData.recurring_rest_days ? formData.recurring_rest_days.join(",") : ""}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (!val) {
+              onInputChange("recurring_rest_days", []);
+              return;
+            }
+            const days = val.split(",")
+              .map(d => parseInt(d.trim()))
+              .filter(n => !isNaN(n));
+            onInputChange("recurring_rest_days", days);
+          }}
+          placeholder="e.g., 0,1 for Sun,Mon or leave empty"
           className="font-mono mt-1.5"
         />
         <p className="text-xs text-muted-foreground mt-1.5 font-mono">
-          Enter days separated by commas (Sun, Mon, Tue, Wed, Thu, Fri, Sat)
+          Enter days as numbers (0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat) separated by commas
         </p>
       </div>
 

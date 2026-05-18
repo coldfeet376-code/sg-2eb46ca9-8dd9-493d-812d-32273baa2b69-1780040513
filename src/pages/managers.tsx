@@ -1006,14 +1006,25 @@ export default function Managers() {
         )}
 
         {/* Manager Dialog */}
-        <ManagerForm
-          open={showManagerDialog}
-          onOpenChange={setShowManagerDialog}
-          editingManager={editingManager}
-          formData={managerForm}
-          onInputChange={(key, value) => setManagerForm(prev => ({ ...prev, [key]: value }))}
-          onSave={handleSaveManager}
-        />
+        <Dialog open={showManagerDialog} onOpenChange={setShowManagerDialog}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="font-condensed text-xl">
+                {editingManager ? "Edit Manager" : "Add Manager"}
+              </DialogTitle>
+              <DialogDescription className="font-mono text-xs">
+                {editingManager ? "Update manager details and training" : "Add a new manager to the rota system"}
+              </DialogDescription>
+            </DialogHeader>
+            <ManagerForm
+              editingManager={editingManager}
+              formData={managerForm}
+              onInputChange={(key, value) => setManagerForm(prev => ({ ...prev, [key]: value }))}
+              onSubmit={handleSaveManager}
+              onCancel={() => setShowManagerDialog(false)}
+            />
+          </DialogContent>
+        </Dialog>
 
         {/* Calendar Availability Dialog */}
         <ManagerAvailabilityDialog
@@ -1022,17 +1033,22 @@ export default function Managers() {
           manager={selectedManagerForCalendar}
           selectedDate={selectedDate}
           onDateChange={setSelectedDate}
-          selectedAvailabilityType={selectedAvailabilityType}
-          onAvailabilityTypeChange={setSelectedAvailabilityType}
-          onSave={handleSetSingleDayAvailability}
+          availabilityType={selectedAvailabilityType}
+          onTypeChange={setSelectedAvailabilityType}
+          onSubmit={handleSetSingleDayAvailability}
         />
 
         {/* Rota Table */}
         {assignments.length > 0 && (
           <ManagerRotaTable
             weekDays={weekDates.map((date, i) => ({ date, dateStr: date.toISOString().split("T")[0], dayOfWeek: i }))}
+            managers={managers}
             assignments={assignments}
             getAvailabilityForManagerDate={getAvailabilityForManagerDate}
+            onDeleteAssignment={(managerId, dateStr) => {
+               // Optional: implement if needed, currently dummy
+               setAssignments(prev => prev.filter(a => !(a.managerId === managerId && a.date === dateStr)));
+            }}
           />
         )}
 
