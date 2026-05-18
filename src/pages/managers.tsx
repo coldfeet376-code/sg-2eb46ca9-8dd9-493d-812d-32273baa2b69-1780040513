@@ -13,6 +13,9 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import type { ManagerAssignment, ManagerDuty, ManagerShiftStart } from "@/types";
 import { Lock, Unlock, Zap, AlertCircle, ChevronLeft, ChevronRight, Download, Plus, Pencil, Trash2, Users, Check, X } from "lucide-react";
 import { getAllManagers, createManager, updateManager, deleteManager, getManagersForDuty, type Manager, getManagerAvailability, setManagerAvailability, getAvailabilityForDate, type ManagerAvailability } from "@/services/managerService";
+import { ManagerForm } from "@/components/managers/ManagerForm";
+import { ManagerAvailabilityDialog } from "@/components/managers/ManagerAvailabilityDialog";
+import { ManagerRotaTable } from "@/components/managers/ManagerRotaTable";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -1003,310 +1006,34 @@ export default function Managers() {
         )}
 
         {/* Manager Dialog */}
-        <Dialog open={showManagerDialog} onOpenChange={setShowManagerDialog}>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle className="font-condensed text-xl">
-                {editingManager ? "Edit Manager" : "Add Manager"}
-              </DialogTitle>
-              <DialogDescription className="font-mono text-xs">
-                Configure manager details and trained duties
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="name" className="font-mono text-xs">Name</Label>
-                <Input
-                  id="name"
-                  value={managerForm.name}
-                  onChange={(e) => setManagerForm({ ...managerForm, name: e.target.value })}
-                  placeholder="Manager name"
-                  className="font-mono mt-1.5"
-                />
-              </div>
-
-              <div>
-                <Label className="font-mono text-xs mb-3 block">Trained Duties</Label>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="can_intake" className="font-mono text-xs cursor-pointer">
-                      Intake
-                    </Label>
-                    <Switch
-                      id="can_intake"
-                      checked={managerForm.can_intake}
-                      onCheckedChange={(checked) =>
-                        setManagerForm({ ...managerForm, can_intake: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="can_out_loading" className="font-mono text-xs cursor-pointer">
-                      Out-loading
-                    </Label>
-                    <Switch
-                      id="can_out_loading"
-                      checked={managerForm.can_out_loading}
-                      onCheckedChange={(checked) =>
-                        setManagerForm({ ...managerForm, can_out_loading: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="can_admin" className="font-mono text-xs cursor-pointer">
-                      Admin
-                    </Label>
-                    <Switch
-                      id="can_admin"
-                      checked={managerForm.can_admin}
-                      onCheckedChange={(checked) =>
-                        setManagerForm({ ...managerForm, can_admin: checked })
-                      }
-                    />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="can_floor" className="font-mono text-xs cursor-pointer">
-                      Floor
-                    </Label>
-                    <Switch
-                      id="can_floor"
-                      checked={managerForm.can_floor}
-                      onCheckedChange={(checked) =>
-                        setManagerForm({ ...managerForm, can_floor: checked })
-                      }
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="preferred_shift" className="font-mono text-xs">
-                  Preferred Shift (Optional)
-                </Label>
-                <Select
-                  value={managerForm.preferred_shift || "none"}
-                  onValueChange={(value) =>
-                    setManagerForm({
-                      ...managerForm,
-                      preferred_shift: value === "none" ? null : (value as "06:00" | "08:00"),
-                    })
-                  }
-                >
-                  <SelectTrigger className="font-mono mt-1.5">
-                    <SelectValue placeholder="No preference" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No preference</SelectItem>
-                    <SelectItem value="06:00">06:00</SelectItem>
-                    <SelectItem value="08:00">08:00</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="font-mono text-xs mb-3 block">Recurring Rest Days (Optional)</Label>
-                <p className="text-xs text-muted-foreground mb-3">
-                  Select days that this manager is always off every week
-                </p>
-                <div className="grid grid-cols-4 gap-2">
-                  {DAYS.map((day, index) => {
-                    const isSelected = managerForm.recurring_rest_days.includes(index);
-                    return (
-                      <button
-                        key={index}
-                        type="button"
-                        onClick={() => {
-                          const current = managerForm.recurring_rest_days;
-                          const updated = isSelected
-                            ? current.filter(d => d !== index)
-                            : [...current, index].sort();
-                          setManagerForm({ ...managerForm, recurring_rest_days: updated });
-                        }}
-                        className={`p-2 text-xs font-mono rounded-lg border-2 transition-all ${
-                          isSelected
-                            ? "bg-blue-500/20 text-blue-700 border-blue-500"
-                            : "bg-muted/50 border-border hover:bg-muted"
-                        }`}
-                      >
-                        {day}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowManagerDialog(false)}
-                className="rounded-lg"
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-              <Button onClick={handleSaveManager} className="rounded-lg gap-2">
-                <Check className="h-4 w-4" />
-                {editingManager ? "Update" : "Create"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ManagerForm
+          open={showManagerDialog}
+          onOpenChange={setShowManagerDialog}
+          editingManager={editingManager}
+          formData={managerForm}
+          onInputChange={(key, value) => setManagerForm(prev => ({ ...prev, [key]: value }))}
+          onSave={handleSaveManager}
+        />
 
         {/* Calendar Availability Dialog */}
-        <Dialog open={showCalendarDialog} onOpenChange={setShowCalendarDialog}>
-          <DialogContent className="sm:max-w-[400px]">
-            <DialogHeader>
-              <DialogTitle className="font-condensed text-xl">
-                Set Availability - {selectedManagerForCalendar?.name}
-              </DialogTitle>
-              <DialogDescription className="font-mono text-xs">
-                Select a date and availability status
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="date" className="font-mono text-xs">Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="font-mono mt-1.5"
-                />
-              </div>
-              <div>
-                <Label htmlFor="availability-type" className="font-mono text-xs">Status</Label>
-                <Select
-                  value={selectedAvailabilityType}
-                  onValueChange={(value) => setSelectedAvailabilityType(value as AvailabilityType)}
-                >
-                  <SelectTrigger className="font-mono mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="available">Available</SelectItem>
-                    <SelectItem value="rest">Rest Day</SelectItem>
-                    <SelectItem value="holiday">Holiday</SelectItem>
-                    <SelectItem value="sick">Sick Leave</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setShowCalendarDialog(false)}
-                className="rounded-lg"
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-              <Button onClick={handleSetSingleDayAvailability} className="rounded-lg gap-2">
-                <Check className="h-4 w-4" />
-                Set Availability
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <ManagerAvailabilityDialog
+          open={showCalendarDialog}
+          onOpenChange={setShowCalendarDialog}
+          manager={selectedManagerForCalendar}
+          selectedDate={selectedDate}
+          onDateChange={setSelectedDate}
+          selectedAvailabilityType={selectedAvailabilityType}
+          onAvailabilityTypeChange={setSelectedAvailabilityType}
+          onSave={handleSetSingleDayAvailability}
+        />
 
         {/* Rota Table */}
         {assignments.length > 0 && (
-          <Card className="shadow-sm hover:shadow-md transition-smooth">
-            <CardHeader>
-              <CardTitle className="font-condensed text-xl">
-                Manager Duties Rota
-              </CardTitle>
-              <CardDescription className="font-mono text-xs">
-                Weekly manager assignments
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="border-b border-border">
-                      <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50 rounded-tl-lg">
-                        Duty
-                      </th>
-                      {weekDates.map((date, i) => (
-                        <th 
-                          key={i} 
-                          className={`text-center p-3 font-mono text-xs font-medium bg-muted/50 ${i === 6 ? 'rounded-tr-lg' : ''}`}
-                        >
-                          <div>{DAYS[i]}</div>
-                          <div className="text-muted-foreground mt-1">
-                            {date.getDate()}/{date.getMonth() + 1}
-                          </div>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DUTIES.map((duty) => (
-                      <tr key={duty} className="border-b border-border hover:bg-muted/30 transition-smooth">
-                        <td className="p-4 font-condensed text-sm font-semibold bg-muted/30">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-3 h-3 rounded ${getDutyColor(duty)}`}></div>
-                            {duty}
-                          </div>
-                        </td>
-                        {DAYS.map((_, dayIdx) => {
-                          const date = weekDates[dayIdx];
-                          const dateStr = date.toISOString().split("T")[0];
-                          
-                          // Get all assignments for this duty on this date
-                          const dayAssignments = assignments.filter(
-                            a => a.duty === duty && a.date === dateStr
-                          );
-                          
-                          const dutyColorClass = getDutyColor(duty);
-                          
-                          return (
-                            <td key={dayIdx} className="p-4 text-center align-top">
-                              {dayAssignments.length > 0 ? (
-                                <div className="space-y-1">
-                                  {dayAssignments.map((assignment, idx) => {
-                                    const availabilityStatus = getAvailabilityForManagerDate(assignment.managerId, dateStr);
-                                    
-                                    return availabilityStatus && availabilityStatus !== "available" ? (
-                                      <div
-                                        key={idx}
-                                        className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all w-full shadow-sm border-2 ${
-                                          availabilityStatus === "rest"
-                                            ? "bg-blue-500/10 text-blue-700 border-blue-500"
-                                            : availabilityStatus === "holiday"
-                                            ? "bg-green-500/10 text-green-700 border-green-500"
-                                            : "bg-red-500/10 text-red-700 border-red-500"
-                                        }`}
-                                      >
-                                        <div className="font-semibold">{assignment.managerName}</div>
-                                        <div className="text-[10px] uppercase tracking-wide mt-1 opacity-80">
-                                          {availabilityStatus}
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div
-                                        key={idx}
-                                        className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all w-full shadow-sm border-2 ${dutyColorClass}`}
-                                      >
-                                        <span className="font-semibold">{assignment.managerName}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              ) : (
-                                <div className="text-xs font-mono text-muted-foreground">—</div>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+          <ManagerRotaTable
+            weekDays={weekDates.map((date, i) => ({ date, dateStr: date.toISOString().split("T")[0], dayOfWeek: i }))}
+            assignments={assignments}
+            getAvailabilityForManagerDate={getAvailabilityForManagerDate}
+          />
         )}
 
         {assignments.length === 0 && (
