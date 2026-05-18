@@ -209,8 +209,12 @@ export default function Managers() {
         }
       });
 
+      // Get list of available managers for this day
+      const availableManagers = managers.filter(m => !unavailableManagerIds.has(m.id));
+
       // For each shift
       for (const shiftStart of SHIFT_STARTS) {
+        const assignedManagerIdsThisShift = new Set<string>();
         let outloadingIntakeManager: Manager | null = null;
 
         // If this day requires same manager for Out-loading and Intake, assign them first
@@ -273,6 +277,7 @@ export default function Managers() {
                 shiftStart,
                 date: dateStr,
               });
+              assignedManagerIdsThisShift.add(outloadingIntakeManager.id);
             }
           } catch (error) {
             console.error(`Error assigning Out-loading/Intake pair on ${dateStr}:`, error);
@@ -328,9 +333,26 @@ export default function Managers() {
               shiftStart,
               date: dateStr,
             });
+            assignedManagerIdsThisShift.add(selectedManager.id);
           } catch (error) {
             console.error(`Error assigning duty ${duty}:`, error);
           }
+        }
+
+        // After all specific duties are assigned, put all remaining available managers on Floor
+        const unassignedManagers = availableManagers.filter(m => 
+          !assignedManagerIdsThisShift.has(m.id) &&
+          m.can_floor // Only assign if they're trained for Floor
+        );
+
+        for (const manager of unassignedManagers) {
+          newAssignments.push({
+            managerId: manager.id,
+            managerName: manager.name,
+            duty: "Floor",
+            shiftStart,
+            date: dateStr,
+          });
         }
       }
     }
