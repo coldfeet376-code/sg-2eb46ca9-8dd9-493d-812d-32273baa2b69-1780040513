@@ -176,6 +176,16 @@ export default function Managers() {
       return;
     }
 
+    console.log("=== STARTING ROTA GENERATION ===");
+    console.log("All managers:", managers.map(m => ({ 
+      name: m.name, 
+      intake: m.can_intake, 
+      outloading: m.can_out_loading, 
+      admin: m.can_admin, 
+      floor: m.can_floor,
+      recurring_rest: m.recurring_rest_days
+    })));
+
     const newAssignments: ManagerAssignment[] = [];
 
     // For each day of the week
@@ -210,6 +220,10 @@ export default function Managers() {
       const assignedManagerIdsThisDay = new Set<string>();
       let outloadingIntakeManager: Manager | null = null;
 
+      console.log(`\n--- DAY ${DAYS[dayOfWeek]} (${dateStr}) ---`);
+      console.log("Unavailable manager IDs:", Array.from(unavailableManagerIds));
+      console.log("Available managers:", availableManagers.map(m => m.name));
+
       // If this day requires same manager for Out-loading and Intake, assign them first
       if (requiresSameManager) {
         try {
@@ -217,11 +231,16 @@ export default function Managers() {
           const outloadingManagers = await getManagersForDuty("Out-loading");
           const intakeManagers = await getManagersForDuty("Intake");
           
+          console.log("Out-loading trained managers:", outloadingManagers.map(m => m.name));
+          console.log("Intake trained managers:", intakeManagers.map(m => m.name));
+          
           // Find managers who can do both
           const bothDutiesManagers = outloadingManagers.filter(om =>
             intakeManagers.some(im => im.id === om.id) &&
             !unavailableManagerIds.has(om.id)
           );
+
+          console.log("Managers who can do BOTH (and are available):", bothDutiesManagers.map(m => m.name));
 
           if (bothDutiesManagers.length === 0) {
             console.warn(`No managers can do both Out-loading and Intake on ${dateStr}`);
@@ -244,7 +263,12 @@ export default function Managers() {
             const freshManagers = bothDutiesManagers.filter(m => !recentIds.has(m.id));
             const poolToUse = freshManagers.length > 0 ? freshManagers : bothDutiesManagers;
             
+            console.log("Fresh managers (not recently assigned):", freshManagers.map(m => m.name));
+            console.log("Pool to select from:", poolToUse.map(m => m.name));
+            
             outloadingIntakeManager = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+
+            console.log("✓ SELECTED for Out-loading + Intake:", outloadingIntakeManager.name);
 
             // Assign to both Out-loading and Intake (no shiftStart anymore)
             newAssignments.push({
@@ -270,12 +294,16 @@ export default function Managers() {
 
       // For Thu/Fri, assign Intake and Out-loading to DIFFERENT managers
       if (!requiresSameManager) {
+        console.log("Thu/Fri: Assigning Out-loading and Intake to DIFFERENT managers");
         try {
           // Assign Out-loading first
           const outloadingManagers = await getManagersForDuty("Out-loading");
           const availableOutloading = outloadingManagers.filter(m => 
             !unavailableManagerIds.has(m.id)
           );
+
+          console.log("Out-loading: trained managers:", outloadingManagers.map(m => m.name));
+          console.log("Out-loading: available:", availableOutloading.map(m => m.name));
 
           if (availableOutloading.length > 0) {
             const recentOutloading = newAssignments.filter(a => 
@@ -286,7 +314,11 @@ export default function Managers() {
             const freshManagers = availableOutloading.filter(m => !recentIds.has(m.id));
             const poolToUse = freshManagers.length > 0 ? freshManagers : availableOutloading;
             
+            console.log("Out-loading: fresh pool:", freshManagers.map(m => m.name));
+            
             const selectedOutloading = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+            console.log("✓ SELECTED for Out-loading:", selectedOutloading.name);
+            
             newAssignments.push({
               managerId: selectedOutloading.id,
               managerName: selectedOutloading.name,
@@ -304,6 +336,9 @@ export default function Managers() {
             !assignedManagerIdsThisDay.has(m.id) // CRITICAL: exclude already assigned
           );
 
+          console.log("Intake: trained managers:", intakeManagers.map(m => m.name));
+          console.log("Intake: available (excluding already assigned):", availableIntake.map(m => m.name));
+
           if (availableIntake.length > 0) {
             const recentIntake = newAssignments.filter(a => 
               a.duty === "Intake" && 
@@ -313,7 +348,11 @@ export default function Managers() {
             const freshManagers = availableIntake.filter(m => !recentIds.has(m.id));
             const poolToUse = freshManagers.length > 0 ? freshManagers : availableIntake;
             
+            console.log("Intake: fresh pool:", freshManagers.map(m => m.name));
+            
             const selectedIntake = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+            console.log("✓ SELECTED for Intake:", selectedIntake.name);
+            
             newAssignments.push({
               managerId: selectedIntake.id,
               managerName: selectedIntake.name,
@@ -334,13 +373,18 @@ export default function Managers() {
         : ["Admin", "Floor"]; // Thu/Fri: already assigned Intake/Out-loading above
 
       for (const duty of dutiesToAssign) {
+        console.log(`\nAssigning duty: ${duty}`);
         try {
           const dutyManagers = await getManagersForDuty(duty);
+          
+          console.log(`${duty}: trained managers:`, dutyManagers.map(m => m.name));
           
           // Filter out unavailable managers
           const workingManagers = dutyManagers.filter(m => 
             !unavailableManagerIds.has(m.id)
           );
+
+          console.log(`${duty}: available managers:`, workingManagers.map(m => m.name));
 
           if (workingManagers.length === 0) {
             console.warn(`No managers available for duty: ${duty} on ${dateStr}`);
@@ -356,9 +400,13 @@ export default function Managers() {
           const recentManagerIds = new Set(recentAssignments.map(a => a.managerId));
           const freshManagers = workingManagers.filter(m => !recentManagerIds.has(m.id));
 
+          console.log(`${duty}: fresh managers:`, freshManagers.map(m => m.name));
+
           // Pick from fresh managers if available, otherwise from all eligible
           const poolToUse = freshManagers.length > 0 ? freshManagers : workingManagers;
           const selectedManager = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+
+          console.log(`✓ SELECTED for ${duty}:`, selectedManager.name);
 
           newAssignments.push({
             managerId: selectedManager.id,
@@ -378,6 +426,8 @@ export default function Managers() {
         !assignedManagerIdsThisDay.has(m.id) &&
         m.can_floor // Only assign if they're trained for Floor
       );
+
+      console.log("Unassigned managers for Floor:", unassignedManagers.map(m => m.name));
 
       for (const manager of unassignedManagers) {
         newAssignments.push({
