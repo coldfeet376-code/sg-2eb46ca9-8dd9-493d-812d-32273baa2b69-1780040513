@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { ManagerDuty } from "@/types";
 
 export interface Manager {
   id: string;
