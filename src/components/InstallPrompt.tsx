@@ -16,12 +16,14 @@ export function InstallPrompt() {
   useEffect(() => {
     // Check if already installed
     if (window.matchMedia("(display-mode: standalone)").matches) {
+      console.log("PWA: Already installed (standalone mode)");
       setIsInstalled(true);
       return;
     }
 
     // Listen for the beforeinstallprompt event
     const handler = (e: Event) => {
+      console.log("PWA: beforeinstallprompt event fired");
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       setShowPrompt(true);
@@ -34,9 +36,16 @@ export function InstallPrompt() {
     if (dismissed) {
       const dismissedTime = parseInt(dismissed, 10);
       const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
-      if (daysSinceDismissed < 30) {
+      console.log(`PWA: Dismissed ${daysSinceDismissed.toFixed(1)} days ago`);
+      if (daysSinceDismissed < 7) {
+        console.log("PWA: Still within 7-day dismissal period");
         setShowPrompt(false);
+      } else {
+        console.log("PWA: Dismissal period expired, clearing localStorage");
+        localStorage.removeItem("pwa-install-dismissed");
       }
+    } else {
+      console.log("PWA: No previous dismissal found");
     }
 
     return () => {
@@ -60,9 +69,19 @@ export function InstallPrompt() {
   };
 
   const handleDismiss = () => {
+    console.log("PWA: User dismissed install prompt");
     setShowPrompt(false);
     localStorage.setItem("pwa-install-dismissed", Date.now().toString());
   };
+
+  // Expose manual trigger for debugging
+  useEffect(() => {
+    (window as any).showPWAPrompt = () => {
+      console.log("PWA: Manual trigger requested");
+      localStorage.removeItem("pwa-install-dismissed");
+      setShowPrompt(true);
+    };
+  }, []);
 
   // Don't show if already installed or no prompt available
   if (isInstalled || !showPrompt || !deferredPrompt) {
