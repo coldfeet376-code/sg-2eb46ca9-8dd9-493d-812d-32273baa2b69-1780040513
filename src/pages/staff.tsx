@@ -76,11 +76,22 @@ export default function StaffPage() {
   // Bulk operations - multi-select state
   const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
 
+  // Batch availability state
+  const [batchDate, setBatchDate] = useState<string>("");
+  const [batchAvailability, setBatchAvailability] = useState<AvailabilityType>("rest");
+
+  // Bulk operations state
+  const [bulkData, setBulkData] = useState<string>("");
+  const [bulkAvailability, setBulkAvailability] = useState<AvailabilityType>("available");
+
   // React Query hooks
   const { data: staff = [], isLoading: staffLoading } = useStaff();
   const addStaffMutation = useAddStaff();
   const updateStaffMutation = useUpdateStaff();
   const deleteStaffMutation = useDeleteStaff();
+
+  // Derived selected staff
+  const selectedStaff = staff.filter(s => selectedStaffIds.has(s.id));
 
   // Get week dates (Saturday to Sunday)
   const getWeekDates = (weekStart: Date): Date[] => {
@@ -435,6 +446,22 @@ export default function StaffPage() {
     }
   };
 
+  const handleBatchAvailability = () => {
+    if (!batchDate) {
+      toast({ title: "Please select a date", variant: "destructive" });
+      return;
+    }
+    handleBulkSetAvailability(Array.from(selectedStaffIds), [batchDate], batchAvailability);
+  };
+
+  const handleBulkImport = () => {
+    toast({ title: "Import functionality coming soon" });
+  };
+
+  const downloadTemplate = () => {
+    toast({ title: "Template download coming soon" });
+  };
+
   const handleCopyWeek = async (fromWeek: Date, toWeek: Date, staffIds: string[]) => {
     try {
       for (const staffId of staffIds) {
@@ -620,8 +647,12 @@ export default function StaffPage() {
 
         {/* Bulk Operations */}
         <StaffBulkOperations
-          onImport={handleBulkImport}
-          onDownloadTemplate={downloadTemplate}
+          bulkData={bulkData}
+          bulkAvailability={bulkAvailability}
+          onBulkDataChange={setBulkData}
+          onBulkAvailabilityChange={setBulkAvailability}
+          onBulkImport={handleBulkImport}
+          onExportTemplate={downloadTemplate}
         />
 
         <Card className="shadow-sm">

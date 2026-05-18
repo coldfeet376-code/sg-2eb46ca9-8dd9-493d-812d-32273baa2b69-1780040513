@@ -887,7 +887,7 @@ export default function Home() {
 
             <RotaWeekNavigator
               weekStart={weekStart}
-              onPrevWeek={() => {
+              onPreviousWeek={() => {
                 const prevWeek = new Date(weekStart);
                 prevWeek.setDate(prevWeek.getDate() - 7);
                 setWeekStart(prevWeek);
@@ -896,6 +896,15 @@ export default function Home() {
                 const nextWeek = new Date(weekStart);
                 nextWeek.setDate(nextWeek.getDate() + 7);
                 setWeekStart(nextWeek);
+              }}
+              onTodayClick={() => {
+                const today = new Date();
+                const day = today.getDay();
+                const diff = day === 0 ? 0 : 7 - day;
+                const saturday = new Date(today);
+                saturday.setDate(today.getDate() + diff);
+                saturday.setHours(0, 0, 0, 0);
+                setWeekStart(saturday);
               }}
             />
 
