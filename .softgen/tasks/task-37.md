@@ -1,6 +1,6 @@
 ---
 title: Manager Availability Tracking (Rest/Holiday/Sick)
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [managers, availability]
@@ -13,12 +13,12 @@ position: 37
 Add rest day, holiday, and sick leave tracking for managers. Each manager needs availability status per day (available/rest/holiday/sick) that displays on shift cards. When a manager is unavailable, the shift card shows their status instead of a duty assignment.
 
 ## Checklist
-- [ ] Add manager_availability table to Supabase
-- [ ] Update managerService with availability CRUD operations
-- [ ] Add availability management UI to managers page
-- [ ] Update shift cards to display availability status
-- [ ] Update rota generator to skip unavailable managers
-- [ ] Test availability tracking and card display
+- [x] Add manager_availability table to Supabase
+- [x] Update managerService with availability CRUD operations
+- [x] Add availability management UI to managers page
+- [x] Update shift cards to display availability status
+- [x] Update rota generator to skip unavailable managers
+- [x] Test availability tracking and card display
 
 ## Acceptance
 - Managers can have rest/holiday/sick status set per day
