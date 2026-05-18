@@ -9,6 +9,7 @@ export interface Manager {
   can_admin: boolean;
   can_floor: boolean;
   preferred_shift: "06:00" | "08:00" | null;
+  recurring_rest_days: number[];
   created_at: string;
   updated_at: string;
 }

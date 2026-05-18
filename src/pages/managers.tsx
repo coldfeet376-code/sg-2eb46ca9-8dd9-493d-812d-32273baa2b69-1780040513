@@ -50,6 +50,7 @@ export default function Managers() {
     can_admin: true,
     can_floor: true,
     preferred_shift: null as "06:00" | "08:00" | null,
+    recurring_rest_days: [] as number[],
   });
   const [showManageSection, setShowManageSection] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -187,6 +188,7 @@ export default function Managers() {
       const currentDate = new Date(weekStart);
       currentDate.setDate(weekStart.getDate() + dayOffset);
       const dateStr = currentDate.toISOString().split("T")[0];
+      const dayOfWeek = currentDate.getDay(); // 0=Sunday, 1=Monday, etc.
 
       // Get availability for this date
       const dayAvailability = await getAvailabilityForDate(dateStr);
@@ -195,6 +197,13 @@ export default function Managers() {
           .filter(a => a.type !== "available")
           .map(a => a.manager_id)
       );
+
+      // Add managers with recurring rest days for this day of week
+      managers.forEach(manager => {
+        if (manager.recurring_rest_days && manager.recurring_rest_days.includes(dayOfWeek)) {
+          unavailableManagerIds.add(manager.id);
+        }
+      });
 
       // For each shift
       for (const shiftStart of SHIFT_STARTS) {
@@ -271,6 +280,7 @@ export default function Managers() {
       can_admin: true,
       can_floor: true,
       preferred_shift: null,
+      recurring_rest_days: [],
     });
     setShowManagerDialog(true);
   };
@@ -284,6 +294,7 @@ export default function Managers() {
       can_admin: manager.can_admin,
       can_floor: manager.can_floor,
       preferred_shift: manager.preferred_shift,
+      recurring_rest_days: manager.recurring_rest_days || [],
     });
     setShowManagerDialog(true);
   };
@@ -800,6 +811,11 @@ export default function Managers() {
                               Prefers {manager.preferred_shift}
                             </Badge>
                           )}
+                          {manager.recurring_rest_days && manager.recurring_rest_days.length > 0 && (
+                            <Badge variant="outline" className="text-xs font-mono bg-blue-500/10 text-blue-700 border-blue-500">
+                              Rest: {manager.recurring_rest_days.map(d => DAYS[d]).join(", ")}
+                            </Badge>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -935,6 +951,38 @@ export default function Managers() {
                     <SelectItem value="08:00">08:00</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div>
+                <Label className="font-mono text-xs mb-3 block">Recurring Rest Days (Optional)</Label>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Select days that this manager is always off every week
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                  {DAYS.map((day, index) => {
+                    const isSelected = managerForm.recurring_rest_days.includes(index);
+                    return (
+                      <button
+                        key={index}
+                        type="button"
+                        onClick={() => {
+                          const current = managerForm.recurring_rest_days;
+                          const updated = isSelected
+                            ? current.filter(d => d !== index)
+                            : [...current, index].sort();
+                          setManagerForm({ ...managerForm, recurring_rest_days: updated });
+                        }}
+                        className={`p-2 text-xs font-mono rounded-lg border-2 transition-all ${
+                          isSelected
+                            ? "bg-blue-500/20 text-blue-700 border-blue-500"
+                            : "bg-muted/50 border-border hover:bg-muted"
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             <DialogFooter>

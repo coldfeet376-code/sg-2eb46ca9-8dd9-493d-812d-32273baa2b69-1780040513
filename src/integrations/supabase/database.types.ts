@@ -136,6 +136,7 @@ export type Database = {
           id: string
           name: string
           preferred_shift: string | null
+          recurring_rest_days: number[] | null
           updated_at: string | null
         }
         Insert: {
@@ -147,6 +148,7 @@ export type Database = {
           id?: string
           name: string
           preferred_shift?: string | null
+          recurring_rest_days?: number[] | null
           updated_at?: string | null
         }
         Update: {
@@ -158,6 +160,7 @@ export type Database = {
           id?: string
           name?: string
           preferred_shift?: string | null
+          recurring_rest_days?: number[] | null
           updated_at?: string | null
         }
         Relationships: []
