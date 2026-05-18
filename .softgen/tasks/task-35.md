@@ -1,6 +1,6 @@
 ---
 title: Manager Duties Password-Protected Tab
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [managers, authentication, rota]
@@ -14,11 +14,11 @@ Create a password-protected tab for manager duty rotation with simplified rota s
 
 ## Checklist
 - [x] Add manager types to types/index.ts (ManagerDuty, ManagerAssignment, ManagerShiftStart)
-- [ ] Create src/pages/managers.tsx with password gate
-- [ ] Add "Managers" link to Layout navigation
-- [ ] Implement shift card layout matching main rota style
-- [ ] Add generate & lock functionality with password protection
-- [ ] Test password gate and lock/unlock flow
+- [x] Create src/pages/managers.tsx with password gate
+- [x] Add "Managers" link to Layout navigation
+- [x] Implement shift card layout matching main rota style
+- [x] Add generate & lock functionality with password protection
+- [x] Test password gate and lock/unlock flow
 
 ## Acceptance
 - Manager tab requires password to access
