@@ -85,7 +85,7 @@ export default function Managers() {
       addNotification({
         staffName: "System",
         message: "Failed to load managers",
-        type: "error",
+        type: "info",
       });
     } finally {
       setLoading(false);
@@ -135,7 +135,7 @@ export default function Managers() {
       addNotification({
         staffName: "System",
         message: "No managers available. Add managers first.",
-        type: "error",
+        type: "info",
       });
       return;
     }
@@ -241,7 +241,7 @@ export default function Managers() {
         addNotification({
           staffName: "System",
           message: "Manager name is required",
-          type: "error",
+          type: "info",
         });
         return;
       }
@@ -272,7 +272,7 @@ export default function Managers() {
       addNotification({
         staffName: "System",
         message: "Failed to save manager",
-        type: "error",
+        type: "info",
       });
     }
   };
@@ -293,7 +293,7 @@ export default function Managers() {
       addNotification({
         staffName: "System",
         message: "Failed to delete manager",
-        type: "error",
+        type: "info",
       });
     }
   };

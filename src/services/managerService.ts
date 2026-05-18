@@ -41,7 +41,7 @@ export async function getAllManagers(): Promise<Manager[]> {
     throw error;
   }
 
-  return data || [];
+  return (data as unknown as Manager[]) || [];
 }
 
 /**
@@ -61,7 +61,7 @@ export async function getManagerById(id: string): Promise<Manager | null> {
     throw error;
   }
 
-  return data;
+  return data ? (data as unknown as Manager) : null;
 }
 
 /**
@@ -81,7 +81,7 @@ export async function createManager(input: CreateManagerInput): Promise<Manager>
     throw error;
   }
 
-  return data;
+  return data as unknown as Manager;
 }
 
 /**
@@ -107,7 +107,7 @@ export async function updateManager(input: UpdateManagerInput): Promise<Manager>
     throw error;
   }
 
-  return data;
+  return data as unknown as Manager;
 }
 
 /**
@@ -145,7 +145,8 @@ export async function getManagersForDuty(
   const { data, error } = await supabase
     .from("managers")
     .select("*")
-    .eq(column, true)
+    // Use "as any" to prevent TypeScript excessively deep instantiation errors with Supabase types
+    .eq(column as any, true)
     .order("name", { ascending: true });
 
   console.log(`getManagersForDuty (${duty}):`, { data, error });
@@ -155,5 +156,5 @@ export async function getManagersForDuty(
     throw error;
   }
 
-  return data || [];
+  return (data as unknown as Manager[]) || [];
 }
