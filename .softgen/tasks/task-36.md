@@ -1,6 +1,6 @@
 ---
 title: Supabase Manager System with Duty Restrictions
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [managers, database, supabase]
@@ -13,13 +13,13 @@ position: 36
 Store managers in Supabase with configurable duty training and shift preferences. Each manager has flags for which duties they can perform (Intake, Out-loading, Admin, Floor) and preferred shift times (6am/8am). Rota generator respects these restrictions when assigning duties.
 
 ## Checklist
-- [ ] Get database schema
-- [ ] Create managers table with duty training columns
-- [ ] Create managerService.ts for CRUD operations
-- [ ] Add "Manage Managers" UI section to managers page
-- [ ] Update rota generator to respect duty restrictions
-- [ ] Add RLS policies for managers table
-- [ ] Test CRUD operations and rota generation
+- [x] Get database schema
+- [x] Create managers table with duty training columns
+- [x] Create managerService.ts for CRUD operations
+- [x] Add "Manage Managers" UI section to managers page
+- [x] Update rota generator to respect duty restrictions
+- [x] Add RLS policies for managers table
+- [x] Test CRUD operations and rota generation
 
 ## Acceptance
 - Managers stored in Supabase with duty training flags
