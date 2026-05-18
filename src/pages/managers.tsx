@@ -17,7 +17,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "@/components/ui/calendar";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DUTIES: ManagerDuty[] = ["Intake", "Out-loading", "Admin", "Floor"];
@@ -53,14 +52,11 @@ export default function Managers() {
   });
   const [showManageSection, setShowManageSection] = useState(false);
   const [loading, setLoading] = useState(true);
-
-  // Availability management state
-  const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
-  const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
-  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
-  const [availabilityType, setAvailabilityType] = useState<AvailabilityType>("available");
   const [availabilityMap, setAvailabilityMap] = useState<Record<string, ManagerAvailability>>({});
-  const [availabilityNotes, setAvailabilityNotes] = useState("");
+  const [showCalendarDialog, setShowCalendarDialog] = useState(false);
+  const [selectedManagerForCalendar, setSelectedManagerForCalendar] = useState<Manager | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedAvailabilityType, setSelectedAvailabilityType] = useState<AvailabilityType>("rest");
 
   useEffect(() => {
     const auth = sessionStorage.getItem("manager-auth");
@@ -497,39 +493,72 @@ export default function Managers() {
     }
   };
 
-  const openAvailabilityDialog = (manager: Manager) => {
-    setSelectedManager(manager);
-    setSelectedDates([]);
-    setAvailabilityType("available");
-    setAvailabilityNotes("");
-    setShowAvailabilityDialog(true);
-  };
-
-  const handleSetAvailability = async () => {
-    if (!selectedManager || selectedDates.length === 0) return;
-
+  const handleQuickAvailability = async (manager: Manager, status: AvailabilityType) => {
     try {
-      // Save all selected dates
-      for (const date of selectedDates) {
+      // Set availability for all days in current week
+      const weekDates = DAYS.map((_, i) => {
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + i);
+        return date;
+      });
+
+      for (const date of weekDates) {
         const dateStr = date.toISOString().split("T")[0];
-        await setManagerAvailability(
-          selectedManager.id,
-          dateStr,
-          availabilityType,
-          availabilityNotes
-        );
+        await setManagerAvailability(manager.id, dateStr, status, "");
       }
-      
+
       addNotification({
         staffName: "System",
-        message: `Updated ${selectedManager.name}'s availability for ${selectedDates.length} day${selectedDates.length > 1 ? 's' : ''}`,
+        message: `Set ${manager.name} as ${status} for current week`,
         type: "info",
       });
-      
-      setShowAvailabilityDialog(false);
+
       loadAvailability();
     } catch (error) {
       console.error("Error setting availability:", error);
+      addNotification({
+        staffName: "System",
+        message: "Failed to update availability",
+        type: "info",
+      });
+    }
+  };
+
+  const openCalendarDialog = (manager: Manager) => {
+    setSelectedManagerForCalendar(manager);
+    setSelectedDate("");
+    setSelectedAvailabilityType("rest");
+    setShowCalendarDialog(true);
+  };
+
+  const handleSetSingleDayAvailability = async () => {
+    if (!selectedManagerForCalendar || !selectedDate) {
+      addNotification({
+        staffName: "System",
+        message: "Please select a date",
+        type: "info",
+      });
+      return;
+    }
+
+    try {
+      await setManagerAvailability(
+        selectedManagerForCalendar.id,
+        selectedDate,
+        selectedAvailabilityType,
+        ""
+      );
+
+      addNotification({
+        staffName: "System",
+        message: `Set ${selectedManagerForCalendar.name} as ${selectedAvailabilityType} on ${new Date(selectedDate).toLocaleDateString()}`,
+        type: "info",
+      });
+
+      setShowCalendarDialog(false);
+      loadAvailability();
+    } catch (error) {
+      console.error("Error setting single day availability:", error);
       addNotification({
         staffName: "System",
         message: "Failed to update availability",
@@ -942,10 +971,10 @@ export default function Managers() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => openAvailabilityDialog(manager)}
-                          className="rounded-lg text-accent hover:bg-accent/10"
+                          onClick={() => openCalendarDialog(manager)}
+                          className="rounded-lg gap-1"
                         >
-                          <Calendar className="h-4 w-4" />
+                          <span className="font-mono text-xs">Set Availability</span>
                         </Button>
                         <Button
                           variant="outline"
@@ -1122,63 +1151,33 @@ export default function Managers() {
           </DialogContent>
         </Dialog>
 
-        {/* Availability Dialog */}
-        <Dialog open={showAvailabilityDialog} onOpenChange={setShowAvailabilityDialog} modal>
-          <DialogContent className="sm:max-w-[420px]">
+        {/* Calendar Availability Dialog */}
+        <Dialog open={showCalendarDialog} onOpenChange={setShowCalendarDialog}>
+          <DialogContent className="sm:max-w-[400px]">
             <DialogHeader>
-              <DialogTitle className="font-condensed text-lg">
-                Set Availability: {selectedManager?.name}
+              <DialogTitle className="font-condensed text-xl">
+                Set Availability - {selectedManagerForCalendar?.name}
               </DialogTitle>
               <DialogDescription className="font-mono text-xs">
-                Select dates and mark status
+                Select a date and availability status
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 py-2">
+            <div className="space-y-4 py-4">
               <div>
-                <Label className="font-mono text-xs mb-2 block">Select Date(s)</Label>
-                <div className="border rounded-lg bg-background p-2">
-                  <Calendar
-                    mode="multiple"
-                    selected={selectedDates}
-                    onSelect={(dates) => setSelectedDates(dates || [])}
-                    className="w-full"
-                    classNames={{
-                      months: "flex flex-col",
-                      month: "space-y-2",
-                      caption: "flex justify-center pt-1 relative items-center",
-                      caption_label: "text-sm font-medium",
-                      nav: "space-x-1 flex items-center",
-                      nav_button: "h-6 w-6 bg-transparent p-0 opacity-50 hover:opacity-100",
-                      nav_button_previous: "absolute left-1",
-                      nav_button_next: "absolute right-1",
-                      table: "w-full border-collapse",
-                      head_row: "flex",
-                      head_cell: "text-muted-foreground rounded-md w-8 font-normal text-[0.7rem]",
-                      row: "flex w-full mt-1",
-                      cell: "h-8 w-8 text-center text-sm p-0 relative",
-                      day: "h-8 w-8 p-0 font-normal text-sm hover:bg-accent hover:text-accent-foreground rounded-md",
-                      day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
-                      day_today: "bg-accent text-accent-foreground font-semibold",
-                      day_outside: "text-muted-foreground opacity-30",
-                      day_disabled: "text-muted-foreground opacity-30",
-                      day_hidden: "invisible",
-                    }}
-                  />
-                </div>
-                {selectedDates.length > 0 && (
-                  <p className="text-xs font-mono text-muted-foreground mt-2">
-                    {selectedDates.length} day{selectedDates.length > 1 ? 's' : ''} selected
-                  </p>
-                )}
+                <Label htmlFor="date" className="font-mono text-xs">Date</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="font-mono mt-1.5"
+                />
               </div>
-
               <div>
-                <Label htmlFor="availability-type" className="font-mono text-xs">
-                  Status
-                </Label>
+                <Label htmlFor="availability-type" className="font-mono text-xs">Status</Label>
                 <Select
-                  value={availabilityType}
-                  onValueChange={(value) => setAvailabilityType(value as AvailabilityType)}
+                  value={selectedAvailabilityType}
+                  onValueChange={(value) => setSelectedAvailabilityType(value as AvailabilityType)}
                 >
                   <SelectTrigger className="font-mono mt-1.5">
                     <SelectValue />
@@ -1191,34 +1190,19 @@ export default function Managers() {
                   </SelectContent>
                 </Select>
               </div>
-
-              <div>
-                <Label htmlFor="notes" className="font-mono text-xs">Notes (Optional)</Label>
-                <Input
-                  id="notes"
-                  value={availabilityNotes}
-                  onChange={(e) => setAvailabilityNotes(e.target.value)}
-                  placeholder="Add notes..."
-                  className="font-mono mt-1.5"
-                />
-              </div>
             </div>
             <DialogFooter>
               <Button
                 variant="outline"
-                onClick={() => setShowAvailabilityDialog(false)}
+                onClick={() => setShowCalendarDialog(false)}
                 className="rounded-lg"
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
               </Button>
-              <Button 
-                onClick={handleSetAvailability} 
-                className="rounded-lg gap-2"
-                disabled={selectedDates.length === 0}
-              >
+              <Button onClick={handleSetSingleDayAvailability} className="rounded-lg gap-2">
                 <Check className="h-4 w-4" />
-                Save
+                Set Availability
               </Button>
             </DialogFooter>
           </DialogContent>
