@@ -13,13 +13,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SEO } from "@/components/SEO";
-import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
+import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks, generateWeekRota } from "@/lib/rotaGenerator";
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
 import { rotaService } from "@/services/rotaService";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useStaff, useTaskConfig } from "@/hooks/useSupabaseQueries";
-import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics } from "@/types";
+import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
 import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw, Zap, TrendingUp } from "lucide-react";
+import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -789,14 +790,6 @@ export default function Home() {
       });
   };
 
-  const handlePrevWeek = () => {
-    setWeekStart(navigateWeek(weekStart, "prev"));
-  };
-
-  const handleNextWeek = () => {
-    setWeekStart(navigateWeek(weekStart, "next"));
-  };
-
   const handlePrint = () => {
     window.print();
   };
@@ -892,12 +885,19 @@ export default function Home() {
               </Button>
             )}
 
-            <Button variant="outline" size="sm" onClick={handlePrevWeek} className="rounded-lg">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleNextWeek} className="rounded-lg">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <RotaWeekNavigator
+              weekStart={weekStart}
+              onPrevWeek={() => {
+                const prevWeek = new Date(weekStart);
+                prevWeek.setDate(prevWeek.getDate() - 7);
+                setWeekStart(prevWeek);
+              }}
+              onNextWeek={() => {
+                const nextWeek = new Date(weekStart);
+                nextWeek.setDate(nextWeek.getDate() + 7);
+                setWeekStart(nextWeek);
+              }}
+            />
 
             {assignments.length > 0 && (
               <>

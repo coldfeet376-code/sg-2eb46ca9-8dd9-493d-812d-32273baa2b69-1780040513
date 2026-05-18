@@ -16,7 +16,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SEO } from "@/components/SEO";
-import { BulkOperationsPanel } from "@/components/BulkOperationsPanel";
+import { StaffBulkOperations } from "@/components/staff/StaffBulkOperations";
+import { StaffAvailabilityPanel } from "@/components/staff/StaffAvailabilityPanel";
 import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart } from "@/types";
@@ -26,7 +27,7 @@ import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-const DAYS = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"];
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const SHIFT_STARTS: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
 
@@ -602,15 +603,25 @@ export default function StaffPage() {
           </CardContent>
         </Card>
 
-        <BulkOperationsPanel
-          staff={staff}
-          selectedStaffIds={selectedStaffIds}
-          onToggleStaff={toggleStaffSelection}
-          onSelectAll={selectAllStaff}
-          onClearSelection={clearStaffSelection}
-          onBulkSetAvailability={handleBulkSetAvailability}
-          onCopyWeek={handleCopyWeek}
-          weekStart={currentWeekStart}
+        {/* Batch Availability Setting */}
+        {selectedStaff.length > 0 && (
+          <StaffAvailabilityPanel
+            selectedStaff={selectedStaff}
+            selectedDate={batchDate}
+            selectedAvailability={batchAvailability}
+            onDateChange={setBatchDate}
+            onAvailabilityChange={setBatchAvailability}
+            onApply={handleBatchAvailability}
+            onClearSelection={() => setSelectedStaff([])}
+          />
+        )}
+
+        {/* Staff List */}
+
+        {/* Bulk Operations */}
+        <StaffBulkOperations
+          onImport={handleBulkImport}
+          onDownloadTemplate={downloadTemplate}
         />
 
         <Card className="shadow-sm">
