@@ -379,9 +379,10 @@ export default function Managers() {
           
           console.log(`${duty}: trained managers:`, dutyManagers.map(m => m.name));
           
-          // Filter out unavailable managers
+          // Filter out unavailable managers AND managers already assigned to Intake/Out-loading
           const workingManagers = dutyManagers.filter(m => 
-            !unavailableManagerIds.has(m.id)
+            !unavailableManagerIds.has(m.id) &&
+            !assignedManagerIdsThisDay.has(m.id) // CRITICAL: exclude managers on Intake/Out-loading
           );
 
           console.log(`${duty}: available managers:`, workingManagers.map(m => m.name));
