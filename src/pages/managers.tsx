@@ -1123,7 +1123,7 @@ export default function Managers() {
         </Dialog>
 
         {/* Availability Dialog */}
-        <Dialog open={showAvailabilityDialog} onOpenChange={setShowAvailabilityDialog}>
+        <Dialog open={showAvailabilityDialog} onOpenChange={setShowAvailabilityDialog} modal>
           <DialogContent className="sm:max-w-[420px]">
             <DialogHeader>
               <DialogTitle className="font-condensed text-lg">
