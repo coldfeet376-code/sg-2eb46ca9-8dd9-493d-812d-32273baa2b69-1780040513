@@ -8,6 +8,65 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+// Custom hook to expose PWA install functionality
+export function usePWAInstall() {
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    // Check if already installed
+    if (window.matchMedia("(display-mode: standalone)").matches) {
+      console.log("PWA: Already installed (standalone mode)");
+      setIsInstalled(true);
+      return;
+    }
+
+    // Listen for the beforeinstallprompt event
+    const handler = (e: Event) => {
+      console.log("PWA: beforeinstallprompt event fired");
+      e.preventDefault();
+      const promptEvent = e as BeforeInstallPromptEvent;
+      setDeferredPrompt(promptEvent);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) {
+      console.log("PWA: No deferred prompt available");
+      return;
+    }
+
+    try {
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`PWA: User choice: ${outcome}`);
+
+      if (outcome === "accepted") {
+        setIsInstalled(true);
+      }
+
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+    } catch (error) {
+      console.error("PWA: Install error:", error);
+    }
+  };
+
+  return {
+    isInstallable: isInstallable && !isInstalled,
+    isInstalled,
+    install: handleInstall,
+  };
+}
+
 export function InstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);

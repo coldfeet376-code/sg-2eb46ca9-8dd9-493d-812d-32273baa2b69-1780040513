@@ -6,12 +6,14 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useTour } from "@/contexts/TourContext";
-import { LayoutGrid, BarChart3, LogOut, Menu, RefreshCw, HelpCircle } from "lucide-react";
+import { usePWAInstall } from "@/components/InstallPrompt";
+import { LayoutGrid, BarChart3, LogOut, Menu, RefreshCw, HelpCircle, Download } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [userRole, setUserRole] = useState<"manager" | "supervisor" | "staff">("manager");
   const { resetAllTours } = useTour();
+  const { isInstallable, install } = usePWAInstall();
 
   useEffect(() => {
     const role = localStorage.getItem("warehouse-user-role") || "manager";
@@ -187,6 +189,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
             >
               <HelpCircle className="h-5 w-5" />
             </Button>
+            {isInstallable && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={install}
+                className="rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                title="Download App"
+              >
+                <Download className="h-5 w-5" />
+              </Button>
+            )}
             <ThemeToggle />
             <div data-tour="notifications">
               <NotificationCenter />
