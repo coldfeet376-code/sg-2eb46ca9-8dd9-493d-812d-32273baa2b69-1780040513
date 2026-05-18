@@ -305,6 +305,10 @@ export default function Managers() {
           );
 
           if (availableIntake.length > 0) {
+            const recentIntake = newAssignments.filter(a => 
+              a.duty === "Intake" && 
+              availableIntake.some(m => m.id === a.managerId)
+            );
             const recentIds = new Set(recentIntake.map(a => a.managerId));
             const freshManagers = availableIntake.filter(m => !recentIds.has(m.id));
             const poolToUse = freshManagers.length > 0 ? freshManagers : availableIntake;

@@ -18,7 +18,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Check, X } from "lucide-react";
-import type { Manager, AvailabilityType } from "@/types";
+import type { AvailabilityType } from "@/types";
+import type { Manager } from "@/services/managerService";
 
 interface ManagerAvailabilityDialogProps {
   open: boolean;

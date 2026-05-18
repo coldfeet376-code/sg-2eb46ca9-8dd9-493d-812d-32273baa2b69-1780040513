@@ -11,7 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Calendar, Check, X } from "lucide-react";
-import type { Staff, AvailabilityType } from "@/types";
+import type { AvailabilityType } from "@/types";
+import type { Staff } from "@/services/staffService";
 
 interface StaffAvailabilityPanelProps {
   selectedStaff: Staff[];

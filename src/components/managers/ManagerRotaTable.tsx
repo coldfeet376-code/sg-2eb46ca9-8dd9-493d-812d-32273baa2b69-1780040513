@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Trash2 } from "lucide-react";
-import type { Manager, ManagerAssignment, AvailabilityType } from "@/types";
+import type { ManagerAssignment, AvailabilityType } from "@/types";
+import type { Manager } from "@/services/managerService";
 
 interface ManagerRotaTableProps {
   weekDays: Array<{ date: Date; dateStr: string; dayOfWeek: number }>;

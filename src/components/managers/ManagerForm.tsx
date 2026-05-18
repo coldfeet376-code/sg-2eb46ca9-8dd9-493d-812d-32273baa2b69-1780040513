@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Check, X } from "lucide-react";
-import type { Manager, ManagerDuty } from "@/types";
+import type { ManagerDuty } from "@/types";
+import type { Manager } from "@/services/managerService";
 
 interface ManagerFormProps {
   editingManager: Manager | null;
@@ -55,12 +56,12 @@ export function ManagerForm({
         <Label className="font-mono text-xs mb-3 block">Training</Label>
         <div className="space-y-3">
           {duties.map(({ key, label }) => (
-            <div key={key} className="flex items-center justify-between">
-              <Label htmlFor={key} className="font-mono text-xs">
+            <div key={key as string} className="flex items-center justify-between">
+              <Label htmlFor={key as string} className="font-mono text-xs">
                 {label}
               </Label>
               <Switch
-                id={key}
+                id={key as string}
                 checked={formData[key] as boolean}
                 onCheckedChange={(checked) => onInputChange(key, checked)}
               />
