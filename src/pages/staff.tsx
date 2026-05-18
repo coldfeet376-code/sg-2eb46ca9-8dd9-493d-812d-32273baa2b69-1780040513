@@ -639,7 +639,7 @@ export default function StaffPage() {
             onDateChange={setBatchDate}
             onAvailabilityChange={setBatchAvailability}
             onApply={handleBatchAvailability}
-            onClearSelection={() => setSelectedStaff([])}
+            onClearSelection={() => setSelectedStaffIds(new Set())}
           />
         )}
 

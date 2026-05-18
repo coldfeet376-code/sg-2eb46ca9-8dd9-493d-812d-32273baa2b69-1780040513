@@ -887,7 +887,7 @@ export default function Home() {
 
             <RotaWeekNavigator
               weekStart={weekStart}
-              onPreviousWeek={() => {
+              onPrevWeek={() => {
                 const prevWeek = new Date(weekStart);
                 prevWeek.setDate(prevWeek.getDate() - 7);
                 setWeekStart(prevWeek);
