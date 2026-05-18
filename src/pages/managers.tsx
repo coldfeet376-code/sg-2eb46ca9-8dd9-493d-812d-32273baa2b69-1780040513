@@ -12,16 +12,19 @@ import { SEO } from "@/components/SEO";
 import { useNotifications } from "@/contexts/NotificationContext";
 import type { ManagerAssignment, ManagerDuty, ManagerShiftStart } from "@/types";
 import { Lock, Unlock, Zap, AlertCircle, ChevronLeft, ChevronRight, Download, Plus, Pencil, Trash2, Users, Check, X } from "lucide-react";
-import { getAllManagers, createManager, updateManager, deleteManager, getManagersForDuty, type Manager } from "@/services/managerService";
+import { getAllManagers, createManager, updateManager, deleteManager, getManagersForDuty, type Manager, getManagerAvailability, setManagerAvailability, getAvailabilityForDate, type ManagerAvailability } from "@/services/managerService";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DUTIES: ManagerDuty[] = ["Intake", "Out-loading", "Admin", "Floor"];
 const SHIFT_STARTS: ManagerShiftStart[] = ["06:00", "08:00"];
 const MANAGER_PASSWORD = "manager123"; // TODO: Move to env or config
+
+type AvailabilityType = "available" | "rest" | "holiday" | "sick";
 
 export default function Managers() {
   const router = useRouter();
@@ -51,6 +54,14 @@ export default function Managers() {
   const [showManageSection, setShowManageSection] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Availability management state
+  const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
+  const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [availabilityType, setAvailabilityType] = useState<AvailabilityType>("available");
+  const [availabilityMap, setAvailabilityMap] = useState<Record<string, ManagerAvailability>>({});
+  const [availabilityNotes, setAvailabilityNotes] = useState("");
+
   useEffect(() => {
     const auth = sessionStorage.getItem("manager-auth");
     if (auth === "true") {
@@ -74,6 +85,35 @@ export default function Managers() {
       loadManagers();
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated && managers.length > 0) {
+      loadAvailability();
+    }
+  }, [isAuthenticated, managers, weekStart]);
+
+  const loadAvailability = async () => {
+    try {
+      const startDate = weekStart.toISOString().split("T")[0];
+      const endDate = new Date(weekStart);
+      endDate.setDate(endDate.getDate() + 6);
+      const endDateStr = endDate.toISOString().split("T")[0];
+
+      const availMap: Record<string, ManagerAvailability> = {};
+      
+      for (const manager of managers) {
+        const availData = await getManagerAvailability(manager.id, startDate, endDateStr);
+        availData.forEach(avail => {
+          const key = `${manager.id}-${avail.date}`;
+          availMap[key] = avail;
+        });
+      }
+      
+      setAvailabilityMap(availMap);
+    } catch (error) {
+      console.error("Failed to load availability:", error);
+    }
+  };
 
   const loadManagers = async () => {
     try {
@@ -148,6 +188,14 @@ export default function Managers() {
       currentDate.setDate(weekStart.getDate() + dayOffset);
       const dateStr = currentDate.toISOString().split("T")[0];
 
+      // Get availability for this date
+      const dayAvailability = await getAvailabilityForDate(dateStr);
+      const unavailableManagerIds = new Set(
+        dayAvailability
+          .filter(a => a.type !== "available")
+          .map(a => a.manager_id)
+      );
+
       // For each shift
       for (const shiftStart of SHIFT_STARTS) {
         // For each duty, get managers who can do it
@@ -155,19 +203,24 @@ export default function Managers() {
           try {
             const availableManagers = await getManagersForDuty(duty);
             
-            if (availableManagers.length === 0) {
-              console.warn(`No managers available for duty: ${duty}`);
+            // Filter out unavailable managers
+            const workingManagers = availableManagers.filter(m => 
+              !unavailableManagerIds.has(m.id)
+            );
+
+            if (workingManagers.length === 0) {
+              console.warn(`No managers available for duty: ${duty} on ${dateStr}`);
               continue;
             }
 
             // Prefer managers with matching shift preference, but allow any if needed
-            let eligibleManagers = availableManagers.filter(m => 
+            let eligibleManagers = workingManagers.filter(m => 
               !m.preferred_shift || m.preferred_shift === shiftStart
             );
 
             // If no one with matching preference, use anyone trained for this duty
             if (eligibleManagers.length === 0) {
-              eligibleManagers = availableManagers;
+              eligibleManagers = workingManagers;
             }
 
             // Check who hasn't been assigned this duty recently (fairness)
@@ -296,6 +349,49 @@ export default function Managers() {
         type: "info",
       });
     }
+  };
+
+  const openAvailabilityDialog = (manager: Manager) => {
+    setSelectedManager(manager);
+    setSelectedDate(undefined);
+    setAvailabilityType("available");
+    setAvailabilityNotes("");
+    setShowAvailabilityDialog(true);
+  };
+
+  const handleSetAvailability = async () => {
+    if (!selectedManager || !selectedDate) return;
+
+    try {
+      const dateStr = selectedDate.toISOString().split("T")[0];
+      await setManagerAvailability(
+        selectedManager.id,
+        dateStr,
+        availabilityType,
+        availabilityNotes
+      );
+      
+      addNotification({
+        staffName: "System",
+        message: `Updated ${selectedManager.name}'s availability`,
+        type: "info",
+      });
+      
+      setShowAvailabilityDialog(false);
+      loadAvailability();
+    } catch (error) {
+      console.error("Error setting availability:", error);
+      addNotification({
+        staffName: "System",
+        message: "Failed to update availability",
+        type: "info",
+      });
+    }
+  };
+
+  const getAvailabilityForManagerDate = (managerId: string, dateStr: string): AvailabilityType => {
+    const key = `${managerId}-${dateStr}`;
+    return availabilityMap[key]?.type || "available";
   };
 
   const exportPDF = () => {
@@ -707,6 +803,14 @@ export default function Managers() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => openAvailabilityDialog(manager)}
+                          className="rounded-lg text-accent hover:bg-accent/10"
+                        >
+                          <Calendar className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => openEditDialog(manager)}
                           className="rounded-lg"
                         >
@@ -847,6 +951,80 @@ export default function Managers() {
           </DialogContent>
         </Dialog>
 
+        {/* Availability Dialog */}
+        <Dialog open={showAvailabilityDialog} onOpenChange={setShowAvailabilityDialog}>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle className="font-condensed text-xl">
+                Set Availability for {selectedManager?.name}
+              </DialogTitle>
+              <DialogDescription className="font-mono text-xs">
+                Mark days as rest, holiday, or sick
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label className="font-mono text-xs mb-2 block">Select Date</Label>
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  className="rounded-md border"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="availability-type" className="font-mono text-xs">
+                  Status
+                </Label>
+                <Select
+                  value={availabilityType}
+                  onValueChange={(value) => setAvailabilityType(value as AvailabilityType)}
+                >
+                  <SelectTrigger className="font-mono mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="available">Available</SelectItem>
+                    <SelectItem value="rest">Rest Day</SelectItem>
+                    <SelectItem value="holiday">Holiday</SelectItem>
+                    <SelectItem value="sick">Sick Leave</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="notes" className="font-mono text-xs">Notes (Optional)</Label>
+                <Input
+                  id="notes"
+                  value={availabilityNotes}
+                  onChange={(e) => setAvailabilityNotes(e.target.value)}
+                  placeholder="Add notes..."
+                  className="font-mono mt-1.5"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setShowAvailabilityDialog(false)}
+                className="rounded-lg"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSetAvailability} 
+                className="rounded-lg gap-2"
+                disabled={!selectedDate}
+              >
+                <Check className="h-4 w-4" />
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Shift Cards */}
         {SHIFT_STARTS.map((shiftStart) => (
           <Card key={shiftStart} className="shadow-sm hover:shadow-md transition-smooth">
@@ -898,15 +1076,38 @@ export default function Managers() {
                             a => a.duty === duty && a.shiftStart === shiftStart && a.date === dateStr
                           );
                           const dutyColorClass = getDutyColor(duty);
+
+                          // Check if assigned manager has availability status
+                          let availabilityStatus: AvailabilityType | null = null;
+                          if (assignment) {
+                            availabilityStatus = getAvailabilityForManagerDate(assignment.managerId, dateStr);
+                          }
                           
                           return (
                             <td key={dayIdx} className="p-4 text-center align-top">
                               {assignment ? (
-                                <div
-                                  className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all w-full shadow-sm border-2 ${dutyColorClass}`}
-                                >
-                                  <span className="font-semibold">{assignment.managerName}</span>
-                                </div>
+                                availabilityStatus && availabilityStatus !== "available" ? (
+                                  <div
+                                    className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all w-full shadow-sm border-2 ${
+                                      availabilityStatus === "rest"
+                                        ? "bg-blue-500/10 text-blue-700 border-blue-500"
+                                        : availabilityStatus === "holiday"
+                                        ? "bg-green-500/10 text-green-700 border-green-500"
+                                        : "bg-red-500/10 text-red-700 border-red-500"
+                                    }`}
+                                  >
+                                    <div className="font-semibold">{assignment.managerName}</div>
+                                    <div className="text-[10px] uppercase tracking-wide mt-1 opacity-80">
+                                      {availabilityStatus}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all w-full shadow-sm border-2 ${dutyColorClass}`}
+                                  >
+                                    <span className="font-semibold">{assignment.managerName}</span>
+                                  </div>
+                                )
                               ) : (
                                 <div className="text-xs font-mono text-muted-foreground">—</div>
                               )}
