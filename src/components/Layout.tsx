@@ -106,6 +106,14 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       Swaps
                     </Link>
                   )}
+                  {canAccessPage("managers") && (
+                    <Link
+                      href="/managers"
+                      className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                    >
+                      Managers
+                    </Link>
+                  )}
                 </nav>
               </SheetContent>
             </Sheet>
