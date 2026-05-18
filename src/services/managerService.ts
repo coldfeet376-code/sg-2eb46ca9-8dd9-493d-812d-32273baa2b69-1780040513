@@ -142,11 +142,11 @@ export async function getManagersForDuty(
 
   const column = columnMap[duty];
 
-  const { data, error } = await supabase
-    .from("managers")
-    .select("*")
-    // Use "as any" to prevent TypeScript excessively deep instantiation errors with Supabase types
-    .eq(column as any, true)
+  // Use any for the query builder to avoid TS excessively deep instantiation errors
+  // with dynamic column names in Supabase's eq() method
+  const queryBuilder: any = supabase.from("managers").select("*");
+  const { data, error } = await queryBuilder
+    .eq(column, true)
     .order("name", { ascending: true });
 
   console.log(`getManagersForDuty (${duty}):`, { data, error });
