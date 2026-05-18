@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { SEO } from "@/components/SEO";
-import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks, generateWeekRota } from "@/lib/rotaGenerator";
+import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
 import { rotaService } from "@/services/rotaService";
 import { useNotifications } from "@/contexts/NotificationContext";
