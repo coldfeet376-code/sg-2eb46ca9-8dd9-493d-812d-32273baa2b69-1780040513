@@ -130,14 +130,12 @@ export async function deleteManager(id: string): Promise<void> {
 /**
  * Get managers who can perform a specific duty
  */
-export async function getManagersForDuty(
-  duty: "Intake" | "Out-loading" | "Admin" | "Floor"
-): Promise<Manager[]> {
-  const columnMap = {
-    "Intake": "can_intake",
+export async function getManagersForDuty(duty: ManagerDuty): Promise<Manager[]> {
+  const columnMap: Record<ManagerDuty, string> = {
+    Intake: "can_intake",
     "Out-loading": "can_out_loading",
-    "Admin": "can_admin",
-    "Floor": "can_floor",
+    Admin: "can_admin",
+    Floor: "can_floor",
   };
 
   const column = columnMap[duty];
@@ -157,4 +155,97 @@ export async function getManagersForDuty(
   }
 
   return (data as unknown as Manager[]) || [];
+}
+
+// Availability management
+export interface ManagerAvailability {
+  id: string;
+  manager_id: string;
+  date: string;
+  type: "rest" | "holiday" | "sick" | "available";
+  notes?: string;
+  created_at: string;
+}
+
+export async function getManagerAvailability(
+  managerId: string,
+  startDate: string,
+  endDate: string
+): Promise<ManagerAvailability[]> {
+  const { data, error } = await supabase
+    .from("manager_availability")
+    .select("*")
+    .eq("manager_id", managerId)
+    .gte("date", startDate)
+    .lte("date", endDate)
+    .order("date", { ascending: true });
+
+  console.log("getManagerAvailability:", { data, error });
+
+  if (error) {
+    console.error("Error fetching manager availability:", error);
+    throw error;
+  }
+
+  return (data as unknown as ManagerAvailability[]) || [];
+}
+
+export async function setManagerAvailability(
+  managerId: string,
+  date: string,
+  type: "rest" | "holiday" | "sick" | "available",
+  notes?: string
+): Promise<void> {
+  const { error } = await supabase.from("manager_availability").upsert(
+    {
+      manager_id: managerId,
+      date,
+      type,
+      notes: notes || null,
+    },
+    {
+      onConflict: "manager_id,date",
+    }
+  );
+
+  console.log("setManagerAvailability:", { error });
+
+  if (error) {
+    console.error("Error setting manager availability:", error);
+    throw error;
+  }
+}
+
+export async function deleteManagerAvailability(
+  managerId: string,
+  date: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("manager_availability")
+    .delete()
+    .eq("manager_id", managerId)
+    .eq("date", date);
+
+  console.log("deleteManagerAvailability:", { error });
+
+  if (error) {
+    console.error("Error deleting manager availability:", error);
+    throw error;
+  }
+}
+
+export async function getAvailabilityForDate(date: string): Promise<ManagerAvailability[]> {
+  const { data, error } = await supabase
+    .from("manager_availability")
+    .select("*")
+    .eq("date", date);
+
+  console.log("getAvailabilityForDate:", { data, error });
+
+  if (error) {
+    console.error("Error fetching availability for date:", error);
+    throw error;
+  }
+
+  return (data as unknown as ManagerAvailability[]) || [];
 }

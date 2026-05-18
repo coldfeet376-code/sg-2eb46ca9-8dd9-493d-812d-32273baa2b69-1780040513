@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -87,6 +87,41 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      manager_availability: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          manager_id: string
+          notes: string | null
+          type: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          manager_id: string
+          notes?: string | null
+          type: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          manager_id?: string
+          notes?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manager_availability_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "managers"
             referencedColumns: ["id"]
           },
         ]
