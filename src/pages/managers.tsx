@@ -190,6 +190,10 @@ export default function Managers() {
       const dateStr = currentDate.toISOString().split("T")[0];
       const dayOfWeek = currentDate.getDay(); // 0=Sunday, 1=Monday, etc.
 
+      // Check if this day requires same manager for Out-loading and Intake
+      // Saturday=6, Sunday=0, Monday=1, Tuesday=2
+      const requiresSameManager = [0, 1, 2, 6].includes(dayOfWeek);
+
       // Get availability for this date
       const dayAvailability = await getAvailabilityForDate(dateStr);
       const unavailableManagerIds = new Set(
@@ -207,8 +211,80 @@ export default function Managers() {
 
       // For each shift
       for (const shiftStart of SHIFT_STARTS) {
-        // For each duty, get managers who can do it
-        for (const duty of DUTIES) {
+        let outloadingIntakeManager: Manager | null = null;
+
+        // If this day requires same manager for Out-loading and Intake, assign them first
+        if (requiresSameManager) {
+          try {
+            // Get managers who can do BOTH Out-loading and Intake
+            const outloadingManagers = await getManagersForDuty("Out-loading");
+            const intakeManagers = await getManagersForDuty("Intake");
+            
+            // Find managers who can do both
+            const bothDutiesManagers = outloadingManagers.filter(om =>
+              intakeManagers.some(im => im.id === om.id) &&
+              !unavailableManagerIds.has(om.id)
+            );
+
+            if (bothDutiesManagers.length === 0) {
+              console.warn(`No managers can do both Out-loading and Intake on ${dateStr}`);
+            } else {
+              // Prefer managers with matching shift preference
+              let eligibleManagers = bothDutiesManagers.filter(m => 
+                !m.preferred_shift || m.preferred_shift === shiftStart
+              );
+
+              if (eligibleManagers.length === 0) {
+                eligibleManagers = bothDutiesManagers;
+              }
+
+              // Check who hasn't been assigned these duties recently (fairness)
+              const recentOutloading = newAssignments.filter(a => 
+                a.duty === "Out-loading" && 
+                eligibleManagers.some(m => m.id === a.managerId)
+              );
+              const recentIntake = newAssignments.filter(a => 
+                a.duty === "Intake" && 
+                eligibleManagers.some(m => m.id === a.managerId)
+              );
+
+              const recentIds = new Set([
+                ...recentOutloading.map(a => a.managerId),
+                ...recentIntake.map(a => a.managerId)
+              ]);
+
+              const freshManagers = eligibleManagers.filter(m => !recentIds.has(m.id));
+              const poolToUse = freshManagers.length > 0 ? freshManagers : eligibleManagers;
+              
+              outloadingIntakeManager = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+
+              // Assign to both Out-loading and Intake
+              newAssignments.push({
+                managerId: outloadingIntakeManager.id,
+                managerName: outloadingIntakeManager.name,
+                duty: "Out-loading",
+                shiftStart,
+                date: dateStr,
+              });
+              newAssignments.push({
+                managerId: outloadingIntakeManager.id,
+                managerName: outloadingIntakeManager.name,
+                duty: "Intake",
+                shiftStart,
+                date: dateStr,
+              });
+            }
+          } catch (error) {
+            console.error(`Error assigning Out-loading/Intake pair on ${dateStr}:`, error);
+          }
+        }
+
+        // Now assign remaining duties (Admin, Floor, and Out-loading/Intake if not paired)
+        const dutiesToAssign = requiresSameManager && outloadingIntakeManager
+          ? ["Admin", "Floor"] // Skip Out-loading and Intake since they're already assigned
+          : DUTIES; // Assign all duties normally
+
+        for (const duty of dutiesToAssign) {
           try {
             const availableManagers = await getManagersForDuty(duty);
             
