@@ -21,7 +21,6 @@ import { Calendar } from "@/components/ui/calendar";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DUTIES: ManagerDuty[] = ["Intake", "Out-loading", "Admin", "Floor"];
-const SHIFT_STARTS: ManagerShiftStart[] = ["06:00", "08:00"];
 const MANAGER_PASSWORD = "manager123"; // TODO: Move to env or config
 
 type AvailabilityType = "available" | "rest" | "holiday" | "sick";
@@ -191,8 +190,9 @@ export default function Managers() {
       const dayOfWeek = currentDate.getDay(); // 0=Sunday, 1=Monday, etc.
 
       // Check if this day requires same manager for Out-loading and Intake
-      // Saturday=6, Sunday=0, Monday=1, Tuesday=2
-      const requiresSameManager = [0, 1, 2, 6].includes(dayOfWeek);
+      // Saturday=6, Sunday=0, Monday=1, Tuesday=2, Wednesday=3
+      // Thu/Fri (4,5) need DIFFERENT managers for Intake and Out-loading
+      const requiresSameManager = [0, 1, 2, 3, 6].includes(dayOfWeek);
 
       // Get availability for this date
       const dayAvailability = await getAvailabilityForDate(dateStr);
@@ -211,149 +211,186 @@ export default function Managers() {
 
       // Get list of available managers for this day
       const availableManagers = managers.filter(m => !unavailableManagerIds.has(m.id));
+      const assignedManagerIdsThisDay = new Set<string>();
+      let outloadingIntakeManager: Manager | null = null;
 
-      // For each shift
-      for (const shiftStart of SHIFT_STARTS) {
-        const assignedManagerIdsThisShift = new Set<string>();
-        let outloadingIntakeManager: Manager | null = null;
+      // If this day requires same manager for Out-loading and Intake, assign them first
+      if (requiresSameManager) {
+        try {
+          // Get managers who can do BOTH Out-loading and Intake
+          const outloadingManagers = await getManagersForDuty("Out-loading");
+          const intakeManagers = await getManagersForDuty("Intake");
+          
+          // Find managers who can do both
+          const bothDutiesManagers = outloadingManagers.filter(om =>
+            intakeManagers.some(im => im.id === om.id) &&
+            !unavailableManagerIds.has(om.id)
+          );
 
-        // If this day requires same manager for Out-loading and Intake, assign them first
-        if (requiresSameManager) {
-          try {
-            // Get managers who can do BOTH Out-loading and Intake
-            const outloadingManagers = await getManagersForDuty("Out-loading");
-            const intakeManagers = await getManagersForDuty("Intake");
+          if (bothDutiesManagers.length === 0) {
+            console.warn(`No managers can do both Out-loading and Intake on ${dateStr}`);
+          } else {
+            // Check who hasn't been assigned these duties recently (fairness)
+            const recentOutloading = newAssignments.filter(a => 
+              a.duty === "Out-loading" && 
+              bothDutiesManagers.some(m => m.id === a.managerId)
+            );
+            const recentIntake = newAssignments.filter(a => 
+              a.duty === "Intake" && 
+              bothDutiesManagers.some(m => m.id === a.managerId)
+            );
+
+            const recentIds = new Set([
+              ...recentOutloading.map(a => a.managerId),
+              ...recentIntake.map(a => a.managerId)
+            ]);
+
+            const freshManagers = bothDutiesManagers.filter(m => !recentIds.has(m.id));
+            const poolToUse = freshManagers.length > 0 ? freshManagers : bothDutiesManagers;
             
-            // Find managers who can do both
-            const bothDutiesManagers = outloadingManagers.filter(om =>
-              intakeManagers.some(im => im.id === om.id) &&
-              !unavailableManagerIds.has(om.id)
-            );
+            outloadingIntakeManager = poolToUse[Math.floor(Math.random() * poolToUse.length)];
 
-            if (bothDutiesManagers.length === 0) {
-              console.warn(`No managers can do both Out-loading and Intake on ${dateStr}`);
-            } else {
-              // Prefer managers with matching shift preference
-              let eligibleManagers = bothDutiesManagers.filter(m => 
-                !m.preferred_shift || m.preferred_shift === shiftStart
-              );
-
-              if (eligibleManagers.length === 0) {
-                eligibleManagers = bothDutiesManagers;
-              }
-
-              // Check who hasn't been assigned these duties recently (fairness)
-              const recentOutloading = newAssignments.filter(a => 
-                a.duty === "Out-loading" && 
-                eligibleManagers.some(m => m.id === a.managerId)
-              );
-              const recentIntake = newAssignments.filter(a => 
-                a.duty === "Intake" && 
-                eligibleManagers.some(m => m.id === a.managerId)
-              );
-
-              const recentIds = new Set([
-                ...recentOutloading.map(a => a.managerId),
-                ...recentIntake.map(a => a.managerId)
-              ]);
-
-              const freshManagers = eligibleManagers.filter(m => !recentIds.has(m.id));
-              const poolToUse = freshManagers.length > 0 ? freshManagers : eligibleManagers;
-              
-              outloadingIntakeManager = poolToUse[Math.floor(Math.random() * poolToUse.length)];
-
-              // Assign to both Out-loading and Intake
-              newAssignments.push({
-                managerId: outloadingIntakeManager.id,
-                managerName: outloadingIntakeManager.name,
-                duty: "Out-loading",
-                shiftStart,
-                date: dateStr,
-              });
-              newAssignments.push({
-                managerId: outloadingIntakeManager.id,
-                managerName: outloadingIntakeManager.name,
-                duty: "Intake",
-                shiftStart,
-                date: dateStr,
-              });
-              assignedManagerIdsThisShift.add(outloadingIntakeManager.id);
-            }
-          } catch (error) {
-            console.error(`Error assigning Out-loading/Intake pair on ${dateStr}:`, error);
-          }
-        }
-
-        // Now assign remaining duties (Admin, Floor, and Out-loading/Intake if not paired)
-        const dutiesToAssign: ManagerDuty[] = requiresSameManager && outloadingIntakeManager
-          ? ["Admin", "Floor"] // Skip Out-loading and Intake since they're already assigned
-          : DUTIES; // Assign all duties normally
-
-        for (const duty of dutiesToAssign) {
-          try {
-            const availableManagers = await getManagersForDuty(duty);
-            
-            // Filter out unavailable managers
-            const workingManagers = availableManagers.filter(m => 
-              !unavailableManagerIds.has(m.id)
-            );
-
-            if (workingManagers.length === 0) {
-              console.warn(`No managers available for duty: ${duty} on ${dateStr}`);
-              continue;
-            }
-
-            // Prefer managers with matching shift preference, but allow any if needed
-            let eligibleManagers = workingManagers.filter(m => 
-              !m.preferred_shift || m.preferred_shift === shiftStart
-            );
-
-            // If no one with matching preference, use anyone trained for this duty
-            if (eligibleManagers.length === 0) {
-              eligibleManagers = workingManagers;
-            }
-
-            // Check who hasn't been assigned this duty recently (fairness)
-            const recentAssignments = newAssignments.filter(a => 
-              a.duty === duty && 
-              eligibleManagers.some(m => m.id === a.managerId)
-            );
-
-            const recentManagerIds = new Set(recentAssignments.map(a => a.managerId));
-            const freshManagers = eligibleManagers.filter(m => !recentManagerIds.has(m.id));
-
-            // Pick from fresh managers if available, otherwise from all eligible
-            const poolToUse = freshManagers.length > 0 ? freshManagers : eligibleManagers;
-            const selectedManager = poolToUse[Math.floor(Math.random() * poolToUse.length)];
-
+            // Assign to both Out-loading and Intake (no shiftStart anymore)
             newAssignments.push({
-              managerId: selectedManager.id,
-              managerName: selectedManager.name,
-              duty,
-              shiftStart,
+              managerId: outloadingIntakeManager.id,
+              managerName: outloadingIntakeManager.name,
+              duty: "Out-loading",
+              shiftStart: "06:00", // Keep for type compatibility, but not displayed
               date: dateStr,
             });
-            assignedManagerIdsThisShift.add(selectedManager.id);
-          } catch (error) {
-            console.error(`Error assigning duty ${duty}:`, error);
+            newAssignments.push({
+              managerId: outloadingIntakeManager.id,
+              managerName: outloadingIntakeManager.name,
+              duty: "Intake",
+              shiftStart: "06:00",
+              date: dateStr,
+            });
+            assignedManagerIdsThisDay.add(outloadingIntakeManager.id);
           }
+        } catch (error) {
+          console.error(`Error assigning Out-loading/Intake pair on ${dateStr}:`, error);
         }
+      }
 
-        // After all specific duties are assigned, put all remaining available managers on Floor
-        const unassignedManagers = availableManagers.filter(m => 
-          !assignedManagerIdsThisShift.has(m.id) &&
-          m.can_floor // Only assign if they're trained for Floor
-        );
+      // For Thu/Fri, assign Intake and Out-loading to DIFFERENT managers
+      if (!requiresSameManager) {
+        try {
+          // Assign Out-loading first
+          const outloadingManagers = await getManagersForDuty("Out-loading");
+          const availableOutloading = outloadingManagers.filter(m => 
+            !unavailableManagerIds.has(m.id)
+          );
 
-        for (const manager of unassignedManagers) {
+          if (availableOutloading.length > 0) {
+            const recentOutloading = newAssignments.filter(a => 
+              a.duty === "Out-loading" && 
+              availableOutloading.some(m => m.id === a.managerId)
+            );
+            const recentIds = new Set(recentOutloading.map(a => a.managerId));
+            const freshManagers = availableOutloading.filter(m => !recentIds.has(m.id));
+            const poolToUse = freshManagers.length > 0 ? freshManagers : availableOutloading;
+            
+            const selectedOutloading = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+            newAssignments.push({
+              managerId: selectedOutloading.id,
+              managerName: selectedOutloading.name,
+              duty: "Out-loading",
+              shiftStart: "06:00",
+              date: dateStr,
+            });
+            assignedManagerIdsThisDay.add(selectedOutloading.id);
+          }
+
+          // Assign Intake to a DIFFERENT manager
+          const intakeManagers = await getManagersForDuty("Intake");
+          const availableIntake = intakeManagers.filter(m => 
+            !unavailableManagerIds.has(m.id) &&
+            !assignedManagerIdsThisDay.has(m.id) // CRITICAL: exclude already assigned
+          );
+
+          if (availableIntake.length > 0) {
+            const recentIntake = newAssignments.filter(a => 
+              a.duty === "Intake" && 
+              availableIntake.some(m => m.id === a.managerId)
+            );
+            const recentIds = new Set(recentIntake.map(a => a.managerId));
+            const freshManagers = availableIntake.filter(m => !recentIds.has(m.id));
+            const poolToUse = freshManagers.length > 0 ? freshManagers : availableIntake;
+            
+            const selectedIntake = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+            newAssignments.push({
+              managerId: selectedIntake.id,
+              managerName: selectedIntake.name,
+              duty: "Intake",
+              shiftStart: "06:00",
+              date: dateStr,
+            });
+            assignedManagerIdsThisDay.add(selectedIntake.id);
+          }
+        } catch (error) {
+          console.error(`Error assigning Out-loading/Intake separately on ${dateStr}:`, error);
+        }
+      }
+
+      // Now assign remaining duties (Admin, Floor)
+      const dutiesToAssign: ManagerDuty[] = requiresSameManager && outloadingIntakeManager
+        ? ["Admin", "Floor"] // Skip Out-loading and Intake since already assigned
+        : ["Admin", "Floor"]; // Thu/Fri: already assigned Intake/Out-loading above
+
+      for (const duty of dutiesToAssign) {
+        try {
+          const dutyManagers = await getManagersForDuty(duty);
+          
+          // Filter out unavailable managers
+          const workingManagers = dutyManagers.filter(m => 
+            !unavailableManagerIds.has(m.id)
+          );
+
+          if (workingManagers.length === 0) {
+            console.warn(`No managers available for duty: ${duty} on ${dateStr}`);
+            continue;
+          }
+
+          // Check who hasn't been assigned this duty recently (fairness)
+          const recentAssignments = newAssignments.filter(a => 
+            a.duty === duty && 
+            workingManagers.some(m => m.id === a.managerId)
+          );
+
+          const recentManagerIds = new Set(recentAssignments.map(a => a.managerId));
+          const freshManagers = workingManagers.filter(m => !recentManagerIds.has(m.id));
+
+          // Pick from fresh managers if available, otherwise from all eligible
+          const poolToUse = freshManagers.length > 0 ? freshManagers : workingManagers;
+          const selectedManager = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+
           newAssignments.push({
-            managerId: manager.id,
-            managerName: manager.name,
-            duty: "Floor",
-            shiftStart,
+            managerId: selectedManager.id,
+            managerName: selectedManager.name,
+            duty,
+            shiftStart: "06:00",
             date: dateStr,
           });
+          assignedManagerIdsThisDay.add(selectedManager.id);
+        } catch (error) {
+          console.error(`Error assigning duty ${duty}:`, error);
         }
+      }
+
+      // After all specific duties are assigned, put all remaining available managers on Floor
+      const unassignedManagers = availableManagers.filter(m => 
+        !assignedManagerIdsThisDay.has(m.id) &&
+        m.can_floor // Only assign if they're trained for Floor
+      );
+
+      for (const manager of unassignedManagers) {
+        newAssignments.push({
+          managerId: manager.id,
+          managerName: manager.name,
+          duty: "Floor",
+          shiftStart: "06:00",
+          date: dateStr,
+        });
       }
     }
 
@@ -538,17 +575,6 @@ export default function Managers() {
             color: #666; 
             margin-bottom: 20px;
           }
-          .shift-section {
-            margin-bottom: 30px;
-          }
-          .shift-header {
-            font-size: 14px;
-            font-weight: 700;
-            margin-bottom: 10px;
-            padding: 8px;
-            background: #f5f5f5;
-            border-radius: 4px;
-          }
           table { 
             width: 100%; 
             border-collapse: collapse; 
@@ -586,45 +612,41 @@ export default function Managers() {
           ${weekDates[0].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} - 
           ${weekDates[6].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
         </div>
-        ${SHIFT_STARTS.map(shift => `
-          <div class="shift-section">
-            <div class="shift-header">${shift} Shift</div>
-            <table>
-              <thead>
-                <tr>
-                  <th>Duty</th>
-                  ${DAYS.map((day, i) => `
-                    <th style="text-align: center;">
-                      ${day}<br>
-                      <span style="font-weight: 400; color: #666;">
-                        ${weekDates[i].getDate()}/${weekDates[i].getMonth() + 1}
-                      </span>
-                    </th>
-                  `).join("")}
-                </tr>
-              </thead>
-              <tbody>
-                ${DUTIES.map(duty => `
-                  <tr>
-                    <td class="duty-cell">${duty}</td>
-                    ${DAYS.map((_, dayIdx) => {
-                      const date = weekDates[dayIdx];
-                      const dateStr = date.toISOString().split("T")[0];
-                      const assignment = assignments.find(
-                        a => a.duty === duty && a.shiftStart === shift && a.date === dateStr
-                      );
-                      return `
-                        <td>
-                          ${assignment ? `<span class="manager-name">${assignment.managerName}</span>` : '—'}
-                        </td>
-                      `;
-                    }).join("")}
-                  </tr>
-                `).join("")}
-              </tbody>
-            </table>
-          </div>
-        `).join("")}
+        <table>
+          <thead>
+            <tr>
+              <th>Duty</th>
+              ${DAYS.map((day, i) => `
+                <th style="text-align: center;">
+                  ${day}<br>
+                  <span style="font-weight: 400; color: #666;">
+                    ${weekDates[i].getDate()}/${weekDates[i].getMonth() + 1}
+                  </span>
+                </th>
+              `).join("")}
+            </tr>
+          </thead>
+          <tbody>
+            ${DUTIES.map(duty => `
+              <tr>
+                <td class="duty-cell">${duty}</td>
+                ${DAYS.map((_, dayIdx) => {
+                  const date = weekDates[dayIdx];
+                  const dateStr = date.toISOString().split("T")[0];
+                  const dayAssignments = assignments.filter(
+                    a => a.duty === duty && a.date === dateStr
+                  );
+                  return `
+                    <td>
+                      ${dayAssignments.map(a => `<span class="manager-name">${a.managerName}</span>`).join('')}
+                      ${dayAssignments.length === 0 ? '—' : ''}
+                    </td>
+                  `;
+                }).join("")}
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
       </body>
       </html>
     `;
@@ -1202,18 +1224,15 @@ export default function Managers() {
           </DialogContent>
         </Dialog>
 
-        {/* Shift Cards */}
-        {SHIFT_STARTS.map((shiftStart) => (
-          <Card key={shiftStart} className="shadow-sm hover:shadow-md transition-smooth">
+        {/* Rota Table */}
+        {assignments.length > 0 && (
+          <Card className="shadow-sm hover:shadow-md transition-smooth">
             <CardHeader>
-              <CardTitle className="font-condensed text-xl flex items-center gap-2">
-                <Badge variant="outline" className="font-mono">
-                  {shiftStart}
-                </Badge>
-                Shift Duties
+              <CardTitle className="font-condensed text-xl">
+                Manager Duties Rota
               </CardTitle>
               <CardDescription className="font-mono text-xs">
-                Manager assignments for {shiftStart} shift
+                Weekly manager assignments
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1249,42 +1268,47 @@ export default function Managers() {
                         {DAYS.map((_, dayIdx) => {
                           const date = weekDates[dayIdx];
                           const dateStr = date.toISOString().split("T")[0];
-                          const assignment = assignments.find(
-                            a => a.duty === duty && a.shiftStart === shiftStart && a.date === dateStr
+                          
+                          // Get all assignments for this duty on this date
+                          const dayAssignments = assignments.filter(
+                            a => a.duty === duty && a.date === dateStr
                           );
+                          
                           const dutyColorClass = getDutyColor(duty);
-
-                          // Check if assigned manager has availability status
-                          let availabilityStatus: AvailabilityType | null = null;
-                          if (assignment) {
-                            availabilityStatus = getAvailabilityForManagerDate(assignment.managerId, dateStr);
-                          }
                           
                           return (
                             <td key={dayIdx} className="p-4 text-center align-top">
-                              {assignment ? (
-                                availabilityStatus && availabilityStatus !== "available" ? (
-                                  <div
-                                    className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all w-full shadow-sm border-2 ${
-                                      availabilityStatus === "rest"
-                                        ? "bg-blue-500/10 text-blue-700 border-blue-500"
-                                        : availabilityStatus === "holiday"
-                                        ? "bg-green-500/10 text-green-700 border-green-500"
-                                        : "bg-red-500/10 text-red-700 border-red-500"
-                                    }`}
-                                  >
-                                    <div className="font-semibold">{assignment.managerName}</div>
-                                    <div className="text-[10px] uppercase tracking-wide mt-1 opacity-80">
-                                      {availabilityStatus}
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div
-                                    className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all w-full shadow-sm border-2 ${dutyColorClass}`}
-                                  >
-                                    <span className="font-semibold">{assignment.managerName}</span>
-                                  </div>
-                                )
+                              {dayAssignments.length > 0 ? (
+                                <div className="space-y-1">
+                                  {dayAssignments.map((assignment, idx) => {
+                                    const availabilityStatus = getAvailabilityForManagerDate(assignment.managerId, dateStr);
+                                    
+                                    return availabilityStatus && availabilityStatus !== "available" ? (
+                                      <div
+                                        key={idx}
+                                        className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all w-full shadow-sm border-2 ${
+                                          availabilityStatus === "rest"
+                                            ? "bg-blue-500/10 text-blue-700 border-blue-500"
+                                            : availabilityStatus === "holiday"
+                                            ? "bg-green-500/10 text-green-700 border-green-500"
+                                            : "bg-red-500/10 text-red-700 border-red-500"
+                                        }`}
+                                      >
+                                        <div className="font-semibold">{assignment.managerName}</div>
+                                        <div className="text-[10px] uppercase tracking-wide mt-1 opacity-80">
+                                          {availabilityStatus}
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div
+                                        key={idx}
+                                        className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all w-full shadow-sm border-2 ${dutyColorClass}`}
+                                      >
+                                        <span className="font-semibold">{assignment.managerName}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               ) : (
                                 <div className="text-xs font-mono text-muted-foreground">—</div>
                               )}
@@ -1298,7 +1322,7 @@ export default function Managers() {
               </div>
             </CardContent>
           </Card>
-        ))}
+        )}
 
         {assignments.length === 0 && (
           <div className="bg-muted/50 border border-border rounded-lg p-8 text-center shadow-sm">
