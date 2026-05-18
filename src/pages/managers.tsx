@@ -57,7 +57,7 @@ export default function Managers() {
   // Availability management state
   const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
   const [selectedManager, setSelectedManager] = useState<Manager | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [availabilityType, setAvailabilityType] = useState<AvailabilityType>("available");
   const [availabilityMap, setAvailabilityMap] = useState<Record<string, ManagerAvailability>>({});
   const [availabilityNotes, setAvailabilityNotes] = useState("");
@@ -353,27 +353,30 @@ export default function Managers() {
 
   const openAvailabilityDialog = (manager: Manager) => {
     setSelectedManager(manager);
-    setSelectedDate(undefined);
+    setSelectedDates([]);
     setAvailabilityType("available");
     setAvailabilityNotes("");
     setShowAvailabilityDialog(true);
   };
 
   const handleSetAvailability = async () => {
-    if (!selectedManager || !selectedDate) return;
+    if (!selectedManager || selectedDates.length === 0) return;
 
     try {
-      const dateStr = selectedDate.toISOString().split("T")[0];
-      await setManagerAvailability(
-        selectedManager.id,
-        dateStr,
-        availabilityType,
-        availabilityNotes
-      );
+      // Save all selected dates
+      for (const date of selectedDates) {
+        const dateStr = date.toISOString().split("T")[0];
+        await setManagerAvailability(
+          selectedManager.id,
+          dateStr,
+          availabilityType,
+          availabilityNotes
+        );
+      }
       
       addNotification({
         staffName: "System",
-        message: `Updated ${selectedManager.name}'s availability`,
+        message: `Updated ${selectedManager.name}'s availability for ${selectedDates.length} day${selectedDates.length > 1 ? 's' : ''}`,
         type: "info",
       });
       
@@ -964,11 +967,11 @@ export default function Managers() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div>
-                <Label className="font-mono text-xs mb-2 block">Select Date</Label>
+                <Label className="font-mono text-xs mb-2 block">Select Date(s)</Label>
                 <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
+                  mode="multiple"
+                  selected={selectedDates}
+                  onSelect={(dates) => setSelectedDates(dates || [])}
                   className="rounded-md border bg-background p-3 w-full"
                   classNames={{
                     months: "flex flex-col space-y-4",
@@ -994,6 +997,11 @@ export default function Managers() {
                     day_hidden: "invisible",
                   }}
                 />
+                {selectedDates.length > 0 && (
+                  <p className="text-xs font-mono text-muted-foreground mt-2">
+                    {selectedDates.length} day{selectedDates.length > 1 ? 's' : ''} selected
+                  </p>
+                )}
               </div>
 
               <div>
@@ -1039,7 +1047,7 @@ export default function Managers() {
               <Button 
                 onClick={handleSetAvailability} 
                 className="rounded-lg gap-2"
-                disabled={!selectedDate}
+                disabled={selectedDates.length === 0}
               >
                 <Check className="h-4 w-4" />
                 Save
