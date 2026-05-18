@@ -280,7 +280,7 @@ export default function Managers() {
         }
 
         // Now assign remaining duties (Admin, Floor, and Out-loading/Intake if not paired)
-        const dutiesToAssign = requiresSameManager && outloadingIntakeManager
+        const dutiesToAssign: ManagerDuty[] = requiresSameManager && outloadingIntakeManager
           ? ["Admin", "Floor"] // Skip Out-loading and Intake since they're already assigned
           : DUTIES; // Assign all duties normally
 
