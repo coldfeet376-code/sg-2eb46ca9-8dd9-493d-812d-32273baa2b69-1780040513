@@ -84,7 +84,7 @@ async function generateSingleScenario(
     // Get unavailable managers
     const unavailableManagerIds = new Set<string>();
     for (const manager of managers) {
-      const availability = await getManagerAvailability(manager.id);
+      const availability = await getManagerAvailability(manager.id, dateStr, dateStr);
       const dayAvail = availability.find((a: any) => a.date === dateStr);
       if (dayAvail && dayAvail.type !== "available") {
         unavailableManagerIds.add(manager.id);
