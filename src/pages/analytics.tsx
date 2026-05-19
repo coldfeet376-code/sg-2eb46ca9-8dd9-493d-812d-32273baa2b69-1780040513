@@ -110,15 +110,15 @@ export default function AnalyticsPage() {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case "high": return "bg-destructive/20 text-destructive border-destructive";
-      case "medium": return "bg-warning/20 text-warning border-warning";
+      case "medium": return "bg-amber-500/20 text-amber-500 border-amber-500";
       default: return "bg-muted text-muted-foreground border-border";
     }
   };
 
-  const getRiskColor = (level: string) => {
+  const getRiskColor = (level: string): "destructive" | "default" | "secondary" => {
     switch (level) {
       case "high": return "destructive";
-      case "medium": return "warning";
+      case "medium": return "default";
       default: return "secondary";
     }
   };
