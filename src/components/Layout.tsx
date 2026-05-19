@@ -7,7 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useTour } from "@/contexts/TourContext";
 import { usePWAInstall } from "@/components/InstallPrompt";
-import { LayoutGrid, BarChart3, LogOut, Menu, RefreshCw, HelpCircle, Download } from "lucide-react";
+import { LayoutGrid, LogOut, Menu, RefreshCw, HelpCircle, Download } from "lucide-react";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -90,15 +90,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       Config
                     </Link>
                   )}
-                  {canAccessPage("analytics") && (
-                    <Link
-                      href="/analytics"
-                      className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
-                    >
-                      <BarChart3 className="h-4 w-4" />
-                      Analytics
-                    </Link>
-                  )}
                   {canAccessPage("swaps") && (
                     <Link
                       href="/swaps"
@@ -149,15 +140,6 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
                 >
                   Config
-                </Link>
-              )}
-              {canAccessPage("analytics") && (
-                <Link
-                  href="/analytics"
-                  className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
-                >
-                  <BarChart3 className="h-4 w-4" />
-                  Analytics
                 </Link>
               )}
               {canAccessPage("swaps") && (
