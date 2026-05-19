@@ -1,5 +1,6 @@
-import type { Manager, ManagerAssignment } from "@/types";
-import { getManagersForDuty, getAvailabilityForDate } from "@/services/managerService";
+import type { ManagerAssignment } from "@/types";
+import type { Manager } from "@/services/managerService";
+import { getManagersForDuty, getManagerAvailability } from "@/services/managerService";
 
 export interface RotaScenario {
   id: string;
@@ -83,8 +84,9 @@ async function generateSingleScenario(
     // Get unavailable managers
     const unavailableManagerIds = new Set<string>();
     for (const manager of managers) {
-      const availability = await getAvailabilityForDate(manager.id, dateStr);
-      if (availability.type !== "available") {
+      const availability = await getManagerAvailability(manager.id);
+      const dayAvail = availability.find((a: any) => a.date === dateStr);
+      if (dayAvail && dayAvail.type !== "available") {
         unavailableManagerIds.add(manager.id);
       }
     }
@@ -103,12 +105,14 @@ async function generateSingleScenario(
           managerId: selected.id,
           managerName: selected.name,
           duty: "Out-loading",
+          shiftStart: "06:00",
           date: dateStr,
         });
         assignments.push({
           managerId: selected.id,
           managerName: selected.name,
           duty: "Intake",
+          shiftStart: "06:00",
           date: dateStr,
         });
         assignedManagerIdsThisDay.add(selected.id);
@@ -126,6 +130,7 @@ async function generateSingleScenario(
           managerId: selected.id,
           managerName: selected.name,
           duty: "Out-loading",
+          shiftStart: "06:00",
           date: dateStr,
         });
         assignedManagerIdsThisDay.add(selected.id);
@@ -138,6 +143,7 @@ async function generateSingleScenario(
           managerId: selected.id,
           managerName: selected.name,
           duty: "Intake",
+          shiftStart: "06:00",
           date: dateStr,
         });
         assignedManagerIdsThisDay.add(selected.id);
@@ -158,6 +164,7 @@ async function generateSingleScenario(
           managerId: selected.id,
           managerName: selected.name,
           duty,
+          shiftStart: "06:00",
           date: dateStr,
         });
         assignedManagerIdsThisDay.add(selected.id);
@@ -173,6 +180,7 @@ async function generateSingleScenario(
         managerId: manager.id,
         managerName: manager.name,
         duty: "Floor",
+        shiftStart: "06:00",
         date: dateStr,
       });
     });
