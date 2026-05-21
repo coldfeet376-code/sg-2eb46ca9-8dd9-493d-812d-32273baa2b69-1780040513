@@ -902,6 +902,133 @@ export default function Home() {
           />
         </div>
 
+        {/* Action Controls */}
+        <Card className="shadow-sm no-print" data-tour="generate-controls">
+          <CardHeader className="border-b border-border/50 bg-muted/30">
+            <CardTitle className="text-xl font-condensed font-bold tracking-tight">
+              Rota Actions
+            </CardTitle>
+            <CardDescription className="text-sm font-sans">
+              Generate schedules, manage locks, and export data
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={generateRota}
+                disabled={!staff.length || !taskConfig || staffLoading || configLoading}
+                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
+                size="lg"
+              >
+                <Zap className="h-5 w-5" />
+                Generate Rota
+              </Button>
+
+              <Button
+                onClick={lockAll}
+                disabled={assignments.length === 0}
+                variant="outline"
+                className="gap-2 font-sans font-medium"
+                size="lg"
+              >
+                <Lock className="h-4 w-4" />
+                Lock All
+              </Button>
+
+              <Button
+                onClick={() => setShowUnlockConfirm(true)}
+                disabled={lockedAssignments.length === 0}
+                variant="outline"
+                className="gap-2 font-sans font-medium"
+                size="lg"
+              >
+                <Unlock className="h-4 w-4" />
+                Unlock All ({getLockedCount()})
+              </Button>
+
+              <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
+                <SheetTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="gap-2 font-sans font-medium"
+                    size="lg"
+                    disabled={getCurrentWeekHistory().length === 0}
+                  >
+                    <History className="h-4 w-4" />
+                    History ({getCurrentWeekHistory().length})
+                  </Button>
+                </SheetTrigger>
+                <SheetContent className="w-full sm:max-w-lg">
+                  <SheetHeader>
+                    <SheetTitle className="font-condensed text-xl">Rota History</SheetTitle>
+                    <SheetDescription className="font-sans text-sm">
+                      Previous versions for week starting {weekStart.toLocaleDateString("en-GB")}
+                    </SheetDescription>
+                  </SheetHeader>
+                  <ScrollArea className="h-[calc(100vh-150px)] mt-6">
+                    <div className="space-y-3">
+                      {getCurrentWeekHistory().map((snapshot) => (
+                        <Card key={snapshot.id} className="shadow-sm hover:shadow-md transition-smooth">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <CardTitle className="text-sm font-mono font-semibold">
+                                  {formatTimestamp(snapshot.timestamp)}
+                                </CardTitle>
+                                <CardDescription className="text-xs font-mono mt-1">
+                                  {snapshot.assignments.length} assignments, {snapshot.lockedAssignments.length} locked
+                                </CardDescription>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => restoreSnapshot(snapshot)}
+                                className="gap-2 font-sans text-xs"
+                              >
+                                <RotateCcw className="h-3 w-3" />
+                                Restore
+                              </Button>
+                            </div>
+                          </CardHeader>
+                        </Card>
+                      ))}
+                      {getCurrentWeekHistory().length === 0 && (
+                        <div className="text-center py-8 text-muted-foreground font-mono text-sm">
+                          No history for this week
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </SheetContent>
+              </Sheet>
+
+              <div className="flex gap-2 ml-auto">
+                <Button
+                  onClick={exportWeekPDF}
+                  disabled={assignments.length === 0}
+                  variant="outline"
+                  className="gap-2 font-sans font-medium"
+                  size="lg"
+                >
+                  <Download className="h-4 w-4" />
+                  Export PDF
+                </Button>
+
+                <Button
+                  onClick={exportCSV}
+                  disabled={assignments.length === 0}
+                  variant="outline"
+                  className="gap-2 font-sans font-medium"
+                  size="lg"
+                >
+                  <Download className="h-4 w-4" />
+                  Export CSV
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Unlock All Confirmation */}
         {showUnlockConfirm && (
           <Alert className="bg-warning/10 border-warning">
