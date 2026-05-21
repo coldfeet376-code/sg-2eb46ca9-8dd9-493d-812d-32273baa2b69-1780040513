@@ -130,49 +130,46 @@ export default function AnalyticsPage() {
       </Head>
       <Layout>
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-condensed font-bold">Analytics Dashboard</h1>
-              <p className="text-sm text-muted-foreground font-mono mt-1">
-                Historical trends, patterns, and AI-powered optimization
+              <h1 className="text-4xl font-condensed font-bold tracking-tight text-foreground mb-2">
+                Analytics Dashboard
+              </h1>
+              <p className="text-sm font-sans text-muted-foreground">
+                AI-powered insights and predictive workforce intelligence
               </p>
             </div>
             <Button
               onClick={loadData}
               disabled={loading}
-              variant="outline"
-              className="gap-2"
+              className="font-sans font-medium"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               Refresh Data
             </Button>
           </div>
 
-          <Tabs defaultValue="trends" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="trends" className="gap-2">
-                <TrendingUp className="h-4 w-4" />
+          <Tabs defaultValue="trends" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3 bg-muted/50">
+              <TabsTrigger value="trends" className="font-sans font-medium">
                 Historical Trends
               </TabsTrigger>
-              <TabsTrigger value="patterns" className="gap-2">
-                <AlertTriangle className="h-4 w-4" />
+              <TabsTrigger value="patterns" className="font-sans font-medium">
                 Absence Patterns
               </TabsTrigger>
-              <TabsTrigger value="optimization" className="gap-2">
-                <Sparkles className="h-4 w-4" />
+              <TabsTrigger value="optimization" className="font-sans font-medium">
                 AI Optimization
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="trends" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-condensed flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    Assignment Trends (12 Weeks)
+            <TabsContent value="trends" className="space-y-6">
+              <Card className="shadow-sm">
+                <CardHeader className="border-b border-border/50 bg-muted/30">
+                  <CardTitle className="text-2xl font-condensed font-bold tracking-tight">
+                    12-Week Assignment Trends
                   </CardTitle>
-                  <CardDescription className="font-mono text-xs">
-                    Week-over-week assignment patterns and changes
+                  <CardDescription className="text-sm font-sans">
+                    Historical assignment patterns and week-over-week changes
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -270,15 +267,14 @@ export default function AnalyticsPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="patterns" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-condensed flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5" />
-                    Detected Absence Patterns
+            <TabsContent value="patterns" className="space-y-6">
+              <Card className="shadow-sm">
+                <CardHeader className="border-b border-border/50 bg-muted/30">
+                  <CardTitle className="text-2xl font-condensed font-bold tracking-tight">
+                    Absence Pattern Analysis
                   </CardTitle>
-                  <CardDescription className="font-mono text-xs">
-                    ML-identified patterns in manager absences by day of week
+                  <CardDescription className="text-sm font-sans">
+                    ML-based detection of sick day patterns by manager and day
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -363,114 +359,111 @@ export default function AnalyticsPage() {
               </Card>
             </TabsContent>
 
-            <TabsContent value="optimization" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="font-condensed flex items-center gap-2">
-                    <Sparkles className="h-5 w-5" />
-                    AI-Optimized Rota Scenarios
-                  </CardTitle>
-                  <CardDescription className="font-mono text-xs">
-                    Generate and compare multiple optimized rota scenarios
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    onClick={generateScenarios}
-                    disabled={loading || managers.length === 0}
-                    className="w-full gap-2 mb-4"
-                  >
-                    <Sparkles className={`h-4 w-4 ${loading ? "animate-pulse" : ""}`} />
-                    Generate 3 Optimized Scenarios
-                  </Button>
+            <TabsContent value="optimization" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-condensed font-bold tracking-tight">
+                    AI-Powered Rota Optimization
+                  </h2>
+                  <p className="text-sm font-sans text-muted-foreground mt-1">
+                    Generate and compare optimized scenarios scored on fairness metrics
+                  </p>
+                </div>
+                <Button
+                  onClick={generateScenarios}
+                  disabled={loading || managers.length === 0}
+                  className="font-sans font-medium"
+                >
+                  <Sparkles className={`h-4 w-4 ${loading ? "animate-pulse" : ""}`} />
+                  Generate 3 Optimized Scenarios
+                </Button>
+              </div>
 
-                  {scenarios.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-8">
-                      Click above to generate AI-optimized scenarios
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {scenarios.map((scenario) => (
-                        <div
-                          key={scenario.id}
-                          className={`p-4 rounded-lg border ${scenario.score >= 85 ? "border-primary bg-primary/5" : "bg-card"}`}
-                        >
-                          <div className="flex items-start justify-between mb-3">
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-condensed text-lg font-bold">
-                                  Scenario {scenario.id}
-                                </span>
-                                {scenario.score >= 85 && (
-                                  <span className="text-primary">⭐</span>
-                                )}
-                              </div>
-                              <p className="text-xs text-muted-foreground font-mono">
-                                {scenario.recommendation}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-condensed font-bold">
-                                {scenario.score}
-                              </div>
-                              <div className="text-xs text-muted-foreground font-mono">
-                                score
-                              </div>
-                            </div>
+              {scenarios.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Click above to generate AI-optimized scenarios
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {scenarios.map((scenario) => (
+                    <div
+                      key={scenario.id}
+                      className={`p-4 rounded-lg border ${scenario.score >= 85 ? "border-primary bg-primary/5" : "bg-card"}`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-condensed text-lg font-bold">
+                              Scenario {scenario.id}
+                            </span>
+                            {scenario.score >= 85 && (
+                              <span className="text-primary">⭐</span>
+                            )}
                           </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                            <div className="p-2 rounded bg-muted/50">
-                              <div className="text-xs text-muted-foreground font-mono">Shift Balance</div>
-                              <div className="text-lg font-mono font-semibold">{scenario.metrics.shiftBalance}</div>
-                            </div>
-                            <div className="p-2 rounded bg-muted/50">
-                              <div className="text-xs text-muted-foreground font-mono">Duty Balance</div>
-                              <div className="text-lg font-mono font-semibold">{scenario.metrics.dutyBalance}</div>
-                            </div>
-                            <div className="p-2 rounded bg-muted/50">
-                              <div className="text-xs text-muted-foreground font-mono">Weekend Balance</div>
-                              <div className="text-lg font-mono font-semibold">{scenario.metrics.weekendBalance}</div>
-                            </div>
-                            <div className="p-2 rounded bg-muted/50">
-                              <div className="text-xs text-muted-foreground font-mono">Difficulty Balance</div>
-                              <div className="text-lg font-mono font-semibold">{scenario.metrics.difficultyBalance}</div>
-                            </div>
-                          </div>
-
-                          {scenario.strengths.length > 0 && (
-                            <div className="mb-2">
-                              <div className="text-xs text-muted-foreground font-mono mb-1">Strengths</div>
-                              <div className="space-y-1">
-                                {scenario.strengths.map((strength, idx) => (
-                                  <div key={idx} className="text-xs font-mono flex items-center gap-2">
-                                    <span className="text-green-500">✓</span>
-                                    {strength}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {scenario.weaknesses.length > 0 && (
-                            <div>
-                              <div className="text-xs text-muted-foreground font-mono mb-1">Areas for Improvement</div>
-                              <div className="space-y-1">
-                                {scenario.weaknesses.map((weakness, idx) => (
-                                  <div key={idx} className="text-xs font-mono flex items-center gap-2">
-                                    <span className="text-destructive">!</span>
-                                    {weakness}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          <p className="text-xs text-muted-foreground font-mono">
+                            {scenario.recommendation}
+                          </p>
                         </div>
-                      ))}
+                        <div className="text-right">
+                          <div className="text-2xl font-condensed font-bold">
+                            {scenario.score}
+                          </div>
+                          <div className="text-xs text-muted-foreground font-mono">
+                            score
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                        <div className="p-2 rounded bg-muted/50">
+                          <div className="text-xs text-muted-foreground font-mono">Shift Balance</div>
+                          <div className="text-lg font-mono font-semibold">{scenario.metrics.shiftBalance}</div>
+                        </div>
+                        <div className="p-2 rounded bg-muted/50">
+                          <div className="text-xs text-muted-foreground font-mono">Duty Balance</div>
+                          <div className="text-lg font-mono font-semibold">{scenario.metrics.dutyBalance}</div>
+                        </div>
+                        <div className="p-2 rounded bg-muted/50">
+                          <div className="text-xs text-muted-foreground font-mono">Weekend Balance</div>
+                          <div className="text-lg font-mono font-semibold">{scenario.metrics.weekendBalance}</div>
+                        </div>
+                        <div className="p-2 rounded bg-muted/50">
+                          <div className="text-xs text-muted-foreground font-mono">Difficulty Balance</div>
+                          <div className="text-lg font-mono font-semibold">{scenario.metrics.difficultyBalance}</div>
+                        </div>
+                      </div>
+
+                      {scenario.strengths.length > 0 && (
+                        <div className="mb-2">
+                          <div className="text-xs text-muted-foreground font-mono mb-1">Strengths</div>
+                          <div className="space-y-1">
+                            {scenario.strengths.map((strength, idx) => (
+                              <div key={idx} className="text-xs font-mono flex items-center gap-2">
+                                <span className="text-green-500">✓</span>
+                                {strength}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {scenario.weaknesses.length > 0 && (
+                        <div>
+                          <div className="text-xs text-muted-foreground font-mono mb-1">Areas for Improvement</div>
+                          <div className="space-y-1">
+                            {scenario.weaknesses.map((weakness, idx) => (
+                              <div key={idx} className="text-xs font-mono flex items-center gap-2">
+                                <span className="text-destructive">!</span>
+                                {weakness}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  ))}
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </div>

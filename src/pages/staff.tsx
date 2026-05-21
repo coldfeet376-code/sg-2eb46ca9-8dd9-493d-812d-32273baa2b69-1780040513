@@ -540,11 +540,22 @@ export default function StaffPage() {
       <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
 
       <div className="space-y-6">
-        <div>
-          <h1 className="font-condensed text-3xl font-bold tracking-tight">Staff Management</h1>
-          <p className="text-sm text-muted-foreground font-mono mt-1">
-            Manage employees, training, and weekly availability
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-4xl font-condensed font-bold tracking-tight text-foreground mb-2">
+              Staff Management
+            </h1>
+            <p className="text-sm font-sans text-muted-foreground">
+              Configure team members and training assignments
+            </p>
+          </div>
+          <Button
+            onClick={handleAddStaff}
+            className="font-sans font-medium"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Staff
+          </Button>
         </div>
 
         <Card className="shadow-sm hover:shadow-md transition-smooth">

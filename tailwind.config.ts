@@ -82,9 +82,9 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["IBM Plex Sans", "system-ui", "sans-serif"],
-        condensed: ["IBM Plex Sans Condensed", "Arial", "sans-serif"],
-        mono: ["IBM Plex Mono", "Courier New", "monospace"],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        condensed: ['Sora', 'Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Consolas', 'monospace'],
       },
       keyframes: {
         "accordion-down": {

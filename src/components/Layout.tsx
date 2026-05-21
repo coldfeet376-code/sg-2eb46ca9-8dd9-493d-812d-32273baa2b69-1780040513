@@ -52,6 +52,68 @@ export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background gradient-mesh">
       <header className="border-b border-border/50 bg-card/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="fixed top-0 left-0 right-0 bg-background/95 backdrop-blur-sm border-b border-border z-50 shadow-sm">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <LayoutGrid className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-condensed font-bold tracking-tight text-foreground">
+                    GIST Rota
+                  </h1>
+                  <p className="text-xs font-sans text-muted-foreground">
+                    Warehouse Work System
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 md:gap-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleRestartTour}
+                  className="rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                  title="Restart Tour"
+                >
+                  <HelpCircle className="h-5 w-5" />
+                </Button>
+                {isInstallable && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={install}
+                    className="rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                    title="Download App"
+                  >
+                    <Download className="h-5 w-5" />
+                  </Button>
+                )}
+                <ThemeToggle />
+                <div data-tour="notifications">
+                  <NotificationCenter />
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="gap-2 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-smooth hidden sm:flex"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="font-mono text-xs">Logout</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleLogout}
+                  className="rounded-xl hover:bg-destructive/10 hover:text-destructive transition-smooth sm:hidden"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-4 md:gap-8">
             <Sheet>
@@ -126,25 +188,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 WAREHOUSE ROTA
               </span>
             </Link>
-            <nav className="hidden md:flex items-center gap-1">
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-2">
               <Link
                 href="/"
-                className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                className="px-4 py-2 text-sm font-sans font-medium rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
               >
                 Rota
               </Link>
-              {canAccessPage("staff") && (
-                <Link
-                  href="/staff"
-                  className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
-                >
-                  Staff
-                </Link>
-              )}
+              <Link
+                href="/staff"
+                className="px-4 py-2 text-sm font-sans font-medium rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+              >
+                Staff
+              </Link>
               {canAccessPage("config") && (
                 <Link
                   href="/config"
-                  className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                  className="px-4 py-2 text-sm font-sans font-medium rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
                 >
                   Config
                 </Link>
@@ -152,7 +213,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {canAccessPage("swaps") && (
                 <Link
                   href="/swaps"
-                  className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
+                  className="px-4 py-2 text-sm font-sans font-medium rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Swaps
@@ -161,62 +222,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
               {canAccessPage("managers") && (
                 <Link
                   href="/managers"
-                  className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                  className="px-4 py-2 text-sm font-sans font-medium rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
                 >
                   Managers
                 </Link>
               )}
               <Link
                 href="/analytics"
-                className="px-4 py-2 text-sm font-mono rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
+                className="px-4 py-2 text-sm font-sans font-medium rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
               >
                 <BarChart3 className="h-4 w-4" />
                 Analytics
               </Link>
-            </nav>
-          </div>
-          <div className="flex items-center gap-2 md:gap-3">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleRestartTour}
-              className="rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
-              title="Restart Tour"
-            >
-              <HelpCircle className="h-5 w-5" />
-            </Button>
-            {isInstallable && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={install}
-                className="rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
-                title="Download App"
-              >
-                <Download className="h-5 w-5" />
-              </Button>
-            )}
-            <ThemeToggle />
-            <div data-tour="notifications">
-              <NotificationCenter />
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="gap-2 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-smooth hidden sm:flex"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="font-mono text-xs">Logout</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleLogout}
-              className="rounded-xl hover:bg-destructive/10 hover:text-destructive transition-smooth sm:hidden"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </header>

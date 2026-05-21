@@ -896,16 +896,15 @@ export default function Managers() {
 
         {/* Manager Management Section */}
         {showManageSection && (
-          <Card className="shadow-sm border-primary/20">
-            <CardHeader>
+          <Card className="shadow-sm">
+            <CardHeader className="border-b border-border/50 bg-muted/30">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="font-condensed text-xl flex items-center gap-2">
-                    <Users className="h-5 w-5 text-primary" />
-                    Manage Managers
+                  <CardTitle className="text-2xl font-condensed font-bold tracking-tight">
+                    {formatDateRange(weekDates[0], weekDates[6])}
                   </CardTitle>
-                  <CardDescription className="font-mono text-xs mt-1">
-                    Configure managers and their trained duties
+                  <CardDescription className="text-sm font-sans mt-1">
+                    Week {getWeekNumber(weekStart)} • {isLocked ? "🔒 Locked" : "Unlocked"}
                   </CardDescription>
                 </div>
                 <Button

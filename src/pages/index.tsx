@@ -855,110 +855,37 @@ export default function Home() {
           </Alert>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="font-condensed text-3xl font-bold tracking-tight">
+            <h1 className="text-4xl font-condensed font-bold tracking-tight text-foreground mb-2">
               Weekly Rota
             </h1>
-            <p className="text-sm text-muted-foreground font-mono mt-1">
-              {weekDates[0].toLocaleDateString("en-GB", { 
-                day: "2-digit", 
-                month: "short", 
-                year: "numeric" 
-              })} - {weekDates[6].toLocaleDateString("en-GB", { 
-                day: "2-digit", 
-                month: "short", 
-                year: "numeric" 
-              })}
+            <p className="text-sm font-sans text-muted-foreground">
+              Automated fair distribution rotation system
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Generate Rota Button - Prominent position */}
-            {staff.length > 0 && taskConfig && (
-              <Button
-                onClick={generateRota}
-                size="lg"
-                className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base bg-accent hover:bg-accent/90 text-accent-foreground"
-              >
-                <Zap className="h-5 w-5" />
-                <span>Generate Rota</span>
-              </Button>
-            )}
-
-            <RotaWeekNavigator
-              weekStart={weekStart}
-              onPreviousWeek={() => {
-                const prevWeek = new Date(weekStart);
-                prevWeek.setDate(prevWeek.getDate() - 7);
-                setWeekStart(prevWeek);
-              }}
-              onNextWeek={() => {
-                const nextWeek = new Date(weekStart);
-                nextWeek.setDate(nextWeek.getDate() + 7);
-                setWeekStart(nextWeek);
-              }}
-              onTodayClick={() => {
-                const today = new Date();
-                const day = today.getDay();
-                const diff = day === 0 ? 0 : 7 - day;
-                const saturday = new Date(today);
-                saturday.setDate(today.getDate() + diff);
-                saturday.setHours(0, 0, 0, 0);
-                setWeekStart(saturday);
-              }}
-            />
-
-            {assignments.length > 0 && (
-              <>
-                {lockedAssignments.length < assignments.length && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={lockAll}
-                    className="gap-2 rounded-lg text-primary hover:text-primary"
-                  >
-                    <Lock className="h-4 w-4" />
-                    <span className="font-mono text-xs">Lock All</span>
-                  </Button>
-                )}
-                {lockedAssignments.length > 0 && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => setShowUnlockConfirm(true)}
-                    className="gap-2 rounded-lg text-warning hover:text-warning"
-                  >
-                    <Unlock className="h-4 w-4" />
-                    <span className="font-mono text-xs">Unlock All ({getLockedCount()})</span>
-                  </Button>
-                )}
-              </>
-            )}
-            
-            <div className="flex gap-2">
-              <Button 
-                variant="default" 
-                size="sm" 
-                className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-smooth hidden sm:flex"
-                onClick={exportPDF}
-                disabled={staff.length === 0 || !taskConfig}
-              >
-                <Download className="h-4 w-4" />
-                <span className="font-mono text-xs">PDF</span>
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-smooth hidden sm:flex"
-                onClick={exportCSV}
-                disabled={staff.length === 0 || !taskConfig}
-              >
-                <Download className="h-4 w-4" />
-                <span className="font-mono text-xs">CSV</span>
-              </Button>
-            </div>
-          </div>
+          <RotaWeekNavigator
+            weekStart={weekStart}
+            onPreviousWeek={() => {
+              const prevWeek = new Date(weekStart);
+              prevWeek.setDate(prevWeek.getDate() - 7);
+              setWeekStart(prevWeek);
+            }}
+            onNextWeek={() => {
+              const nextWeek = new Date(weekStart);
+              nextWeek.setDate(nextWeek.getDate() + 7);
+              setWeekStart(nextWeek);
+            }}
+            onTodayClick={() => {
+              const today = new Date();
+              const day = today.getDay();
+              const diff = day === 0 ? 0 : 7 - day;
+              const saturday = new Date(today);
+              saturday.setDate(today.getDate() + diff);
+              saturday.setHours(0, 0, 0, 0);
+              setWeekStart(saturday);
+            }}
+          />
         </div>
 
         {/* Unlock All Confirmation */}
