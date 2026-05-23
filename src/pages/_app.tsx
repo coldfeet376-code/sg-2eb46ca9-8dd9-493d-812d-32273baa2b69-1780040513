@@ -9,10 +9,12 @@ import { TourProvider } from "@/contexts/TourContext";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 import { AuditProvider } from "@/contexts/AuditContext";
 import { authService } from "@/services/authService";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [queryClient] = useState(() => new QueryClient());
 
   useEffect(() => {
     // Check authentication on mount
@@ -63,17 +65,19 @@ export default function App({ Component, pageProps }: AppProps) {
   }
 
   return (
-    <ThemeProvider>
-      <NotificationProvider>
-        <TourProvider>
-          <UndoRedoProvider>
-            <AuditProvider>
-              <Component {...pageProps} />
-              <Toaster />
-            </AuditProvider>
-          </UndoRedoProvider>
-        </TourProvider>
-      </NotificationProvider>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <NotificationProvider>
+          <TourProvider>
+            <UndoRedoProvider>
+              <AuditProvider>
+                <Component {...pageProps} />
+                <Toaster />
+              </AuditProvider>
+            </UndoRedoProvider>
+          </TourProvider>
+        </NotificationProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }
