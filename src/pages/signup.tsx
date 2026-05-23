@@ -18,11 +18,19 @@ export default function SignUpPage() {
   const [validating, setValidating] = useState(true);
   const [inviteValid, setInviteValid] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [isSpecialAdminSetup, setIsSpecialAdminSetup] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
   const token = router.query.token as string;
+  const isSetup = router.query.setup === "admin";
 
   useEffect(() => {
+    if (isSetup) {
+      setIsSpecialAdminSetup(true);
+      setValidating(false);
+      return;
+    }
+
     const validateToken = async () => {
       if (!token) {
         setValidating(false);
@@ -53,6 +61,10 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
+      if (isSpecialAdminSetup && email.toLowerCase() !== "coldfeet376@gmail.com") {
+        throw new Error("Unauthorized email for setup");
+      }
+
       // Sign up with display name
       await authService.signUp(email, password, name);
       
@@ -86,7 +98,7 @@ export default function SignUpPage() {
           <CardContent className="pt-12 pb-12">
             <div className="text-center space-y-4">
               <div className="h-8 w-8 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-muted-foreground font-sans">Validating invitation...</p>
+              <p className="text-sm text-muted-foreground font-sans">Validating...</p>
             </div>
           </CardContent>
         </Card>
@@ -94,7 +106,7 @@ export default function SignUpPage() {
     );
   }
 
-  if (!token || !inviteValid) {
+  if (!isSpecialAdminSetup && (!token || !inviteValid)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
         <Card className="w-full max-w-md shadow-lg">
@@ -163,12 +175,17 @@ export default function SignUpPage() {
                 id="email"
                 type="email"
                 value={email}
-                disabled
-                className="font-sans bg-muted"
+                onChange={(e) => isSpecialAdminSetup && setEmail(e.target.value)}
+                disabled={!isSpecialAdminSetup}
+                required
+                className={`font-sans ${!isSpecialAdminSetup ? 'bg-muted' : ''}`}
+                placeholder={isSpecialAdminSetup ? "admin@example.com" : ""}
               />
-              <p className="text-xs text-muted-foreground font-sans">
-                Invitation sent to this email address
-              </p>
+              {!isSpecialAdminSetup && (
+                <p className="text-xs text-muted-foreground font-sans">
+                  Invitation sent to this email address
+                </p>
+              )}
             </div>
             
             <div className="space-y-2">
