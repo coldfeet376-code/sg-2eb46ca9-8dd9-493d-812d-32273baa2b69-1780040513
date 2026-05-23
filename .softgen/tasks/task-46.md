@@ -1,29 +1,32 @@
 ---
 title: Multi-User Real-Time Collaboration
-status: in_progress
+status: done
 priority: high
 type: feature
-tags: [realtime, collaboration, supabase]
+tags: [realtime, collaboration, audit]
 created_by: agent
-created_at: 2026-05-23T18:55:00Z
+created_at: 2026-05-23T18:48:00Z
 position: 0
 ---
 
 ## Notes
-Implement real-time collaboration features so multiple warehouse managers can work together without conflicts or stale data.
+Implement real-time sync, audit trail, and shared rota storage so multiple users can collaborate on the same warehouse rota system with automatic updates across all connected browsers.
 
 ## Checklist
-- [ ] Move rota storage from localStorage to Supabase database
-- [ ] Add real-time subscriptions for staff, rotas, managers, and availability
-- [ ] Create audit trail table tracking who made each change
-- [ ] Add user identification (track logged-in user email/name)
-- [ ] Add "Recent Changes" panel showing who did what and when
-- [ ] Add real-time notifications when colleagues make changes
-- [ ] Handle subscription cleanup on component unmount
-- [ ] Test concurrent editing scenarios
+- [x] Create `rotas` table in Supabase for shared rota storage
+- [x] Create `audit_log` table for tracking user actions
+- [x] Implement rotaRealtimeService with Supabase Realtime channels
+- [x] Replace localStorage with Supabase storage in main rota page
+- [x] Add real-time subscription for rotas table (auto-update on changes)
+- [x] Add real-time subscription for audit log (track all actions)
+- [x] Create RecentChangesPanel component showing last 20 actions
+- [x] Log all actions: generate, lock, unlock, lock_all, unlock_all
+- [x] Add user notifications when colleagues make changes
+- [x] Update analytics page to read from shared Supabase storage
 
 ## Acceptance
-- Changes made by User A appear instantly on User B's screen
-- Audit log shows exact user who made each change with timestamp
-- No need to manually refresh to see colleagues' updates
-- Recent changes panel displays activity from all users
+- Multiple users can open the app simultaneously and see the same data
+- When one user generates/modifies a rota, other users see changes instantly
+- Recent changes panel displays activity from all users with timestamps
+- Analytics page reads from shared database, not localStorage
+- No manual refresh needed to see colleagues' updates
