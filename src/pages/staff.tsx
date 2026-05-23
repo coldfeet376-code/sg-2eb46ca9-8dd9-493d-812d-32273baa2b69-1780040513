@@ -865,6 +865,7 @@ export default function StaffPage() {
                                     const dateStr = date.toISOString().split("T")[0];
                                     const isOpen = openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr;
                                     const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
+                                    const dayLabel = DAYS[date.getDay()];
                                     
                                     return (
                                       <Popover key={`${idx}-${renderKey}`} open={isOpen} onOpenChange={(open) => {
@@ -878,12 +879,17 @@ export default function StaffPage() {
                                           <button
                                             disabled={isLoading}
                                             className={cn(
-                                              "aspect-square rounded-lg border-2 transition-all font-mono text-sm font-bold flex items-center justify-center min-h-[48px] hover:scale-105",
+                                              "aspect-square rounded-lg border-2 transition-all font-mono text-xs font-bold flex flex-col items-center justify-center min-h-[56px] hover:scale-105 gap-0.5",
                                               getDayColor(availType),
                                               isLoading && "opacity-50 cursor-wait animate-pulse"
                                             )}
                                           >
-                                            {isLoading ? "..." : getDayLabel(availType)}
+                                            <span className="text-[10px] opacity-80 font-semibold">
+                                              {dayLabel}
+                                            </span>
+                                            <span className="text-lg leading-none">
+                                              {isLoading ? "..." : getDayLabel(availType)}
+                                            </span>
                                           </button>
                                         </PopoverTrigger>
                                         <PopoverContent align="center" className="w-56 p-2">
