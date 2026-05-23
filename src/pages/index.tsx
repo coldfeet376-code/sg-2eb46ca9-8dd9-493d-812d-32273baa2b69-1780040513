@@ -275,7 +275,12 @@ export default function Home() {
   };
 
   const generateRota = async () => {
-    const newAssignments = generateWeeklyRota(staff, taskConfig, weekStart, lockedAssignments);
+    const newAssignments = generateWeeklyRota({
+      staff,
+      taskConfig,
+      weekStart,
+      lockedAssignments
+    });
     setAssignments(newAssignments);
     const metrics = calculateFairnessMetrics(newAssignments, staff);
     setFairnessMetrics(metrics);
@@ -290,7 +295,7 @@ export default function Home() {
     addNotification({
       staffName: "System",
       message: "Rota generated successfully",
-      type: "success",
+      type: "info",
     });
   };
 
@@ -364,33 +369,57 @@ export default function Home() {
     return history.filter(h => h.weekStart === weekStartStr);
   };
 
-  const toggleLock = async (dayIndex: number, task: Task) => {
+  const toggleLockAssignment = async (task: string, dayIndex: number, staffName: string) => {
+    const dateStr = weekDates[dayIndex].toISOString().split("T")[0];
+    
     const assignment = assignments.find(
-      (a) => a.dayOfWeek === dayIndex && a.task === task
+      (a) => a.task === task && a.date === dateStr && a.staffName === staffName
     );
 
     if (!assignment) return;
 
-    const key = `${dayIndex}-${task}`;
-    const isLocked = lockedAssignments.some((la) => la === key);
+    const isLocked = lockedAssignments.some(
+      (la) => la.task === task && la.date === dateStr && la.staffName === staffName
+    );
 
+    let newLocked: Assignment[];
     if (isLocked) {
-      setLockedAssignments(lockedAssignments.filter((la) => la !== key));
+      newLocked = lockedAssignments.filter(
+        (la) => !(la.task === task && la.date === dateStr && la.staffName === staffName)
+      );
       await rotaRealtimeService.logAction(
         "unlocked",
         "assignment",
-        key,
-        `Unlocked ${task} on ${DAYS[dayIndex]}`
+        `${dateStr}-${task}-${staffName}`,
+        `Unlocked ${staffName} for ${task} on ${DAYS[dayIndex]}`
       );
     } else {
-      setLockedAssignments([...lockedAssignments, key]);
+      newLocked = [...lockedAssignments, assignment];
       await rotaRealtimeService.logAction(
         "locked",
         "assignment",
-        key,
-        `Locked ${assignment.staffName} for ${task} on ${DAYS[dayIndex]}`
+        `${dateStr}-${task}-${staffName}`,
+        `Locked ${staffName} for ${task} on ${DAYS[dayIndex]}`
       );
     }
+    setLockedAssignments(newLocked);
+  };
+
+  const isAssignmentLocked = (task: string, dayIndex: number, staffName: string) => {
+    const dateStr = weekDates[dayIndex].toISOString().split("T")[0];
+    return lockedAssignments.some(
+      (la) => la.task === task && la.date === dateStr && la.staffName === staffName
+    );
+  };
+
+  const lockAll = async () => {
+    setLockedAssignments([...assignments]);
+    await rotaRealtimeService.logAction(
+      "locked",
+      "rota",
+      weekStart.toISOString().split("T")[0],
+      "Locked all assignments"
+    );
   };
 
   const unlockAll = async () => {

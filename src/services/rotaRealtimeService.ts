@@ -56,7 +56,7 @@ export const rotaRealtimeService = {
       .single();
 
     if (error) throw error;
-    return data as StoredRota;
+    return data as unknown as StoredRota;
   },
 
   /**
@@ -72,7 +72,8 @@ export const rotaRealtimeService = {
       .maybeSingle();
 
     if (error) throw error;
-    return data as StoredRota | null;
+    if (!data) return null;
+    return data as unknown as StoredRota;
   },
 
   /**
@@ -85,7 +86,7 @@ export const rotaRealtimeService = {
       .order("week_start", { ascending: false });
 
     if (error) throw error;
-    return (data as StoredRota[]) || [];
+    return (data as unknown as StoredRota[]) || [];
   },
 
   /**
