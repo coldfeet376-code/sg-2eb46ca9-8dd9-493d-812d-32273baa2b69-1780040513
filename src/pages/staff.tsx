@@ -16,6 +16,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SEO } from "@/components/SEO";
+import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { StaffBulkOperations } from "@/components/staff/StaffBulkOperations";
 import { StaffAvailabilityPanel } from "@/components/staff/StaffAvailabilityPanel";
 import { useAudit } from "@/contexts/AuditContext";
@@ -26,7 +28,6 @@ import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { AlertDialog, AlertDialogTitle, AlertDialogDescription, AlertDialogHeader } from "@/components/ui/alert-dialog";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
@@ -690,21 +691,18 @@ export default function StaffPage() {
             )}
             
             {!staffLoading && staff.length === 0 && (
-              <div className="text-center py-12">
-                <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <Users className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="text-lg font-condensed font-bold tracking-tight mb-2">
-                  No Staff Members Yet
-                </h3>
-                <p className="text-sm font-sans text-muted-foreground mb-4">
-                  Add your first team member to start scheduling
-                </p>
-                <Button onClick={handleAddStaff} size="lg" className="gap-2">
-                  <Plus className="h-5 w-5" />
-                  Add First Staff Member
-                </Button>
-              </div>
+              <EmptyState
+                icon={Users}
+                title="No Staff Members Yet"
+                description="Add your first team member to start scheduling warehouse rotas and managing availability."
+                action={{
+                  label: "Add First Staff Member",
+                  onClick: () => {
+                    // Scroll to top form
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }
+                }}
+              />
             )}
 
             {!staffLoading && staff.length > 0 && (
@@ -761,20 +759,16 @@ export default function StaffPage() {
                               </div>
                             </div>
 
-                            {deleteConfirmId === member.id && (
-                              <AlertDialog>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle className="font-condensed text-xl">
-                                    Delete {member.name}?
-                                  </AlertDialogTitle>
-                                  <AlertDialogDescription className="font-sans">
-                                    This action cannot be undone. This staff member will be permanently removed from the system.
-                                    <br /><br />
-                                    <strong>Note:</strong> Any existing assignments in generated rotas will remain, but you won't be able to generate new rotas including this person.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                              </AlertDialog>
-                            )}
+                            <ConfirmDialog
+                              open={deleteConfirmId === member.id}
+                              onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+                              title={`Delete ${member.name}?`}
+                              description="This action cannot be undone. This staff member will be permanently removed from the system. Any existing assignments in generated rotas will remain, but you won't be able to generate new rotas including this person."
+                              confirmLabel="Delete Staff"
+                              cancelLabel="Cancel"
+                              variant="destructive"
+                              onConfirm={() => handleDeleteStaff(member.id)}
+                            />
 
                             {isEditing && (
                               <div className="mt-4 p-4 space-y-4 bg-muted/30 rounded-lg">

@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SEO } from "@/components/SEO";
+import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { generateManagerDutiesPDF } from "@/lib/pdfGenerator";
 import { ManagerDutiesPrintPreview } from "@/components/ManagerDutiesPrintPreview";
@@ -80,6 +82,7 @@ export default function Managers() {
   const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
   const [selectedManager, setSelectedManager] = useState<any>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [deleteConfirmManager, setDeleteConfirmManager] = useState<Manager | null>(null);
 
   useEffect(() => {
     const auth = sessionStorage.getItem("manager-auth");
@@ -842,21 +845,15 @@ export default function Managers() {
               )}
 
               {!loading && managers.length === 0 && (
-                <div className="text-center py-12">
-                  <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <Users className="h-8 w-8 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-condensed font-bold tracking-tight mb-2">
-                    No Managers Yet
-                  </h3>
-                  <p className="text-sm font-sans text-muted-foreground mb-4">
-                    Add shift managers to start scheduling duties
-                  </p>
-                  <Button onClick={openCreateDialog} size="lg" className="gap-2">
-                    <Plus className="h-5 w-5" />
-                    Add First Manager
-                  </Button>
-                </div>
+                <EmptyState
+                  icon={Users}
+                  title="No Managers Yet"
+                  description="Add shift managers to start scheduling warehouse duties and coordinating daily operations."
+                  action={{
+                    label: "Add First Manager",
+                    onClick: openCreateDialog
+                  }}
+                />
               )}
 
               {!loading && managers.length > 0 && (
@@ -923,7 +920,7 @@ export default function Managers() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDeleteManager(manager)}
+                          onClick={() => setDeleteConfirmManager(manager)}
                           className="rounded-lg text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -933,6 +930,22 @@ export default function Managers() {
                   ))}
                 </div>
               )}
+
+              <ConfirmDialog
+                open={deleteConfirmManager !== null}
+                onOpenChange={(open) => !open && setDeleteConfirmManager(null)}
+                title={`Delete ${deleteConfirmManager?.name}?`}
+                description="This action cannot be undone. This manager will be permanently removed from the system. Any existing duty assignments in generated rotas will remain."
+                confirmLabel="Delete Manager"
+                cancelLabel="Cancel"
+                variant="destructive"
+                onConfirm={async () => {
+                  if (deleteConfirmManager) {
+                    await handleDeleteManager(deleteConfirmManager);
+                    setDeleteConfirmManager(null);
+                  }
+                }}
+              />
             </CardContent>
           </Card>
         )}
@@ -994,12 +1007,15 @@ export default function Managers() {
         )}
 
         {assignments.length === 0 && (
-          <div className="bg-muted/50 border border-border rounded-lg p-8 text-center shadow-sm">
-            <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-sm font-mono text-muted-foreground">
-              No manager duties generated yet. Click "Generate Rota" to create the schedule.
-            </p>
-          </div>
+          <EmptyState
+            icon={Calendar}
+            title="No Duties Scheduled Yet"
+            description="Click 'Generate Rota' to automatically create the manager duties schedule based on availability and training."
+            action={{
+              label: "Generate Rota",
+              onClick: generateRota
+            }}
+          />
         )}
       </div>
       {/* Print Preview Dialog */}
