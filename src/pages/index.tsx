@@ -1459,28 +1459,20 @@ export default function Home() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="font-mono text-xl font-bold tabular-nums text-primary">
-                      {fairnessMetrics.taskScore}
+                      {Math.max(0, 100 - Math.round(fairnessMetrics.standardDeviation * 10))}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Task Score
+                      Task Balance
                     </p>
                   </div>
                   <div>
                     <div className="font-mono text-xl font-bold tabular-nums text-primary">
-                      {fairnessMetrics.staffScore}
+                      {fairnessMetrics.standardDeviation}
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Staff Score
+                      Deviation
                     </p>
                   </div>
-                </div>
-                <div>
-                  <div className="font-mono text-xl font-bold tabular-nums text-primary">
-                    {fairnessMetrics.evenness}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Evenness
-                  </p>
                 </div>
               </div>
             </CardContent>

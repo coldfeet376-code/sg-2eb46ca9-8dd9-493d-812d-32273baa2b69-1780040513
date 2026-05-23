@@ -6,6 +6,7 @@ interface TourContextType {
   startTour: () => void;
   completeTour: () => void;
   setCurrentStep: (step: number) => void;
+  resetAllTours: () => void;
 }
 
 const TourContext = createContext<TourContextType | undefined>(undefined);
@@ -45,6 +46,12 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resetAllTours = () => {
+    localStorage.removeItem(TOUR_STORAGE_KEY);
+    setCurrentStep(0);
+    setIsTourActive(true);
+  };
+
   return (
     <TourContext.Provider
       value={{
@@ -53,6 +60,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         startTour,
         completeTour,
         setCurrentStep,
+        resetAllTours,
       }}
     >
       {children}
