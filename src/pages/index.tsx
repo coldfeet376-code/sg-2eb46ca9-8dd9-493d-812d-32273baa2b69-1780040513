@@ -869,6 +869,18 @@ export default function Home() {
           </Alert>
         )}
 
+        {(staffLoading || configLoading) && (
+          <Card className="shadow-sm">
+            <CardContent className="pt-6">
+              <div className="space-y-4">
+                <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
+                <div className="h-4 bg-muted animate-pulse rounded w-1/2" />
+                <div className="h-4 bg-muted animate-pulse rounded w-2/3" />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-4xl font-condensed font-bold tracking-tight text-foreground mb-2">
@@ -1060,6 +1072,41 @@ export default function Home() {
               </div>
             </div>
           </Alert>
+        )}
+
+        {/* Weekly Rota Display */}
+        {!staffLoading && !configLoading && assignments.length === 0 && (
+          <Card className="shadow-sm">
+            <CardContent className="pt-12 pb-12 text-center">
+              <div className="max-w-md mx-auto space-y-4">
+                <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                  <Zap className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-condensed font-bold tracking-tight mb-2">
+                    No Rota Generated Yet
+                  </h3>
+                  <p className="text-sm font-sans text-muted-foreground">
+                    Click "Generate Rota" above to create a fair distribution schedule for this week
+                  </p>
+                </div>
+                <Button
+                  onClick={generateRota}
+                  disabled={!staff.length || !taskConfig}
+                  size="lg"
+                  className="gap-2 font-sans font-medium mt-4"
+                >
+                  <Zap className="h-5 w-5" />
+                  Generate Rota Now
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {assignments.length > 0 && (
+          <Card className="shadow-sm">
+        </Card>
         )}
 
         {/* Print-only header */}

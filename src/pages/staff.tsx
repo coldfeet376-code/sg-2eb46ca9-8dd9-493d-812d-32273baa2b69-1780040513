@@ -26,6 +26,7 @@ import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { AlertDialog, AlertDialogTitle, AlertDialogDescription, AlertDialogHeader } from "@/components/ui/alert-dialog";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
@@ -666,75 +667,44 @@ export default function StaffPage() {
           onExportTemplate={downloadTemplate}
         />
 
-        <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <div>
-              <CardTitle className="font-condensed flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Staff Members
-              </CardTitle>
-              <CardDescription className="font-mono text-xs mt-1">
-                {staff.length} staff member{staff.length !== 1 ? "s" : ""}
-                {filterShift !== "all" && ` (${filterShift} shift)`}
-              </CardDescription>
-            </div>
-            <Select value={filterShift} onValueChange={(v) => setFilterShift(v as ShiftStart | "all")}>
-              <SelectTrigger className="w-32 rounded-lg font-mono text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="font-mono text-xs">All Shifts</SelectItem>
-                {SHIFT_STARTS.map((shift) => (
-                  <SelectItem key={shift} value={shift} className="font-mono text-xs">{shift}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        <Card className="shadow-sm" data-tour="staff-table">
+          <CardHeader className="border-b border-border/50 bg-muted/30">
+            <CardTitle className="text-xl font-condensed font-bold tracking-tight">
+              Team Members
+            </CardTitle>
+            <CardDescription className="text-sm font-sans">
+              {staff.length} staff • Configure training and availability
+            </CardDescription>
           </CardHeader>
-
-          <CardContent>
-            {/* Week Navigation */}
-            <div className="mb-6 p-4 bg-muted/30 rounded-lg">
-              <div className="flex items-center justify-between mb-4">
-                <Button variant="outline" size="sm" onClick={() => navigateWeek("prev")} className="rounded-lg">
-                  <ChevronDown className="h-4 w-4 rotate-90" />
-                </Button>
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-condensed font-semibold">
-                    {weekDates[0].toLocaleDateString("en-GB", { day: "numeric", month: "short" })} - {weekDates[6].toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                  </span>
-                </div>
-                <Button variant="outline" size="sm" onClick={() => navigateWeek("next")} className="rounded-lg">
-                  <ChevronDown className="h-4 w-4 -rotate-90" />
-                </Button>
-              </div>
-              
-              <div className="grid grid-cols-7 gap-1">
-                {weekDates.map((date, idx) => (
-                  <div key={idx} className="text-center">
-                    <div className="font-mono text-[10px] text-muted-foreground mb-1">
-                      {["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"][idx]}
-                    </div>
-                    <div className="font-mono text-sm font-semibold">
-                      {date.getDate()}
-                    </div>
-                  </div>
+          <CardContent className="pt-6">
+            {staffLoading && (
+              <div className="space-y-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
                 ))}
               </div>
-              
-              <Button variant="ghost" size="sm" onClick={goToToday} className="w-full mt-3 rounded-lg font-mono text-xs">
-                Today
-              </Button>
-            </div>
-
-            {staff.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <Users className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p className="text-sm font-mono">No staff members yet</p>
-                <p className="text-xs font-mono mt-1">Add staff above to get started</p>
+            )}
+            
+            {!staffLoading && staff.length === 0 && (
+              <div className="text-center py-12">
+                <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Users className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-lg font-condensed font-bold tracking-tight mb-2">
+                  No Staff Members Yet
+                </h3>
+                <p className="text-sm font-sans text-muted-foreground mb-4">
+                  Add your first team member to start scheduling
+                </p>
+                <Button onClick={handleAddStaff} size="lg" className="gap-2">
+                  <Plus className="h-5 w-5" />
+                  Add First Staff Member
+                </Button>
               </div>
-            ) : (
-              <div className="space-y-4">
+            )}
+
+            {!staffLoading && staff.length > 0 && (
+              <div className="space-y-2">
                 {staff
                   .filter((member) => filterShift === "all" || member.shiftStart === filterShift)
                   .map((member) => {
@@ -788,32 +758,18 @@ export default function StaffPage() {
                             </div>
 
                             {deleteConfirmId === member.id && (
-                              <Alert className="mt-3 bg-destructive/10 border-destructive">
-                                <AlertCircle className="h-4 w-4 text-destructive" />
-                                <div className="flex-1">
-                                  <p className="text-sm text-destructive mb-2">
-                                    Delete {member.name}? This action cannot be undone.
-                                  </p>
-                                  <div className="flex gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleDeleteStaff(member.id)}
-                                      className="rounded-lg text-destructive"
-                                    >
-                                      Confirm Delete
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => setDeleteConfirmId(null)}
-                                      className="rounded-lg"
-                                    >
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                </div>
-                              </Alert>
+                              <AlertDialog>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="font-condensed text-xl">
+                                    Delete {member.name}?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription className="font-sans">
+                                    This action cannot be undone. This staff member will be permanently removed from the system.
+                                    <br /><br />
+                                    <strong>Note:</strong> Any existing assignments in generated rotas will remain, but you won't be able to generate new rotas including this person.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                              </AlertDialog>
                             )}
 
                             {isEditing && (

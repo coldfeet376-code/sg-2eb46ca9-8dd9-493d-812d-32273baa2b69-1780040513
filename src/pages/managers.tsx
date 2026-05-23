@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DUTIES: ManagerDuty[] = ["Intake", "Out-loading", "Admin", "Floor"];
@@ -912,36 +913,42 @@ export default function Managers() {
         {showManageSection && (
           <Card className="shadow-sm">
             <CardHeader className="border-b border-border/50 bg-muted/30">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-2xl font-condensed font-bold tracking-tight">
-                    {formatDateRange(weekDates[0], weekDates[6])}
-                  </CardTitle>
-                  <CardDescription className="text-sm font-sans mt-1">
-                    Week {getWeekNumber(weekStart)} • {isLocked ? "🔒 Locked" : "Unlocked"}
-                  </CardDescription>
-                </div>
-                <Button
-                  onClick={openCreateDialog}
-                  size="sm"
-                  className="gap-2 rounded-lg"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Manager
-                </Button>
-              </div>
+              <CardTitle className="text-xl font-condensed font-bold tracking-tight">
+                Active Managers
+              </CardTitle>
+              <CardDescription className="text-sm font-sans">
+                {managers.length} managers • Configure duties and availability
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              {loading ? (
-                <p className="text-sm text-muted-foreground font-mono text-center py-4">
-                  Loading managers...
-                </p>
-              ) : managers.length === 0 ? (
-                <p className="text-sm text-muted-foreground font-mono text-center py-4">
-                  No managers yet. Click "Add Manager" to get started.
-                </p>
-              ) : (
-                <div className="space-y-2">
+            <CardContent className="pt-6">
+              {loading && (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
+                  ))}
+                </div>
+              )}
+
+              {!loading && managers.length === 0 && (
+                <div className="text-center py-12">
+                  <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <Users className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-lg font-condensed font-bold tracking-tight mb-2">
+                    No Managers Yet
+                  </h3>
+                  <p className="text-sm font-sans text-muted-foreground mb-4">
+                    Add shift managers to start scheduling duties
+                  </p>
+                  <Button onClick={() => setShowAddManager(true)} size="lg" className="gap-2">
+                    <Plus className="h-5 w-5" />
+                    Add First Manager
+                  </Button>
+                </div>
+              )}
+
+              {!loading && managers.length > 0 && (
+                <div className="space-y-3">
                   {managers.map((manager) => (
                     <div
                       key={manager.id}
