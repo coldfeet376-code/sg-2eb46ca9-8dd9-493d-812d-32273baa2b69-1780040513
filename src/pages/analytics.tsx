@@ -5,7 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, TrendingUp, TrendingDown, AlertCircle, Users, Target } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RefreshCw, TrendingUp, TrendingDown, AlertCircle, Users, Target, Printer, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { staffService } from "@/services/staffService";
 import type { StaffMember, Assignment } from "@/types";
@@ -26,35 +27,89 @@ interface TurnHistory {
   fairnessScore: number;
 }
 
+interface WeekData {
+  weekKey: string;
+  weekStart: Date;
+  assignments: Assignment[];
+}
+
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(false);
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [allWeeks, setAllWeeks] = useState<WeekData[]>([]);
+  const [selectedWeek, setSelectedWeek] = useState<string>("");
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary[]>([]);
   const [missedStaff, setMissedStaff] = useState<StaffMember[]>([]);
   const [turnHistory, setTurnHistory] = useState<TurnHistory[]>([]);
   const { toast } = useToast();
 
   useEffect(() => {
+    // Add print-specific styles
+    const style = document.createElement("style");
+    style.textContent = `
+      @media print {
+        @page { size: A4 portrait; margin: 1.5cm; }
+        body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        .no-print { display: none !important; }
+        .print-break-before { page-break-before: always; }
+        .print-break-inside-avoid { page-break-inside: avoid; }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
+
+  useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (selectedWeek && staff.length > 0) {
+      const weekData = allWeeks.find(w => w.weekKey === selectedWeek);
+      if (weekData) {
+        calculateWeeklySummary(staff, weekData.assignments);
+      }
+    }
+  }, [selectedWeek, staff, allWeeks]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       // Load staff
       const staffData = await staffService.getAllStaff();
-
       setStaff(staffData);
 
-      // Get assignments from localStorage for current week
-      const weekStart = getWeekStart(new Date());
-      const weekKey = weekStart.toISOString().split("T")[0];
-      const stored = localStorage.getItem(`rota_${weekKey}`);
+      // Get all stored weeks from localStorage
+      const weeks: WeekData[] = [];
+      const allKeys = Object.keys(localStorage).filter(k => k.startsWith("rota_"));
       
-      if (stored) {
-        const { assignments } = JSON.parse(stored);
-        calculateWeeklySummary(staffData, assignments);
-      } else {
+      allKeys.forEach(key => {
+        const stored = localStorage.getItem(key);
+        if (stored) {
+          try {
+            const data = JSON.parse(stored);
+            const weekKey = key.replace("rota_", "");
+            weeks.push({
+              weekKey,
+              weekStart: new Date(data.weekStart || weekKey),
+              assignments: data.assignments || [],
+            });
+          } catch (e) {
+            console.error("Error parsing stored rota:", e);
+          }
+        }
+      });
+
+      // Sort weeks by date descending (most recent first)
+      weeks.sort((a, b) => b.weekStart.getTime() - a.weekStart.getTime());
+      setAllWeeks(weeks);
+
+      // Auto-select most recent week
+      if (weeks.length > 0 && !selectedWeek) {
+        const mostRecent = weeks[0].weekKey;
+        setSelectedWeek(mostRecent);
+        calculateWeeklySummary(staffData, weeks[0].assignments);
+      } else if (weeks.length === 0) {
         calculateWeeklySummary(staffData, []);
       }
 
@@ -63,7 +118,7 @@ export default function AnalyticsPage() {
 
       toast({
         title: "Data refreshed",
-        description: "Analytics updated successfully",
+        description: `Loaded ${weeks.length} week(s) of data`,
       });
     } catch (error) {
       console.error("Error loading analytics:", error);
@@ -205,7 +260,33 @@ export default function AnalyticsPage() {
       </Head>
       <Layout>
         <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          {/* Print-only header */}
+          <div className="hidden print:block mb-6">
+            <h1 className="font-condensed text-3xl font-bold mb-2">
+              WAREHOUSE ANALYTICS REPORT
+            </h1>
+            {selectedWeek && (
+              <p className="font-mono text-sm text-muted-foreground">
+                Week Starting: {allWeeks.find(w => w.weekKey === selectedWeek)?.weekStart.toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "long",
+                  year: "numeric"
+                })}
+              </p>
+            )}
+            <p className="font-mono text-xs text-muted-foreground mt-1">
+              Generated: {new Date().toLocaleString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+            <hr className="mt-4 border-border" />
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 no-print">
             <div>
               <h1 className="text-4xl font-condensed font-bold tracking-tight text-foreground mb-2">
                 Analytics Dashboard
@@ -214,18 +295,68 @@ export default function AnalyticsPage() {
                 Track assignments, fairness, and team distribution
               </p>
             </div>
-            <Button
-              onClick={loadData}
-              disabled={loading}
-              className="font-sans font-medium"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-              Refresh Data
-            </Button>
+            <div className="flex gap-2">
+              {allWeeks.length > 0 && (
+                <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Select week" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allWeeks.map((week) => (
+                      <SelectItem key={week.weekKey} value={week.weekKey}>
+                        Week of {week.weekStart.toLocaleDateString("en-GB", { 
+                          day: "2-digit", 
+                          month: "short",
+                          year: "numeric"
+                        })}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Button
+                onClick={() => window.print()}
+                disabled={weeklySummary.length === 0}
+                variant="outline"
+                className="font-sans font-medium gap-2"
+              >
+                <Printer className="h-4 w-4" />
+                Print
+              </Button>
+              <Button
+                onClick={loadData}
+                disabled={loading}
+                className="font-sans font-medium"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            </div>
           </div>
 
+          {allWeeks.length === 0 && !loading && (
+            <Card className="shadow-sm">
+              <CardContent className="pt-12 pb-12 text-center">
+                <div className="max-w-md mx-auto space-y-4">
+                  <div className="h-16 w-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+                    <Calendar className="h-8 w-8 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-condensed font-bold tracking-tight mb-2">
+                      No Rota Data Found
+                    </h3>
+                    <p className="text-sm font-sans text-muted-foreground">
+                      Generate a rota on the main page to see analytics
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {allWeeks.length > 0 && (
           <Tabs defaultValue="summary" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3 bg-muted/50">
+            <TabsList className="grid w-full grid-cols-3 bg-muted/50 no-print">
               <TabsTrigger value="summary" className="font-sans font-medium">
                 This Week
               </TabsTrigger>
@@ -435,6 +566,7 @@ export default function AnalyticsPage() {
               </Card>
             </TabsContent>
           </Tabs>
+          )}
         </div>
       </Layout>
     </>
