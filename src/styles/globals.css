@@ -567,9 +567,69 @@
 }
 
 /* Prevent scroll issues with position sticky */
-.sticky-container {
-  position: relative;
-  z-index: 1;
+html, body {
+  overflow-x: hidden;
+}
+
+/* Print-specific styles */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 1cm;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-content {
+    width: 100%;
+    height: auto;
+  }
+
+  /* Hide non-printable elements */
+  .no-print,
+  nav,
+  header,
+  footer,
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Page breaks */
+  .print\:break-before-page {
+    page-break-before: always;
+  }
+
+  .print\:break-inside-avoid {
+    page-break-inside: avoid;
+  }
+
+  /* Optimize table printing */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  /* Ensure colors print correctly */
+  * {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 }
 
 /* Background watermark - GIST logo on all screens */

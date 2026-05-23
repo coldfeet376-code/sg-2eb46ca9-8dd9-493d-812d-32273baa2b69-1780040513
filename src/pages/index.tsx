@@ -20,7 +20,7 @@ import { rotaService } from "@/services/rotaService";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useStaff, useTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
-import { RefreshCw, Download, Lock, Unlock, ChevronLeft, ChevronRight, AlertCircle, History, RotateCcw, Zap, TrendingUp } from "lucide-react";
+import { Lock, Unlock, Save, Download, Copy, Calendar, History, RotateCcw, Zap, LayoutGrid, Printer } from "lucide-react";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
@@ -28,6 +28,8 @@ const OnboardingTour = dynamic(
   () => import("@/components/OnboardingTour").then(mod => mod.OnboardingTour),
   { ssr: false }
 );
+
+import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
@@ -76,7 +78,8 @@ export default function Home() {
   const [showCoverageWarning, setShowCoverageWarning] = useState(false);
   const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
-  const [fairnessMetrics, setFairnessMetrics] = useState<FairnessMetrics | null>(null);
+  const [fairnessMetrics, setFairnessMetrics] = useState<ReturnType<typeof calculateFairnessMetrics> | null>(null);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
   const { addNotification } = useNotifications();
 
   // React Query hooks - cached data with error handling
@@ -899,6 +902,17 @@ export default function Home() {
 
               <div className="flex gap-2 ml-auto">
                 <Button
+                  onClick={() => setShowPrintPreview(true)}
+                  disabled={assignments.length === 0}
+                  variant="outline"
+                  className="gap-2 font-sans font-medium"
+                  size="lg"
+                >
+                  <Printer className="h-4 w-4" />
+                  Print Preview
+                </Button>
+
+                <Button
                   onClick={exportWeekPDF}
                   disabled={assignments.length === 0}
                   variant="outline"
@@ -907,17 +921,6 @@ export default function Home() {
                 >
                   <Download className="h-4 w-4" />
                   Export PDF
-                </Button>
-
-                <Button
-                  onClick={exportCSV}
-                  disabled={assignments.length === 0}
-                  variant="outline"
-                  className="gap-2 font-sans font-medium"
-                  size="lg"
-                >
-                  <Download className="h-4 w-4" />
-                  Export CSV
                 </Button>
               </div>
             </div>
@@ -1361,6 +1364,17 @@ export default function Home() {
           </Card>
         )}
       </div>
+
+      {/* Print Preview Dialog */}
+      <StaffRotaPrintPreview
+        open={showPrintPreview}
+        onClose={() => setShowPrintPreview(false)}
+        weekStart={weekStart}
+        assignments={assignments}
+        staff={staff}
+        fairnessMetrics={fairnessMetrics}
+        lockedCount={lockedAssignments.length}
+      />
     </Layout>
   );
 }

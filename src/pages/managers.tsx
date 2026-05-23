@@ -11,8 +11,9 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SEO } from "@/components/SEO";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { generateManagerDutiesPDF } from "@/lib/pdfGenerator";
+import { ManagerDutiesPrintPreview } from "@/components/ManagerDutiesPrintPreview";
 import type { ManagerAssignment, ManagerDuty, ManagerShiftStart } from "@/types";
-import { Lock, Unlock, Zap, AlertCircle, ChevronLeft, ChevronRight, Download, Plus, Pencil, Trash2, Users, Check, X } from "lucide-react";
+import { Plus, Lock, Unlock, Download, Calendar, RefreshCw, X, Printer } from "lucide-react";
 import { getAllManagers, createManager, updateManager, deleteManager, getManagersForDuty, type Manager, getManagerAvailability, setManagerAvailability, getAvailabilityForDate, type ManagerAvailability } from "@/services/managerService";
 import { ManagerForm } from "@/components/managers/ManagerForm";
 import { ManagerAvailabilityDialog } from "@/components/managers/ManagerAvailabilityDialog";
@@ -76,6 +77,9 @@ export default function Managers() {
   const [selectedManagerForCalendar, setSelectedManagerForCalendar] = useState<Manager | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [selectedAvailabilityType, setSelectedAvailabilityType] = useState<AvailabilityType>("rest");
+  const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
+  const [selectedManager, setSelectedManager] = useState<any>(null);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
 
   useEffect(() => {
     const auth = sessionStorage.getItem("manager-auth");
@@ -789,15 +793,29 @@ export default function Managers() {
                     Locked
                   </Badge>
                 )}
-                <Button 
-                  variant="default" 
-                  size="sm" 
-                  className="gap-2 rounded-lg shadow-sm hover:shadow-md transition-smooth"
-                  onClick={exportPDF}
-                >
-                  <Download className="h-4 w-4" />
-                  <span className="font-mono text-xs">PDF</span>
-                </Button>
+                <div className="flex gap-2 ml-auto">
+                  <Button
+                    onClick={() => setShowPrintPreview(true)}
+                    disabled={assignments.length === 0}
+                    variant="outline"
+                    className="gap-2 font-sans font-medium"
+                    size="lg"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Print Preview
+                  </Button>
+
+                  <Button
+                    onClick={exportPDF}
+                    disabled={assignments.length === 0}
+                    variant="outline"
+                    className="gap-2 font-sans font-medium"
+                    size="lg"
+                  >
+                    <Download className="h-4 w-4" />
+                    Export PDF
+                  </Button>
+                </div>
               </>
             )}
           </div>
@@ -984,6 +1002,14 @@ export default function Managers() {
           </div>
         )}
       </div>
+      {/* Print Preview Dialog */}
+      <ManagerDutiesPrintPreview
+        open={showPrintPreview}
+        onClose={() => setShowPrintPreview(false)}
+        weekStart={weekStart}
+        assignments={assignments}
+        managers={managers.map(m => ({ id: m.id, name: m.name }))}
+      />
     </Layout>
   );
 }
