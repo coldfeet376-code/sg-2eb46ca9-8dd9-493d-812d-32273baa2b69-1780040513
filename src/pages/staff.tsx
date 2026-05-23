@@ -672,6 +672,33 @@ export default function StaffPage() {
           </Card>
         )}
 
+        {/* Quick Shift Filter */}
+        <Card className="shadow-sm">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-4">
+              <Label className="font-mono text-xs font-semibold whitespace-nowrap">
+                Quick Filter:
+              </Label>
+              <Select value={filterShift} onValueChange={(v) => setFilterShift(v as ShiftStart | "all")}>
+                <SelectTrigger className="w-[180px] rounded-lg font-mono text-xs">
+                  <SelectValue placeholder="All Shifts" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="font-mono text-xs">All Shifts</SelectItem>
+                  {SHIFT_STARTS.map((shift) => (
+                    <SelectItem key={shift} value={shift} className="font-mono text-xs">
+                      {shift} Shift
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground font-mono">
+                Showing {staff.filter((member) => filterShift === "all" || member.shiftStart === filterShift).length} of {staff.length} staff
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card className="shadow-sm" data-tour="staff-table">
           <CardHeader className="border-b border-border/50 bg-muted/30">
             <CardTitle className="text-xl font-condensed font-bold tracking-tight">
