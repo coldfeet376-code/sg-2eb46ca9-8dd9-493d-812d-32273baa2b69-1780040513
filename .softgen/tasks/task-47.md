@@ -1,6 +1,6 @@
 ---
 title: User Authentication and Auto-Lock
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [auth, security, ux]
@@ -13,13 +13,13 @@ position: 0
 Add user authentication requiring name and password on first access, with "remember me" functionality and automatic locking of all assignments after rota generation.
 
 ## Checklist
-- [ ] Update login page with name field and improved UX
-- [ ] Add "Remember Me" checkbox with localStorage persistence
-- [ ] Implement auto-redirect to login if not authenticated
-- [ ] Auto-lock all assignments after rota generation
-- [ ] Update authService to handle session persistence
-- [ ] Add user display name tracking in audit log
-- [ ] Test multi-user flow with authentication
+- [x] Update login page with name field and improved UX
+- [x] Add "Remember Me" checkbox with localStorage persistence
+- [x] Implement auto-redirect to login if not authenticated
+- [x] Auto-lock all assignments after rota generation
+- [x] Update authService to handle session persistence
+- [x] Add user display name tracking in audit log
+- [x] Test multi-user flow with authentication
 
 ## Acceptance
 - Users prompted for name and password on first visit

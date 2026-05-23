@@ -152,8 +152,8 @@ export const rotaRealtimeService = {
       user_email: user.email || "unknown@example.com",
       user_name: displayName,
       action,
-      target_type: targetType,
-      target_id: targetId,
+      entity_type: targetType,
+      entity_id: targetId,
       details,
     });
 
