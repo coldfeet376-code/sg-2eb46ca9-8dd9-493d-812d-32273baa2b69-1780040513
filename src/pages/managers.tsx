@@ -13,7 +13,7 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { generateManagerDutiesPDF } from "@/lib/pdfGenerator";
 import { ManagerDutiesPrintPreview } from "@/components/ManagerDutiesPrintPreview";
 import type { ManagerAssignment, ManagerDuty, ManagerShiftStart } from "@/types";
-import { Plus, Lock, Unlock, Download, Calendar, RefreshCw, X, Printer } from "lucide-react";
+import { Plus, Lock, Unlock, Download, Calendar, RefreshCw, X, Printer, Users, Zap, ChevronLeft, ChevronRight, Pencil, Trash2, AlertCircle } from "lucide-react";
 import { getAllManagers, createManager, updateManager, deleteManager, getManagersForDuty, type Manager, getManagerAvailability, setManagerAvailability, getAvailabilityForDate, type ManagerAvailability } from "@/services/managerService";
 import { ManagerForm } from "@/components/managers/ManagerForm";
 import { ManagerAvailabilityDialog } from "@/components/managers/ManagerAvailabilityDialog";

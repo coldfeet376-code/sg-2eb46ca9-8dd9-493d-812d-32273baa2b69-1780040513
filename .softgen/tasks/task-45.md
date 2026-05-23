@@ -1,6 +1,6 @@
 ---
 title: Print Preview Mode for Reports
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [print, preview, reports]
@@ -13,14 +13,14 @@ position: 0
 Add dedicated print preview mode that displays the PDF layout on screen before printing, with print-optimized CSS and one-click print functionality.
 
 ## Checklist
-- [ ] Create StaffRotaPrintPreview component matching PDF layout
-- [ ] Create ManagerDutiesPrintPreview component matching PDF layout
-- [ ] Add print-specific CSS with @media print rules
-- [ ] Add "Print Preview" buttons to both pages
-- [ ] Implement print dialog with full-screen preview
-- [ ] Add "Print" button that triggers window.print()
-- [ ] Hide non-printable UI elements (navigation, buttons) in print mode
-- [ ] Ensure page breaks and formatting match PDF exactly
+- [x] Create StaffRotaPrintPreview component matching PDF layout
+- [x] Create ManagerDutiesPrintPreview component matching PDF layout
+- [x] Add print-specific CSS with @media print rules
+- [x] Add "Print Preview" buttons to both pages
+- [x] Implement print dialog with full-screen preview
+- [x] Add "Print" button that triggers window.print()
+- [x] Hide non-printable UI elements (navigation, buttons) in print mode
+- [x] Ensure page breaks and formatting match PDF exactly
 
 ## Acceptance
 - Clicking "Print Preview" opens full-screen preview with PDF layout

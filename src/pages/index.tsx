@@ -20,7 +20,7 @@ import { rotaService } from "@/services/rotaService";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useStaff, useTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
-import { Lock, Unlock, Save, Download, Copy, Calendar, History, RotateCcw, Zap, LayoutGrid, Printer } from "lucide-react";
+import { Lock, Unlock, Save, Download, Copy, Calendar, History, RotateCcw, Zap, LayoutGrid, Printer, AlertCircle, TrendingUp } from "lucide-react";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues

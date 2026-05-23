@@ -37,7 +37,7 @@ export function ManagerDutiesPrintPreview({
     if (!assignment) return "—";
     
     const manager = managers.find((m) => m.id === assignment.managerId);
-    const shiftLabel = assignment.shiftStart === "6am" ? " (6AM)" : " (2PM)";
+    const shiftLabel = assignment.shiftStart === "06:00" ? " (6AM)" : " (8AM)";
     return manager ? `${manager.name}${shiftLabel}` : "—";
   };
 
