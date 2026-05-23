@@ -1058,18 +1058,23 @@ export default function Managers() {
           onSubmit={handleSetSingleDayAvailability}
         />
 
-        {/* Rota Table */}
+        {/* Manager Rota Table */}
         {assignments.length > 0 && (
-          <ManagerRotaTable
-            weekDays={weekDates.map((date, i) => ({ date, dateStr: date.toISOString().split("T")[0], dayOfWeek: i }))}
-            managers={managers}
-            assignments={assignments}
-            getAvailabilityForManagerDate={getAvailabilityForManagerDate}
-            onDeleteAssignment={(managerId, dateStr) => {
-               // Optional: implement if needed, currently dummy
-               setAssignments(prev => prev.filter(a => !(a.managerId === managerId && a.date === dateStr)));
-            }}
-          />
+          <Card className="shadow-sm" data-tour="manager-rota">
+            <CardHeader className="border-b border-border/50 bg-muted/30">
+            <CardContent className="pt-6">
+              <ManagerRotaTable
+                weekDays={weekDates.map((date, i) => ({ date, dateStr: date.toISOString().split("T")[0], dayOfWeek: i }))}
+                managers={managers}
+                assignments={assignments}
+                getAvailabilityForManagerDate={getAvailabilityForManagerDate}
+                onDeleteAssignment={(managerId, dateStr) => {
+                   // Optional: implement if needed, currently dummy
+                   setAssignments(prev => prev.filter(a => !(a.managerId === managerId && a.date === dateStr)));
+                }}
+              />
+            </CardContent>
+          </Card>
         )}
 
         {assignments.length === 0 && (

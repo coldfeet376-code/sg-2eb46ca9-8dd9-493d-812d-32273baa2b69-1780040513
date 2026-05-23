@@ -658,14 +658,18 @@ export default function StaffPage() {
         {/* Staff List */}
 
         {/* Bulk Operations */}
-        <StaffBulkOperations
-          bulkData={bulkData}
-          bulkAvailability={bulkAvailability}
-          onBulkDataChange={setBulkData}
-          onBulkAvailabilityChange={setBulkAvailability}
-          onBulkImport={handleBulkImport}
-          onExportTemplate={downloadTemplate}
-        />
+        {selectedStaff.length > 0 && (
+          <Card className="shadow-sm bg-primary/5 border-primary/20" data-tour="bulk-operations">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-condensed font-bold tracking-tight">
+                Bulk Operations
+              </CardTitle>
+              <CardDescription className="text-sm font-sans">
+                {selectedStaff.length} staff members selected
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
 
         <Card className="shadow-sm" data-tour="staff-table">
           <CardHeader className="border-b border-border/50 bg-muted/30">

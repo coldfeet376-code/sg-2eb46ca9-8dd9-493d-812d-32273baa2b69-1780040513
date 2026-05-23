@@ -1,49 +1,60 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { useRouter } from "next/router";
+import React, { createContext, useContext, useState, useEffect } from "react";
 
 interface TourContextType {
-  startTour: (tourId: string) => void;
-  hasSeenTour: (tourId: string) => boolean;
-  markTourAsSeen: (tourId: string) => void;
-  resetAllTours: () => void;
+  isTourActive: boolean;
+  currentStep: number;
+  startTour: () => void;
+  completeTour: () => void;
+  setCurrentStep: (step: number) => void;
 }
 
 const TourContext = createContext<TourContextType | undefined>(undefined);
 
-export function TourProvider({ children }: { children: ReactNode }) {
-  const [seenTours, setSeenTours] = useState<Set<string>>(new Set());
-  const router = useRouter();
+const TOUR_STORAGE_KEY = "gist-rota-tour-completed";
+
+export function TourProvider({ children }: { children: React.ReactNode }) {
+  const [isTourActive, setIsTourActive] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("warehouse-tours-seen");
-    if (saved) {
-      setSeenTours(new Set(JSON.parse(saved)));
+    setMounted(true);
+    
+    // Check if tour has been completed before
+    const tourCompleted = localStorage.getItem(TOUR_STORAGE_KEY);
+    
+    // Auto-start tour for new users
+    if (!tourCompleted) {
+      // Delay to ensure page is fully loaded
+      setTimeout(() => {
+        setIsTourActive(true);
+      }, 1000);
     }
   }, []);
 
-  const startTour = (tourId: string) => {
-    // Tour will be started by the component that implements it
-    // This is just a placeholder for future functionality
+  const startTour = () => {
+    setCurrentStep(0);
+    setIsTourActive(true);
   };
 
-  const hasSeenTour = (tourId: string): boolean => {
-    return seenTours.has(tourId);
-  };
-
-  const markTourAsSeen = (tourId: string) => {
-    const updated = new Set(seenTours);
-    updated.add(tourId);
-    setSeenTours(updated);
-    localStorage.setItem("warehouse-tours-seen", JSON.stringify([...updated]));
-  };
-
-  const resetAllTours = () => {
-    setSeenTours(new Set());
-    localStorage.removeItem("warehouse-tours-seen");
+  const completeTour = () => {
+    setIsTourActive(false);
+    setCurrentStep(0);
+    if (mounted) {
+      localStorage.setItem(TOUR_STORAGE_KEY, "true");
+    }
   };
 
   return (
-    <TourContext.Provider value={{ startTour, hasSeenTour, markTourAsSeen, resetAllTours }}>
+    <TourContext.Provider
+      value={{
+        isTourActive,
+        currentStep,
+        startTour,
+        completeTour,
+        setCurrentStep,
+      }}
+    >
       {children}
     </TourContext.Provider>
   );
@@ -51,7 +62,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
 export function useTour() {
   const context = useContext(TourContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useTour must be used within TourProvider");
   }
   return context;

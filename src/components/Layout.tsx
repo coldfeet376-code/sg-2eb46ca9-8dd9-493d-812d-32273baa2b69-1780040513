@@ -145,6 +145,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 href="/staff"
                 className="px-4 py-2 text-sm font-sans font-medium rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                data-tour="staff-nav"
               >
                 Staff
               </Link>
@@ -169,6 +170,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 <Link
                   href="/managers"
                   className="px-4 py-2 text-sm font-sans font-medium rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
+                  data-tour="managers-nav"
                 >
                   Managers
                 </Link>
@@ -176,6 +178,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link
                 href="/analytics"
                 className="px-4 py-2 text-sm font-sans font-medium rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth flex items-center gap-2"
+                data-tour="analytics-nav"
               >
                 <BarChart3 className="h-4 w-4" />
                 Analytics
@@ -189,7 +192,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 size="icon"
                 onClick={handleRestartTour}
                 className="rounded-xl hover:bg-primary/10 hover:text-primary transition-smooth"
-                title="Restart Tour"
+                title="Restart Onboarding Tour"
               >
                 <HelpCircle className="h-5 w-5" />
               </Button>

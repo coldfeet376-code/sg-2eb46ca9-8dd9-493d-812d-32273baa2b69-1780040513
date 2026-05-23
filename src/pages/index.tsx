@@ -911,6 +911,7 @@ export default function Home() {
               saturday.setHours(0, 0, 0, 0);
               setWeekStart(saturday);
             }}
+            data-tour="week-navigator"
           />
         </div>
 
@@ -1434,6 +1435,56 @@ export default function Home() {
               </p>
             </div>
           </Alert>
+        )}
+
+        {fairnessMetrics && assignments.length > 0 && (
+          <Card className="shadow-sm" data-tour="fairness-metrics">
+            <CardHeader className="border-b border-border/50 bg-muted/30">
+              <CardTitle className="text-lg font-condensed font-bold tracking-tight">
+                Fairness Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex-1">
+                    <div className="font-mono text-2xl font-bold tabular-nums text-primary">
+                      {fairnessMetrics.overallScore}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Overall Score
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <div className="font-mono text-xl font-bold tabular-nums text-primary">
+                      {fairnessMetrics.taskScore}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Task Score
+                    </p>
+                  </div>
+                  <div>
+                    <div className="font-mono text-xl font-bold tabular-nums text-primary">
+                      {fairnessMetrics.staffScore}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Staff Score
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <div className="font-mono text-xl font-bold tabular-nums text-primary">
+                    {fairnessMetrics.evenness}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Evenness
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </Layout>
