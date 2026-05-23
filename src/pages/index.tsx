@@ -298,7 +298,7 @@ export default function Home() {
     addNotification({
       staffName: "System",
       message: "Rota generated and locked successfully",
-      type: "success",
+      type: "info",
     });
   };
 

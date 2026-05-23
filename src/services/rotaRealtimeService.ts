@@ -17,6 +17,7 @@ export interface AuditLogEntry {
   id: string;
   user_id: string | null;
   user_email: string | null;
+  user_name: string | null;
   action: string;
   entity_type: string;
   entity_id: string;
@@ -140,7 +141,7 @@ export const rotaRealtimeService = {
     targetId: string,
     details: string
   ): Promise<void> {
-    const user = await getCurrentUser();
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     // Get display name from user metadata or email
