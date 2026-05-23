@@ -23,7 +23,7 @@ export default function App({ Component, pageProps }: AppProps) {
         const session = await authService.getSession();
         
         // Public routes that don't require auth
-        const publicRoutes = ["/login", "/signup", "/forgot-password", "/reset-password"];
+        const publicRoutes = ["/login", "/signup", "/forgot-password", "/reset-password", "/admin/setup"];
         const isPublicRoute = publicRoutes.includes(router.pathname);
 
         if (!session && !isPublicRoute) {
