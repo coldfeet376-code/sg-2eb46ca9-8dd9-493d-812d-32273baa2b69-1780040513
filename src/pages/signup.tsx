@@ -63,7 +63,7 @@ export default function SignUpPage() {
       
       toast({
         title: "Account created",
-        description: "Please check your email to verify your account",
+        description: "Your account is ready to use",
       });
       
       // Redirect to login

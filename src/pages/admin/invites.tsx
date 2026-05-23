@@ -16,6 +16,7 @@ import {
   TableCell,
   TableHead,
   TableHeader,
+  TableHeader,
   TableRow,
 } from "@/components/ui/table";
 import {
@@ -95,11 +96,12 @@ export default function AdminInvitesPage() {
     setSendingInvite(true);
 
     try {
-      // Validate email domain
+      // Validate email domain (allow specific admin email)
+      const isSpecialAdmin = newEmail.toLowerCase() === "coldfeet376@gmail.com";
       const isAdminEmail = newEmail.toLowerCase().startsWith("admin@");
       const hasCorrectDomain = newEmail.toLowerCase().endsWith("@gistworld.com");
       
-      if (!isAdminEmail && !hasCorrectDomain) {
+      if (!isSpecialAdmin && !isAdminEmail && !hasCorrectDomain) {
         toast({
           title: "Invalid email domain",
           description: "Email must be @gistworld.com",

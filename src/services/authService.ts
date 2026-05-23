@@ -19,7 +19,8 @@ export const authService = {
   async isAdmin(): Promise<boolean> {
     const user = await this.getCurrentUser();
     if (!user || !user.email) return false;
-    return user.email.toLowerCase().startsWith("admin@");
+    const email = user.email.toLowerCase();
+    return email.startsWith("admin@") || email === "coldfeet376@gmail.com";
   },
 
   /**
@@ -123,6 +124,9 @@ export const authService = {
    * Sign up a new user with display name
    */
   async signUp(email: string, password: string, displayName: string): Promise<User> {
+    const emailLower = email.toLowerCase();
+    const isAdmin = emailLower.startsWith("admin@") || emailLower === "coldfeet376@gmail.com";
+    
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -130,6 +134,11 @@ export const authService = {
         data: {
           display_name: displayName,
         },
+        emailRedirectTo: undefined,
+        // Skip email confirmation for admin accounts
+        ...(isAdmin && { 
+          emailConfirm: false,
+        }),
       },
     });
 
