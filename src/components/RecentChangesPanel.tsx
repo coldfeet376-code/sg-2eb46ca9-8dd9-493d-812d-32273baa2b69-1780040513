@@ -149,9 +149,9 @@ export function RecentChangesPanel() {
                         {entry.details}
                       </p>
                     )}
-                    {entry.user_email && (
+                    {entry.user_name && (
                       <p className="text-xs font-mono text-muted-foreground mt-1">
-                        by {entry.user_email.split("@")[0]}
+                        by {entry.user_name}
                       </p>
                     )}
                   </div>

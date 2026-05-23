@@ -1,94 +1,192 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { SEO } from "@/components/SEO";
-import { Lock, LayoutGrid, AlertCircle } from "lucide-react";
-
-const CORRECT_PASSWORD = "warehouse2024"; // Generic password - can be changed or moved to .env
-const ALTERNATE_PASSWORD = "Lenziemill"; // Alternate password
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
+import { authService } from "@/services/authService";
+import { LogIn, UserPlus } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Check if already logged in
-    const isLoggedIn = localStorage.getItem("warehouse-auth");
-    if (isLoggedIn === "true") {
-      router.push("/");
-    }
+    // Check if user is already logged in
+    const checkAuth = async () => {
+      const session = await authService.getSession();
+      if (session) {
+        router.push("/");
+      }
+    };
+    checkAuth();
   }, [router]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (password === CORRECT_PASSWORD || password === ALTERNATE_PASSWORD) {
-      localStorage.setItem("warehouse-auth", "true");
-      router.push("/");
-    } else {
-      setError(true);
-      setPassword("");
-      setTimeout(() => setError(false), 3000);
+    setLoading(true);
+
+    try {
+      if (isSignUp) {
+        // Sign up with display name in metadata
+        await authService.signUp(email, password, name);
+        
+        toast({
+          title: "Account created",
+          description: "Please check your email to verify your account",
+        });
+        
+        // Auto switch to login after signup
+        setIsSignUp(false);
+      } else {
+        // Sign in
+        const user = await authService.signIn(email, password);
+        
+        // Store remember me preference
+        if (rememberMe) {
+          localStorage.setItem("warehouse_remember_me", "true");
+        } else {
+          localStorage.removeItem("warehouse_remember_me");
+        }
+        
+        toast({
+          title: "Welcome back!",
+          description: `Logged in as ${user.email}`,
+        });
+        
+        router.push("/");
+      }
+    } catch (error: any) {
+      toast({
+        title: isSignUp ? "Signup failed" : "Login failed",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-background gradient-mesh flex items-center justify-center p-4">
-      <SEO title="Login - Warehouse Rota" description="Access warehouse rota system" />
-      
-      <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="text-center space-y-3">
-          <div className="mx-auto h-16 w-16 rounded-2xl gradient-primary flex items-center justify-center shadow-lg">
-            <Lock className="h-8 w-8 text-white" />
-          </div>
-          <CardTitle className="font-condensed text-2xl">Warehouse Rota System</CardTitle>
-          <CardDescription className="font-mono text-xs">
-            Enter password to access the system
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-3xl font-condensed font-bold tracking-tight">
+            GIST Warehouse Rota
+          </CardTitle>
+          <CardDescription className="font-sans">
+            {isSignUp ? "Create your account to get started" : "Sign in to access the rota system"}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <div className="space-y-2">
+                <Label htmlFor="name" className="font-sans font-medium">
+                  Display Name
+                </Label>
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="John Smith"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required={isSignUp}
+                  className="font-sans"
+                />
+              </div>
+            )}
+            
             <div className="space-y-2">
-              <Label htmlFor="password" className="font-mono text-xs">
+              <Label htmlFor="email" className="font-sans font-medium">
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="john@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="font-sans"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="password" className="font-sans font-medium">
                 Password
               </Label>
               <Input
                 id="password"
                 type="password"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
-                className="rounded-xl font-mono"
-                autoFocus
+                required
+                minLength={6}
+                className="font-sans"
               />
+              {isSignUp && (
+                <p className="text-xs text-muted-foreground font-sans">
+                  Minimum 6 characters
+                </p>
+              )}
             </div>
 
-            {error && (
-              <Alert className="bg-destructive/10 border-destructive/50">
-                <AlertCircle className="h-4 w-4 text-destructive" />
-                <AlertDescription className="font-mono text-xs text-destructive">
-                  Incorrect password. Please try again.
-                </AlertDescription>
-              </Alert>
+            {!isSignUp && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="remember"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                />
+                <Label
+                  htmlFor="remember"
+                  className="text-sm font-sans font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                >
+                  Remember me
+                </Label>
+              </div>
             )}
 
-            <Button 
-              type="submit" 
-              className="w-full gradient-primary text-white rounded-xl shadow-lg hover:shadow-xl transition-smooth"
-              disabled={!password}
+            <Button
+              type="submit"
+              className="w-full font-sans font-medium gap-2"
+              disabled={loading}
+              size="lg"
             >
-              <Lock className="h-4 w-4 mr-2" />
-              <span className="font-mono text-sm">Access System</span>
+              {loading ? (
+                "Please wait..."
+              ) : isSignUp ? (
+                <>
+                  <UserPlus className="h-4 w-4" />
+                  Create Account
+                </>
+              ) : (
+                <>
+                  <LogIn className="h-4 w-4" />
+                  Sign In
+                </>
+              )}
             </Button>
 
-            <p className="text-center text-xs font-mono text-muted-foreground mt-4">
-              Default password: warehouse2024
-            </p>
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-sm font-sans text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
+              >
+                {isSignUp ? "Already have an account? Sign in" : "Don't have an account? Sign up"}
+              </button>
+            </div>
           </form>
         </CardContent>
       </Card>

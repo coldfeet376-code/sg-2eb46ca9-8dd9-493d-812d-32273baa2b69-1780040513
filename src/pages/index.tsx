@@ -285,17 +285,20 @@ export default function Home() {
     const metrics = calculateFairnessMetrics(newAssignments, staff);
     setFairnessMetrics(metrics);
     
+    // Auto-lock all assignments after generation
+    setLockedAssignments([...newAssignments]);
+    
     await rotaRealtimeService.logAction(
       "generated",
       "rota",
       weekStart.toISOString().split("T")[0],
-      `Generated rota for week of ${weekStart.toLocaleDateString()}`
+      `Generated rota for week of ${weekStart.toLocaleDateString()} (auto-locked)`
     );
     
     addNotification({
       staffName: "System",
-      message: "Rota generated successfully",
-      type: "info",
+      message: "Rota generated and locked successfully",
+      type: "success",
     });
   };
 
@@ -309,11 +312,15 @@ export default function Home() {
       lockedAssignments,
     });
     setAssignments(newAssignments);
+    
+    // Auto-lock all assignments after forced generation
+    setLockedAssignments([...newAssignments]);
+    
     saveSnapshot(newAssignments);
 
     addNotification({
       staffName: "System",
-      message: `Rota generated with ${coverageGaps.length} coverage gap(s)`,
+      message: `Rota generated with ${coverageGaps.length} coverage gap(s) and locked`,
       type: "info",
     });
   };

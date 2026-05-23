@@ -136,29 +136,28 @@ export const rotaRealtimeService = {
    */
   async logAction(
     action: string,
-    entityType: string,
-    entityId: string,
-    details?: string
+    targetType: string,
+    targetId: string,
+    details: string
   ): Promise<void> {
-    const { data: session } = await supabase.auth.getSession();
-    const user = session.session?.user;
+    const user = await getCurrentUser();
+    if (!user) return;
 
-    if (!user) {
-      console.warn("Cannot log action: no authenticated user");
-      return;
-    }
+    // Get display name from user metadata or email
+    const displayName = user.user_metadata?.display_name || user.email?.split("@")[0] || "Unknown";
 
     const { error } = await supabase.from("audit_log").insert({
       user_id: user.id,
-      user_email: user.email || null,
+      user_email: user.email || "unknown@example.com",
+      user_name: displayName,
       action,
-      entity_type: entityType,
-      entity_id: entityId,
+      target_type: targetType,
+      target_id: targetId,
       details,
     });
 
     if (error) {
-      console.error("Failed to log action:", error);
+      console.error("Error logging action:", error);
     }
   },
 
