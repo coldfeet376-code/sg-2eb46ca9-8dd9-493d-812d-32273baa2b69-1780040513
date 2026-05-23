@@ -1062,6 +1062,10 @@ export default function Managers() {
         {assignments.length > 0 && (
           <Card className="shadow-sm" data-tour="manager-rota">
             <CardHeader className="border-b border-border/50 bg-muted/30">
+              <CardTitle className="text-xl font-condensed font-bold tracking-tight">
+                Current Week Schedule
+              </CardTitle>
+            </CardHeader>
             <CardContent className="pt-6">
               <ManagerRotaTable
                 weekDays={weekDates.map((date, i) => ({ date, dateStr: date.toISOString().split("T")[0], dayOfWeek: i }))}
