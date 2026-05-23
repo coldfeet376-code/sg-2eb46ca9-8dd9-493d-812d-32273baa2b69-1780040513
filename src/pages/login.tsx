@@ -36,6 +36,20 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
+        // Validate email domain for non-admin users
+        const isAdmin = email.toLowerCase().startsWith("admin@");
+        const hasCorrectDomain = email.toLowerCase().endsWith("@gistworld.com");
+        
+        if (!isAdmin && !hasCorrectDomain) {
+          toast({
+            title: "Invalid email domain",
+            description: "Please use an @gistworld.com email address",
+            variant: "destructive",
+          });
+          setLoading(false);
+          return;
+        }
+        
         // Sign up with display name in metadata
         await authService.signUp(email, password, name);
         
@@ -112,12 +126,17 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="john@example.com"
+                placeholder="john@gistworld.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="font-sans"
               />
+              {isSignUp && (
+                <p className="text-xs text-muted-foreground font-sans">
+                  Must be @gistworld.com email (admin emails excluded)
+                </p>
+              )}
             </div>
             
             <div className="space-y-2">
