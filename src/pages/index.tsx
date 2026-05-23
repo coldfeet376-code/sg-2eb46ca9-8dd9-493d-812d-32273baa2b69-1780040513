@@ -120,28 +120,32 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // Load saved assignments for the current week
-    const savedAssignments = localStorage.getItem("warehouse-assignments");
-    if (savedAssignments) {
-      const parsed = JSON.parse(savedAssignments);
-      const weekStartStr = weekStart.toISOString().split("T")[0];
-      
-      // Filter assignments for current week
-      const weekAssignments = parsed.filter((a: Assignment) => {
-        const assignmentDate = new Date(a.date);
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 7);
-        return assignmentDate >= weekStart && assignmentDate < weekEnd;
-      });
-      
-      setAssignments(weekAssignments);
+    // Load saved assignments for the current week using per-week key
+    const weekKey = weekStart.toISOString().split("T")[0];
+    const stored = localStorage.getItem(`rota_${weekKey}`);
+    
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        setAssignments(parsed.assignments || []);
+      } catch (error) {
+        console.error("Error loading week assignments:", error);
+        setAssignments([]);
+      }
+    } else {
+      setAssignments([]);
     }
   }, [weekStart]);
 
   useEffect(() => {
-    // Save assignments whenever they change
-    localStorage.setItem("warehouse-assignments", JSON.stringify(assignments));
-  }, [assignments]);
+    // Save assignments for current week using per-week key
+    const weekKey = weekStart.toISOString().split("T")[0];
+    localStorage.setItem(`rota_${weekKey}`, JSON.stringify({
+      assignments,
+      weekStart: weekStart.toISOString(),
+      savedAt: new Date().toISOString(),
+    }));
+  }, [assignments, weekStart]);
 
   useEffect(() => {
     // Save locked assignments
