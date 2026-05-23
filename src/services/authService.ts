@@ -187,9 +187,22 @@ export const authService = {
    * Get current user
    */
   async getCurrentUser(): Promise<User | null> {
-    const { data, error } = await supabase.auth.getUser();
-    if (error) throw error;
-    return data.user;
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (error) {
+        // Don't throw if it's just a missing session (user not logged in yet)
+        if (error.message?.includes("session missing") || error.name === "AuthSessionMissingError") {
+          return null;
+        }
+        throw error;
+      }
+      return data.user;
+    } catch (error: any) {
+      if (error.message?.includes("session missing") || error.name === "AuthSessionMissingError") {
+        return null;
+      }
+      throw error;
+    }
   },
 
   /**
