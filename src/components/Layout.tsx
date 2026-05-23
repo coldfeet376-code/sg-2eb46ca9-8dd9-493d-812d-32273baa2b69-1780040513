@@ -2,10 +2,10 @@ import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
-import { Home, Users, Calendar, RefreshCw, BarChart3, ShieldCheck, LogOut } from "lucide-react";
+import { Home, Users, Calendar, RefreshCw, BarChart3, ShieldCheck } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
+import { UserProfileDropdown } from "./UserProfileDropdown";
 import { authService } from "@/services/authService";
-import { useToast } from "@/hooks/use-toast";
 
 interface LayoutProps {
   children: ReactNode;
@@ -13,38 +13,15 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
-  const { toast } = useToast();
   const [isAdmin, setIsAdmin] = useState(false);
-  const [userEmail, setUserEmail] = useState<string>("");
 
   useEffect(() => {
     const checkAdmin = async () => {
       const admin = await authService.isAdmin();
       setIsAdmin(admin);
-      const user = await authService.getCurrentUser();
-      if (user?.email) {
-        setUserEmail(user.email);
-      }
     };
     checkAdmin();
   }, []);
-
-  const handleLogout = async () => {
-    try {
-      await authService.signOut();
-      toast({
-        title: "Logged out",
-        description: "See you next time!",
-      });
-      router.push("/login");
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to logout",
-        variant: "destructive",
-      });
-    }
-  };
 
   const navItems = [
     { href: "/", label: "Rota", icon: Home },
@@ -92,21 +69,8 @@ export function Layout({ children }: LayoutProps) {
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            {userEmail && (
-              <div className="hidden sm:block text-sm font-mono text-muted-foreground">
-                {userEmail}
-              </div>
-            )}
             <ThemeToggle />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              className="gap-2 font-sans"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden sm:inline">Logout</span>
-            </Button>
+            <UserProfileDropdown />
           </div>
         </div>
       </header>
