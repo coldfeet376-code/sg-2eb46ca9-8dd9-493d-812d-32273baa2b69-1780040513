@@ -1,7 +1,124 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { User, Session } from "@supabase/supabase-js";
 
+interface Invitation {
+  id: string;
+  email: string;
+  token: string;
+  invited_by_email: string | null;
+  status: string;
+  expires_at: string;
+  created_at: string;
+  accepted_at: string | null;
+}
+
 export const authService = {
+  /**
+   * Check if current user is an admin
+   */
+  async isAdmin(): Promise<boolean> {
+    const user = await this.getCurrentUser();
+    if (!user || !user.email) return false;
+    return user.email.toLowerCase().startsWith("admin@");
+  },
+
+  /**
+   * Send invitation to a new user
+   */
+  async sendInvitation(email: string): Promise<Invitation> {
+    const user = await this.getCurrentUser();
+    if (!user) throw new Error("Not authenticated");
+
+    // Generate secure random token
+    const token = crypto.randomUUID();
+    const inviteUrl = `${window.location.origin}/signup?token=${token}`;
+
+    const { data, error } = await supabase
+      .from("invitations")
+      .insert({
+        email: email.toLowerCase(),
+        token,
+        invited_by: user.id,
+        invited_by_email: user.email,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        throw new Error("An invitation for this email already exists");
+      }
+      throw error;
+    }
+
+    // TODO: Send email with invite link via Supabase Edge Function or external service
+    // For now, we'll just return the invitation with the URL
+    console.log(`Invitation URL: ${inviteUrl}`);
+
+    return data as Invitation;
+  },
+
+  /**
+   * Get all invitations (admin only)
+   */
+  async getInvitations(): Promise<Invitation[]> {
+    const { data, error } = await supabase
+      .from("invitations")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    return (data as Invitation[]) || [];
+  },
+
+  /**
+   * Validate invitation token
+   */
+  async validateInvitation(token: string): Promise<{ valid: boolean; email?: string }> {
+    const { data, error } = await supabase
+      .from("invitations")
+      .select("*")
+      .eq("token", token)
+      .eq("status", "pending")
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+
+    if (error) throw error;
+    
+    if (!data) {
+      return { valid: false };
+    }
+
+    return { valid: true, email: data.email };
+  },
+
+  /**
+   * Accept invitation and mark as used
+   */
+  async acceptInvitation(token: string): Promise<void> {
+    const { error } = await supabase
+      .from("invitations")
+      .update({
+        status: "accepted",
+        accepted_at: new Date().toISOString(),
+      })
+      .eq("token", token);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Cancel invitation (admin only)
+   */
+  async cancelInvitation(invitationId: string): Promise<void> {
+    const { error } = await supabase
+      .from("invitations")
+      .update({ status: "cancelled" })
+      .eq("id", invitationId);
+
+    if (error) throw error;
+  },
+
   /**
    * Sign up a new user with display name
    */
