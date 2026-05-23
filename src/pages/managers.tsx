@@ -940,7 +940,7 @@ export default function Managers() {
                   <p className="text-sm font-sans text-muted-foreground mb-4">
                     Add shift managers to start scheduling duties
                   </p>
-                  <Button onClick={() => setShowAddManager(true)} size="lg" className="gap-2">
+                  <Button onClick={openCreateDialog} size="lg" className="gap-2">
                     <Plus className="h-5 w-5" />
                     Add First Manager
                   </Button>
