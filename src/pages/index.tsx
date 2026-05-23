@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SEO } from "@/components/SEO";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
+import { generateStaffRotaPDF } from "@/lib/pdfGenerator";
 import { rotaService } from "@/services/rotaService";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { useStaff, useTaskConfig } from "@/hooks/useSupabaseQueries";
@@ -585,138 +586,19 @@ export default function Home() {
   };
 
   const exportWeekPDF = () => {
-    const weekDates = DAYS.map((_, i) => {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
-      return date;
+    generateStaffRotaPDF({
+      weekStart,
+      assignments,
+      staff,
+      fairnessMetrics,
+      lockedCount: lockedAssignments.length,
     });
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Warehouse Rota - Week ${weekDates[0].toLocaleDateString()}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { 
-            font-family: 'IBM Plex Mono', monospace; 
-            padding: 20px; 
-            font-size: 11px;
-            color: #1a1a1a;
-          }
-          h1 { 
-            font-family: 'IBM Plex Sans Condensed', sans-serif; 
-            font-size: 24px; 
-            font-weight: 700;
-            margin-bottom: 8px;
-          }
-          .date-range { 
-            font-size: 10px; 
-            color: #666; 
-            margin-bottom: 20px;
-          }
-          table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-bottom: 20px;
-          }
-          th, td { 
-            border: 1px solid #ddd; 
-            padding: 8px; 
-            text-align: left;
-          }
-          th { 
-            background-color: #f5f5f5; 
-            font-weight: 600;
-            font-size: 10px;
-          }
-          .task-cell { font-weight: 600; }
-          .staff-name { 
-            background-color: #e8f0f7; 
-            color: #2563a5;
-            padding: 4px 6px;
-            margin: 2px 0;
-            border-radius: 4px;
-            display: block;
-            font-size: 10px;
-          }
-          .staff-name.locked {
-            background-color: #fef3c7;
-            color: #92400e;
-            border: 1px solid #fbbf24;
-          }
-          .empty-cell { 
-            color: #999; 
-            text-align: center;
-          }
-          @media print {
-            body { padding: 10px; }
-            @page { margin: 1cm; }
-          }
-        </style>
-      </head>
-      <body>
-        <h1>WAREHOUSE ROTA</h1>
-        <div class="date-range">
-          ${weekDates[0].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} - 
-          ${weekDates[6].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Task</th>
-              ${DAYS.map((day, i) => `
-                <th style="text-align: center;">
-                  ${day}<br>
-                  <span style="font-weight: 400; color: #666;">
-                    ${weekDates[i].getDate()}/${weekDates[i].getMonth() + 1}
-                  </span>
-                </th>
-              `).join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${TASKS.map(task => `
-              <tr>
-                <td class="task-cell">${task}</td>
-                ${DAYS.map((_, dayIdx) => {
-                  const date = weekDates[dayIdx];
-                  const dateStr = date.toISOString().split("T")[0];
-                  const dayAssignments = assignments.filter(a => a.task === task && a.date === dateStr);
-                  
-                  if (dayAssignments.length === 0) {
-                    return `<td class="empty-cell">—</td>`;
-                  }
-                  
-                  return `
-                    <td>
-                      ${dayAssignments.map(a => {
-                        const locked = isAssignmentLocked(task, dayIdx, a.staffName);
-                        return `<span class="staff-name ${locked ? 'locked' : ''}">${a.staffName}${locked ? ' 🔒' : ''}</span>`;
-                      }).join("")}
-                    </td>
-                  `;
-                }).join("")}
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const printWindow = window.open(url, "_blank");
     
-    if (printWindow) {
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-        }, 250);
-      };
-    }
+    addNotification({
+      staffName: "System",
+      message: "Staff rota PDF downloaded successfully",
+      type: "info",
+    });
   };
 
   const weekDates = DAYS.map((_, i) => {

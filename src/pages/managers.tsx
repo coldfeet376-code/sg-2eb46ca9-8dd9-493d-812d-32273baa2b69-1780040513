@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { SEO } from "@/components/SEO";
 import { useNotifications } from "@/contexts/NotificationContext";
+import { generateManagerDutiesPDF } from "@/lib/pdfGenerator";
 import type { ManagerAssignment, ManagerDuty, ManagerShiftStart } from "@/types";
 import { Lock, Unlock, Zap, AlertCircle, ChevronLeft, ChevronRight, Download, Plus, Pencil, Trash2, Users, Check, X } from "lucide-react";
 import { getAllManagers, createManager, updateManager, deleteManager, getManagersForDuty, type Manager, getManagerAvailability, setManagerAvailability, getAvailabilityForDate, type ManagerAvailability } from "@/services/managerService";
@@ -592,124 +593,17 @@ export default function Managers() {
   };
 
   const exportPDF = () => {
-    const weekDates = DAYS.map((_, i) => {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
-      return date;
+    generateManagerDutiesPDF({
+      weekStart,
+      assignments,
+      managers: managers.map(m => ({ id: m.id, name: m.name })),
     });
-
-    const html = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Manager Duties - Week ${weekDates[0].toLocaleDateString()}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { 
-            font-family: 'IBM Plex Mono', monospace; 
-            padding: 20px; 
-            font-size: 11px;
-            color: #1a1a1a;
-          }
-          h1 { 
-            font-family: 'IBM Plex Sans Condensed', sans-serif; 
-            font-size: 24px; 
-            font-weight: 700;
-            margin-bottom: 8px;
-          }
-          .date-range { 
-            font-size: 10px; 
-            color: #666; 
-            margin-bottom: 20px;
-          }
-          table { 
-            width: 100%; 
-            border-collapse: collapse; 
-            margin-bottom: 20px;
-          }
-          th, td { 
-            border: 1px solid #ddd; 
-            padding: 8px; 
-            text-align: left;
-          }
-          th { 
-            background-color: #f5f5f5; 
-            font-weight: 600;
-            font-size: 10px;
-          }
-          .duty-cell { font-weight: 600; }
-          .manager-name { 
-            background-color: #e8f0f7; 
-            color: #2563a5;
-            padding: 4px 6px;
-            margin: 2px 0;
-            border-radius: 4px;
-            display: block;
-            font-size: 10px;
-          }
-          @media print {
-            body { padding: 10px; }
-            @page { margin: 1cm; }
-          }
-        </style>
-      </head>
-      <body>
-        <h1>MANAGER DUTIES ROTA</h1>
-        <div class="date-range">
-          ${weekDates[0].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} - 
-          ${weekDates[6].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Duty</th>
-              ${DAYS.map((day, i) => `
-                <th style="text-align: center;">
-                  ${day}<br>
-                  <span style="font-weight: 400; color: #666;">
-                    ${weekDates[i].getDate()}/${weekDates[i].getMonth() + 1}
-                  </span>
-                </th>
-              `).join("")}
-            </tr>
-          </thead>
-          <tbody>
-            ${DUTIES.map(duty => `
-              <tr>
-                <td class="duty-cell">${duty}</td>
-                ${DAYS.map((_, dayIdx) => {
-                  const date = weekDates[dayIdx];
-                  const dateStr = date.toISOString().split("T")[0];
-                  const dayAssignments = assignments.filter(
-                    a => a.duty === duty && a.date === dateStr
-                  );
-                  return `
-                    <td>
-                      ${dayAssignments.map(a => `<span class="manager-name">${a.managerName}</span>`).join('')}
-                      ${dayAssignments.length === 0 ? '—' : ''}
-                    </td>
-                  `;
-                }).join("")}
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
-
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const printWindow = window.open(url, "_blank");
     
-    if (printWindow) {
-      printWindow.onload = () => {
-        setTimeout(() => {
-          printWindow.print();
-        }, 250);
-      };
-    }
+    addNotification({
+      staffName: "System",
+      message: "Manager duties PDF downloaded successfully",
+      type: "info",
+    });
   };
 
   const weekDates = DAYS.map((_, i) => {
