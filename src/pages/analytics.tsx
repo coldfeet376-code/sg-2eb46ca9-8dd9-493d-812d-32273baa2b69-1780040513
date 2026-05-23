@@ -7,9 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCw, TrendingUp, TrendingDown, AlertCircle, Users, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { getStaff } from "@/services/staffService";
-import { getManagersWithAvailability } from "@/services/managerService";
-import type { Staff, Manager, Assignment, ManagerAssignment } from "@/types";
+import { staffService } from "@/services/staffService";
+import type { StaffMember, Assignment } from "@/types";
 
 interface WeeklySummary {
   staffName: string;
@@ -29,10 +28,9 @@ interface TurnHistory {
 
 export default function AnalyticsPage() {
   const [loading, setLoading] = useState(false);
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [managers, setManagers] = useState<Manager[]>([]);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
   const [weeklySummary, setWeeklySummary] = useState<WeeklySummary[]>([]);
-  const [missedStaff, setMissedStaff] = useState<Staff[]>([]);
+  const [missedStaff, setMissedStaff] = useState<StaffMember[]>([]);
   const [turnHistory, setTurnHistory] = useState<TurnHistory[]>([]);
   const { toast } = useToast();
 
@@ -43,14 +41,10 @@ export default function AnalyticsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load staff and managers
-      const [staffData, managersData] = await Promise.all([
-        getStaff(),
-        getManagersWithAvailability(new Date().toISOString().split("T")[0], new Date().toISOString().split("T")[0])
-      ]);
+      // Load staff
+      const staffData = await staffService.getAllStaff();
 
       setStaff(staffData);
-      setManagers(managersData);
 
       // Get assignments from localStorage for current week
       const weekStart = getWeekStart(new Date());
@@ -93,7 +87,7 @@ export default function AnalyticsPage() {
     return saturday;
   };
 
-  const calculateWeeklySummary = (staffData: Staff[], assignments: Assignment[]) => {
+  const calculateWeeklySummary = (staffData: StaffMember[], assignments: Assignment[]) => {
     const summaryMap = new Map<string, WeeklySummary>();
     const assignedIds = new Set<string>();
 
@@ -122,13 +116,29 @@ export default function AnalyticsPage() {
     });
 
     // Find missed staff (not assigned this week)
-    const missed = staffData.filter(s => !assignedIds.has(s.id) && !s.on_rest);
+    const missed = staffData.filter(s => {
+      if (assignedIds.has(s.id)) return false;
+      
+      // Check if they are on rest for the entire week
+      const weekStart = getWeekStart(new Date());
+      const isAvailable = Array.from({ length: 7 }).some((_, i) => {
+        const d = new Date(weekStart);
+        d.setDate(d.getDate() + i);
+        const dateStr = d.toISOString().split("T")[0];
+        
+        // Return true if they don't have a 'rest', 'holiday', or 'sick' entry for this date
+        const entry = s.availability?.find(a => a.date === dateStr);
+        return !entry || entry.type === "available";
+      });
+      
+      return isAvailable;
+    });
 
     setWeeklySummary(Array.from(summaryMap.values()).sort((a, b) => b.assignmentCount - a.assignmentCount));
     setMissedStaff(missed);
   };
 
-  const calculateTurnHistory = (staffData: Staff[]) => {
+  const calculateTurnHistory = (staffData: StaffMember[]) => {
     const historyMap = new Map<string, TurnHistory>();
 
     // Get all stored weeks from localStorage
