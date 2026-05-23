@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -157,6 +158,18 @@ export default function LoginPage() {
                 <p className="text-xs text-muted-foreground font-sans">
                   Minimum 6 characters
                 </p>
+              )}
+              {!isSignUp && (
+                <div className="flex justify-end">
+                  <Link href="/forgot-password">
+                    <button
+                      type="button"
+                      className="text-xs font-sans text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </Link>
+                </div>
               )}
             </div>
 

@@ -75,6 +75,28 @@ export const authService = {
   },
 
   /**
+   * Send password reset email
+   */
+  async resetPassword(email: string): Promise<void> {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    if (error) throw error;
+  },
+
+  /**
+   * Update user password (after reset)
+   */
+  async updatePassword(newPassword: string): Promise<void> {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    if (error) throw error;
+  },
+
+  /**
    * Check if user has "remember me" enabled
    */
   hasRememberMe(): boolean {
