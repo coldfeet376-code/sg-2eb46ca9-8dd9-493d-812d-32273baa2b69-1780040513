@@ -56,6 +56,39 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       availability: {
         Row: {
           created_at: string | null
@@ -215,6 +248,39 @@ export type Database = {
           created_by?: string | null
           id?: string
           locked_assignments?: Json
+          week_start?: string
+        }
+        Relationships: []
+      }
+      rotas: {
+        Row: {
+          assignments: Json
+          created_at: string | null
+          created_by: string | null
+          fairness_metrics: Json | null
+          id: string
+          locked_count: number | null
+          updated_at: string | null
+          week_start: string
+        }
+        Insert: {
+          assignments: Json
+          created_at?: string | null
+          created_by?: string | null
+          fairness_metrics?: Json | null
+          id?: string
+          locked_count?: number | null
+          updated_at?: string | null
+          week_start: string
+        }
+        Update: {
+          assignments?: Json
+          created_at?: string | null
+          created_by?: string | null
+          fairness_metrics?: Json | null
+          id?: string
+          locked_count?: number | null
+          updated_at?: string | null
           week_start?: string
         }
         Relationships: []

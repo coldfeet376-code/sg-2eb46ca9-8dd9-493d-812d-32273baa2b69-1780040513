@@ -17,7 +17,9 @@ import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
 import { generateStaffRotaPDF } from "@/lib/pdfGenerator";
 import { rotaService } from "@/services/rotaService";
+import { rotaRealtimeService, type StoredRota } from "@/services/rotaRealtimeService";
 import { useNotifications } from "@/contexts/NotificationContext";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useStaff, useTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
 import { Lock, Unlock, Save, Download, Copy, Calendar, History, RotateCcw, Zap, LayoutGrid, Printer, AlertCircle, TrendingUp } from "lucide-react";
@@ -30,6 +32,7 @@ const OnboardingTour = dynamic(
 );
 
 import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
+import { RecentChangesPanel } from "@/components/RecentChangesPanel";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
@@ -81,6 +84,7 @@ export default function Home() {
   const [fairnessMetrics, setFairnessMetrics] = useState<ReturnType<typeof calculateFairnessMetrics> | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const { addNotification } = useNotifications();
+  const [rotaChannel, setRotaChannel] = useState<RealtimeChannel | null>(null);
 
   // React Query hooks - cached data with error handling
   const { data: staff = [], isLoading: staffLoading, error: staffError } = useStaff();
@@ -120,42 +124,77 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // Load saved assignments for the current week using per-week key
-    const weekKey = weekStart.toISOString().split("T")[0];
-    const stored = localStorage.getItem(`rota_${weekKey}`);
-    
-    if (stored) {
+    // Load saved assignments for the current week from Supabase
+    const loadRotaFromSupabase = async () => {
       try {
-        const parsed = JSON.parse(stored);
-        setAssignments(parsed.assignments || []);
+        const rota = await rotaRealtimeService.getRotaForWeek(weekStart);
+        if (rota) {
+          setAssignments(rota.assignments);
+          if (rota.fairness_metrics) {
+            setFairnessMetrics(rota.fairness_metrics as any);
+          }
+        } else {
+          setAssignments([]);
+          setFairnessMetrics(null);
+        }
       } catch (error) {
-        console.error("Error loading week assignments:", error);
+        console.error("Error loading rota:", error);
         setAssignments([]);
+        setFairnessMetrics(null);
       }
-    } else {
-      setAssignments([]);
-    }
+    };
+
+    loadRotaFromSupabase();
+
+    // Set up real-time subscription
+    const channel = rotaRealtimeService.subscribeToRotas((payload) => {
+      // Only update if the change is for the current week
+      const changedWeek = new Date(payload.new.week_start);
+      if (changedWeek.toISOString().split("T")[0] === weekStart.toISOString().split("T")[0]) {
+        setAssignments(payload.new.assignments);
+        if (payload.new.fairness_metrics) {
+          setFairnessMetrics(payload.new.fairness_metrics as any);
+        }
+        
+        addNotification({
+          staffName: "System",
+          message: `Rota updated by colleague`,
+          type: "info",
+        });
+      }
+    });
+
+    setRotaChannel(channel);
+
+    // Cleanup subscription on unmount or week change
+    return () => {
+      if (channel) {
+        rotaRealtimeService.unsubscribe(channel);
+      }
+    };
   }, [weekStart]);
 
+  // Save assignments to Supabase whenever they change
   useEffect(() => {
-    // Save assignments for current week using per-week key
-    const weekKey = weekStart.toISOString().split("T")[0];
-    localStorage.setItem(`rota_${weekKey}`, JSON.stringify({
-      assignments,
-      weekStart: weekStart.toISOString(),
-      savedAt: new Date().toISOString(),
-    }));
-  }, [assignments, weekStart]);
+    const saveRotaToSupabase = async () => {
+      if (assignments.length > 0) {
+        try {
+          await rotaRealtimeService.saveRota(
+            weekStart,
+            assignments,
+            fairnessMetrics,
+            lockedAssignments.length
+          );
+        } catch (error) {
+          console.error("Error saving rota:", error);
+        }
+      }
+    };
 
-  useEffect(() => {
-    // Save locked assignments
-    localStorage.setItem("warehouse-locked-assignments", JSON.stringify(lockedAssignments));
-  }, [lockedAssignments]);
-
-  useEffect(() => {
-    // Save history
-    localStorage.setItem("warehouse-rota-history", JSON.stringify(history));
-  }, [history]);
+    // Debounce to avoid excessive saves
+    const timeoutId = setTimeout(saveRotaToSupabase, 500);
+    return () => clearTimeout(timeoutId);
+  }, [assignments, weekStart, fairnessMetrics, lockedAssignments.length]);
 
   useEffect(() => {
     // Calculate fairness metrics when assignments change
@@ -236,69 +275,23 @@ export default function Home() {
   };
 
   const generateRota = async () => {
-    if (!staff.length || !taskConfig) return;
-
-    // Check for coverage gaps first
-    const gaps = checkCoverageGaps();
-
-    // Always generate the rota
-    const newAssignments = generateWeeklyRota({
-      staff,
-      taskConfig,
-      weekStart,
-      lockedAssignments,
-    });
-    
+    const newAssignments = generateWeeklyRota(staff, taskConfig, weekStart, lockedAssignments);
     setAssignments(newAssignments);
-    saveSnapshot(newAssignments);
-
-    // Create automatic backup
-    try {
-      await rotaService.createBackup(
-        weekStart.toISOString().split("T")[0],
-        newAssignments,
-        lockedAssignments
-      );
-      console.log("Automatic backup created successfully");
-    } catch (error) {
-      console.error("Failed to create automatic backup:", error);
-    }
-
-    // Show coverage gap warning as notification if gaps exist
-    if (gaps.length > 0) {
-      setCoverageGaps(gaps);
-      setShowCoverageWarning(true);
-      addNotification({
-        staffName: "System",
-        message: `Rota generated with ${gaps.length} coverage gap(s) - review warnings`,
-        type: "info",
-      });
-    } else {
-      // Generate notifications for each staff member when no gaps
-      const staffAssignments = new Map<string, Assignment[]>();
-      newAssignments.forEach(assignment => {
-        if (!staffAssignments.has(assignment.staffName)) {
-          staffAssignments.set(assignment.staffName, []);
-        }
-        staffAssignments.get(assignment.staffName)?.push(assignment);
-      });
-
-      staffAssignments.forEach((assignments, staffName) => {
-        const taskList = [...new Set(assignments.map(a => a.task))].join(", ");
-        addNotification({
-          staffName,
-          message: `New assignments: ${taskList}`,
-          type: "assignment",
-          weekStart: weekStart.toISOString(),
-        });
-      });
-      
-      addNotification({
-        staffName: "System",
-        message: "Rota generated successfully with automatic backup",
-        type: "info",
-      });
-    }
+    const metrics = calculateFairnessMetrics(newAssignments, staff);
+    setFairnessMetrics(metrics);
+    
+    await rotaRealtimeService.logAction(
+      "generated",
+      "rota",
+      weekStart.toISOString().split("T")[0],
+      `Generated rota for week of ${weekStart.toLocaleDateString()}`
+    );
+    
+    addNotification({
+      staffName: "System",
+      message: "Rota generated successfully",
+      type: "success",
+    });
   };
 
   const forceGenerateRota = () => {
@@ -371,60 +364,43 @@ export default function Home() {
     return history.filter(h => h.weekStart === weekStartStr);
   };
 
-  const toggleLockAssignment = (task: string, dateIndex: number, staffName: string) => {
-    const date = weekDates[dateIndex];
-    const dateStr = date.toISOString().split("T")[0];
-    
-    const existingLockIndex = lockedAssignments.findIndex(
-      lock => lock.task === task && lock.date === dateStr && lock.staffName === staffName
+  const toggleLock = async (dayIndex: number, task: Task) => {
+    const assignment = assignments.find(
+      (a) => a.dayOfWeek === dayIndex && a.task === task
     );
 
-    if (existingLockIndex >= 0) {
-      // Unlock
-      setLockedAssignments(lockedAssignments.filter((_, i) => i !== existingLockIndex));
+    if (!assignment) return;
+
+    const key = `${dayIndex}-${task}`;
+    const isLocked = lockedAssignments.some((la) => la === key);
+
+    if (isLocked) {
+      setLockedAssignments(lockedAssignments.filter((la) => la !== key));
+      await rotaRealtimeService.logAction(
+        "unlocked",
+        "assignment",
+        key,
+        `Unlocked ${task} on ${DAYS[dayIndex]}`
+      );
     } else {
-      // Lock - Find staff ID for the assignment
-      const staffMember = staff.find(s => s.name === staffName);
-      setLockedAssignments([...lockedAssignments, { 
-        task: task as Task, 
-        date: dateStr, 
-        staffName,
-        staffId: staffMember?.id || `temp-${Date.now()}`
-      }]);
+      setLockedAssignments([...lockedAssignments, key]);
+      await rotaRealtimeService.logAction(
+        "locked",
+        "assignment",
+        key,
+        `Locked ${assignment.staffName} for ${task} on ${DAYS[dayIndex]}`
+      );
     }
   };
 
-  const isAssignmentLocked = (task: string, dateIndex: number, staffName: string): boolean => {
-    const date = weekDates[dateIndex];
-    const dateStr = date.toISOString().split("T")[0];
-    
-    return lockedAssignments.some(
-      lock => lock.task === task && lock.date === dateStr && lock.staffName === staffName
-    );
-  };
-
-  const lockAll = () => {
-    // Lock all current week assignments
-    const allLocks: Assignment[] = assignments.map(a => ({
-      ...a,
-      staffId: a.staffId || staff.find(s => s.name === a.staffName)?.id || `temp-${Date.now()}`
-    }));
-    
-    setLockedAssignments(allLocks);
-    addNotification({
-      staffName: "System",
-      message: `Locked all ${allLocks.length} assignments for this week`,
-      type: "info",
-    });
-  };
-
-  const unlockAll = () => {
+  const unlockAll = async () => {
     setLockedAssignments([]);
-    addNotification({
-      staffName: "System",
-      message: "All assignments unlocked",
-      type: "info",
-    });
+    await rotaRealtimeService.logAction(
+      "unlocked_all",
+      "rota",
+      weekStart.toISOString().split("T")[0],
+      "Unlocked all assignments"
+    );
     setShowUnlockConfirm(false);
   };
 
@@ -1333,18 +1309,8 @@ export default function Home() {
                 Fairness Metrics
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex-1">
-                    <div className="font-mono text-2xl font-bold tabular-nums text-primary">
-                      {fairnessMetrics.overallScore}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Overall Score
-                    </p>
-                  </div>
-                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <div className="font-mono text-xl font-bold tabular-nums text-primary">
@@ -1367,6 +1333,9 @@ export default function Home() {
             </CardContent>
           </Card>
         )}
+
+        {/* Recent Changes Panel */}
+        <RecentChangesPanel />
       </div>
 
       {/* Print Preview Dialog */}
