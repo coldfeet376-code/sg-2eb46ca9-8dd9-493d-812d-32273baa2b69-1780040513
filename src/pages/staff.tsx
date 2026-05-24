@@ -622,6 +622,83 @@ export default function StaffPage() {
       <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
 
       <div className="space-y-6">
+        {/* CRITICAL DEBUG BANNER - Shows what Supabase actually returned */}
+        {staff.length > 0 && (
+          <Alert className="bg-red-50 border-red-300 border-2">
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            <AlertDescription className="text-sm font-mono space-y-2">
+              <div className="font-bold text-red-900 text-base mb-3">🔴 SUPABASE QUERY DEBUG (RAW DATA)</div>
+              {(() => {
+                // Find Wilson I and Allison G in the loaded staff array
+                const wilsonStaff = staff.find(s => s.name.toLowerCase().includes('wilson'));
+                const allisonStaff = staff.find(s => s.name.toLowerCase().includes('allison'));
+                
+                // Get total availability across ALL staff
+                const totalAvailability = staff.reduce((sum, s) => sum + (s.availability?.length || 0), 0);
+                
+                // Get all unique staff IDs that have availability data
+                const staffIdsWithData = new Set(
+                  staff.filter(s => s.availability && s.availability.length > 0).map(s => s.id)
+                );
+                
+                return (
+                  <div className="space-y-3">
+                    <div className="bg-white p-3 rounded border border-red-200">
+                      <div className="font-bold text-red-800 mb-2">📊 OVERALL STATS:</div>
+                      <div>Total Staff Loaded: {staff.length}</div>
+                      <div>Total Availability Records (all staff): {totalAvailability}</div>
+                      <div>Staff with availability data: {staffIdsWithData.size}</div>
+                    </div>
+                    
+                    {wilsonStaff && (
+                      <div className="bg-blue-50 p-3 rounded border border-blue-300">
+                        <div className="font-bold text-blue-800 mb-2">👤 WILSON I:</div>
+                        <div>Staff ID: <code className="bg-blue-100 px-1">{wilsonStaff.id}</code></div>
+                        <div>Availability Array Length: <span className="font-bold text-lg">{wilsonStaff.availability?.length || 0}</span></div>
+                        <div>Has Data: {(wilsonStaff.availability?.length || 0) > 0 ? "✅ YES" : "❌ NO"}</div>
+                        {wilsonStaff.availability && wilsonStaff.availability.length > 0 && (
+                          <div className="mt-1 text-xs">
+                            First entry: {wilsonStaff.availability[0].date} = {wilsonStaff.availability[0].type.toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {allisonStaff && (
+                      <div className="bg-purple-50 p-3 rounded border border-purple-300">
+                        <div className="font-bold text-purple-800 mb-2">👤 ALLISON G:</div>
+                        <div>Staff ID: <code className="bg-purple-100 px-1">{allisonStaff.id}</code></div>
+                        <div>Availability Array Length: <span className="font-bold text-lg">{allisonStaff.availability?.length || 0}</span></div>
+                        <div>Has Data: {(allisonStaff.availability?.length || 0) > 0 ? "✅ YES" : "❌ NO"}</div>
+                        {allisonStaff.availability && allisonStaff.availability.length > 0 && (
+                          <div className="mt-1 text-xs">
+                            First entry: {allisonStaff.availability[0].date} = {allisonStaff.availability[0].type.toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    <div className="bg-yellow-50 p-3 rounded border border-yellow-300">
+                      <div className="font-bold text-yellow-800 mb-2">🎯 DIAGNOSIS:</div>
+                      {totalAvailability === 0 ? (
+                        <div className="text-red-700 font-bold">❌ NO AVAILABILITY DATA LOADED FROM SUPABASE AT ALL!</div>
+                      ) : wilsonStaff && (wilsonStaff.availability?.length || 0) === 0 ? (
+                        <div className="text-orange-700">⚠️ Availability data exists for other staff but NOT for Wilson I. This is a data matching/filtering issue.</div>
+                      ) : (
+                        <div className="text-green-700">✅ Data is being loaded correctly from Supabase</div>
+                      )}
+                    </div>
+                    
+                    <div className="text-xs text-red-700 pt-2 border-t border-red-200">
+                      If this shows 0 for Wilson I but the database SQL confirmed 238 entries, then the staff_id in the availability table doesn't match the staff.id in the staff table for Wilson I specifically.
+                    </div>
+                  </div>
+                );
+              })()}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-condensed font-bold tracking-tight text-foreground mb-2">
