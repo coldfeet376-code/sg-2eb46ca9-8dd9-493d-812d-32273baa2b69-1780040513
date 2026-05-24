@@ -30,6 +30,9 @@ export function generateWeeklyRota({
   // Track what task each staff member did on each date
   const staffTasksByDate: Record<string, Record<string, Task>> = {};
   
+  // NEW: Track how many times each staff member has done each specific task
+  const staffTaskCounts: Record<string, Record<Task, number>> = {};
+  
   // NEW: Track Inbound assignments for 06:00 shift staff based on working days
   const earlyShiftInboundCount: Record<string, number> = {};
   const earlyShiftWorkingDays: Record<string, number> = {};
@@ -37,6 +40,14 @@ export function generateWeeklyRota({
   staff.forEach((s) => {
     staffAssignmentCounts[s.id] = 0;
     staffTasksByDate[s.id] = {};
+    staffTaskCounts[s.id] = {
+      "Frozen": 0,
+      "Milk": 0,
+      "TWI": 0,
+      "Inbound": 0,
+      "Outbound": 0,
+      "Marshaling": 0,
+    };
     
     // For 06:00 shift staff, calculate working days in the week
     if (s.shiftStart === "06:00") {
@@ -67,6 +78,11 @@ export function generateWeeklyRota({
     if (staffId) {
       staffAssignmentCounts[staffId] = (staffAssignmentCounts[staffId] || 0) + 1;
       staffTasksByDate[staffId][a.date] = a.task as Task;
+      
+      // Track task-specific counts
+      if (staffTaskCounts[staffId]) {
+        staffTaskCounts[staffId][a.task as Task] = (staffTaskCounts[staffId][a.task as Task] || 0) + 1;
+      }
       
       // Count existing Inbound assignments for 06:00 shift staff
       if (a.task === "Inbound" && staffMember?.shiftStart === "06:00") {
@@ -154,12 +170,13 @@ export function generateWeeklyRota({
       // Randomize within each shift group, then sort by fairness
       const shuffled = allAvailable.sort(() => Math.random() - 0.5);
 
-      // Sort by:
-      // 1. Avoid consecutive same task (PRIORITY #1)
-      // 2. Fewest assignments (fairness)
-      // 3. Shift start time (earlier shifts get slight priority)
+      // Sort by priority:
+      // 1. Avoid consecutive same task (CRITICAL - prevents burnout)
+      // 2. Fewest times doing THIS SPECIFIC task (task rotation fairness)
+      // 3. Fewest overall assignments (general fairness)
+      // 4. Shift start time (earlier shifts get slight priority)
       const sorted = shuffled.sort((a, b) => {
-        // CRITICAL: Check what task they did on the previous day
+        // PRIORITY #1: Check what task they did on the previous day
         const aPrevTask = staffTasksByDate[a.id]?.[prevDateStr];
         const bPrevTask = staffTasksByDate[b.id]?.[prevDateStr];
         
@@ -167,67 +184,26 @@ export function generateWeeklyRota({
         if (aPrevTask === task && bPrevTask !== task) return 1;
         if (aPrevTask !== task && bPrevTask === task) return -1;
 
-        // Secondary: Fewest assignments overall (fairness)
+        // PRIORITY #2: How many times has each person done THIS SPECIFIC task?
+        // This ensures fair rotation through each task type
+        const aTaskCount = staffTaskCounts[a.id]?.[task] || 0;
+        const bTaskCount = staffTaskCounts[b.id]?.[task] || 0;
+        if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
+
+        // PRIORITY #3: Fewest assignments overall (general fairness)
         const aCount = staffAssignmentCounts[a.id] || 0;
         const bCount = staffAssignmentCounts[b.id] || 0;
         if (aCount !== bCount) return aCount - bCount;
 
-        // Tertiary: Slight preference for earlier shifts
+        // PRIORITY #4: Slight preference for earlier shifts
         const aShiftIndex = shiftOrder.indexOf(a.shift);
         const bShiftIndex = shiftOrder.indexOf(b.shift);
         return aShiftIndex - bShiftIndex;
       });
 
-      // NEW: Special sorting for Inbound task - prioritize 06:00 shift staff based on working days
-      let finalSorted = sorted;
-      if (task === "Inbound") {
-        finalSorted = sorted.sort((a, b) => {
-          const aIsEarlyShift = a.shiftStart === "06:00";
-          const bIsEarlyShift = b.shiftStart === "06:00";
-          
-          // Get current Inbound count and working days for 06:00 shift staff
-          const aInboundCount = earlyShiftInboundCount[a.id] || 0;
-          const bInboundCount = earlyShiftInboundCount[b.id] || 0;
-          const aWorkingDays = earlyShiftWorkingDays[a.id] || 0;
-          const bWorkingDays = earlyShiftWorkingDays[b.id] || 0;
-          
-          // Determine target Inbound assignments: 5-day workers get 2, 3-day workers get 1
-          const aTarget = aWorkingDays >= 5 ? 2 : 1;
-          const bTarget = bWorkingDays >= 5 ? 2 : 1;
-          
-          // Priority 1: 06:00 shift staff who haven't reached their target yet
-          if (aIsEarlyShift && !bIsEarlyShift && aInboundCount < aTarget) return -1;
-          if (!aIsEarlyShift && bIsEarlyShift && bInboundCount < bTarget) return 1;
-          
-          // Priority 2: Among 06:00 shift staff, prefer those furthest from their target
-          if (aIsEarlyShift && bIsEarlyShift) {
-            const aRemaining = aTarget - aInboundCount;
-            const bRemaining = bTarget - bInboundCount;
-            if (aRemaining !== bRemaining) return bRemaining - aRemaining; // Higher remaining gets priority
-          }
-          
-          // Otherwise maintain existing sort order
-          // Check consecutive task constraint
-          const aPrevTask = staffTasksByDate[a.id]?.[prevDateStr];
-          const bPrevTask = staffTasksByDate[b.id]?.[prevDateStr];
-          if (aPrevTask === task && bPrevTask !== task) return 1;
-          if (aPrevTask !== task && bPrevTask === task) return -1;
-          
-          // Fairness
-          const aCount = staffAssignmentCounts[a.id] || 0;
-          const bCount = staffAssignmentCounts[b.id] || 0;
-          if (aCount !== bCount) return aCount - bCount;
-          
-          // Shift priority
-          const aShiftIndex = shiftOrder.indexOf(a.shift);
-          const bShiftIndex = shiftOrder.indexOf(b.shift);
-          return aShiftIndex - bShiftIndex;
-        });
-      }
-
       // Assign the needed staff
-      for (let i = 0; i < Math.min(needed, finalSorted.length); i++) {
-        const selectedStaff = finalSorted[i];
+      for (let i = 0; i < Math.min(needed, sorted.length); i++) {
+        const selectedStaff = sorted[i];
         assignments.push({
           staffId: selectedStaff.id,
           staffName: selectedStaff.name,
@@ -239,9 +215,9 @@ export function generateWeeklyRota({
         // Track what task this staff member did on this date
         staffTasksByDate[selectedStaff.id][dateStr] = task;
         
-        // Track Inbound assignments for 06:00 shift staff
-        if (task === "Inbound" && selectedStaff.shiftStart === "06:00") {
-          earlyShiftInboundCount[selectedStaff.id] = (earlyShiftInboundCount[selectedStaff.id] || 0) + 1;
+        // Track this specific task count for fairness
+        if (staffTaskCounts[selectedStaff.id]) {
+          staffTaskCounts[selectedStaff.id][task] = (staffTaskCounts[selectedStaff.id][task] || 0) + 1;
         }
       }
     }
