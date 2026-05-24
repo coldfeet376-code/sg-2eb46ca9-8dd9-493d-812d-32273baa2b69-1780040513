@@ -337,8 +337,9 @@ export default function StaffPage() {
       const staffMember = staff.find(s => s.id === staffId);
       const staffName = staffMember?.name || "Staff";
       
-      // Format date for display (e.g., "Sat 17 May")
-      const dateObj = new Date(dateStr + "T12:00:00");
+      // Format date for display - parse the YYYY-MM-DD string as local date
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const dateObj = new Date(year, month - 1, day); // months are 0-indexed
       const dateDisplay = dateObj.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
       
       if (type === "clear") {
@@ -394,7 +395,8 @@ export default function StaffPage() {
   };
 
   const getAvailabilityForDate = (staffMember: StaffMember, date: Date): AvailabilityType | null => {
-    const dateStr = date.toISOString().split("T")[0];
+    // Use LOCAL date formatting to match what we're storing
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const entry = staffMember.availability?.find(a => a.date === dateStr);
     return entry ? entry.type : null;
   };
@@ -1048,7 +1050,8 @@ export default function StaffPage() {
                                 <div className="grid grid-cols-7 gap-2" key={`${member.id}-${renderKey}`}>
                                   {weekDates.map((date, idx) => {
                                     const availType = getAvailabilityForDate(member, date);
-                                    const dateStr = date.toISOString().split("T")[0];
+                                    // Use LOCAL date formatting to avoid timezone shifts
+                                    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
                                     const isOpen = openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr;
                                     const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
                                     const dayLabel = DAYS[date.getDay()];
