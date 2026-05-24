@@ -710,11 +710,35 @@ export default function StaffPage() {
           </div>
           <div className="flex gap-2">
             <Button
+              variant="destructive"
+              onClick={async () => {
+                toast({ title: "🧹 Clearing ALL caches...", description: "This will force reload the app" });
+                
+                // Clear service worker caches
+                if ('serviceWorker' in navigator && 'caches' in window) {
+                  const cacheNames = await caches.keys();
+                  await Promise.all(cacheNames.map(name => caches.delete(name)));
+                  console.log('✅ Service worker caches cleared');
+                }
+                
+                // Clear React Query cache
+                queryClient.clear();
+                
+                // Force hard reload with cache bypass
+                setTimeout(() => {
+                  window.location.reload();
+                }, 500);
+              }}
+              className="font-sans font-medium"
+            >
+              🧹 Clear Cache & Reload
+            </Button>
+            <Button
               variant="outline"
               onClick={async () => {
                 toast({ title: "🔄 Refreshing data...", description: "Loading latest from database" });
-                await queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
-                await queryClient.refetchQueries({ queryKey: ["staff", "v2"], type: "active" });
+                await queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
+                await queryClient.refetchQueries({ queryKey: ["staff", "v3"], type: "active" });
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 setRenderKey(prev => prev + 1);
                 toast({ title: "✅ Data Refreshed", description: "Loaded latest availability data" });
@@ -722,13 +746,6 @@ export default function StaffPage() {
               className="font-sans font-medium"
             >
               🔄 Refresh Data
-            </Button>
-            <Button
-              onClick={handleAddStaff}
-              className="font-sans font-medium"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Staff
             </Button>
           </div>
         </div>

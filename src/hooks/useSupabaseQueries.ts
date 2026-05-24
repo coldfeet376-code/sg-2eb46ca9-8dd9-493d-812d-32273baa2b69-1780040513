@@ -9,9 +9,9 @@ interface TaskConfig {
 // Staff Query Hook
 export function useStaff() {
   return useQuery({
-    queryKey: ["staff", "v3", Date.now()], // FORCE NEW QUERY: timestamp ensures browser can't use cached version
+    queryKey: ["staff", "v3"], // Static version key - Date.now() was preventing proper caching
     queryFn: async () => {
-      console.log("🔍 Starting staff query with v3 cache buster...");
+      console.log("🔍 Starting staff query with v3...");
       console.log("⚠️ CRITICAL: Fetching ALL availability records using .range(0, 50000)");
       
       const { data: staffData, error: staffError } = await supabase
