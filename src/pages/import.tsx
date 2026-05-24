@@ -39,6 +39,8 @@ export default function ImportPage() {
   const [dateRange, setDateRange] = useState<string>("");
   const [debugInfo, setDebugInfo] = useState<string>("");
   const [isClearing, setIsClearing] = useState(false);
+  const [currentProcessingStaff, setCurrentProcessingStaff] = useState<string>("");
+  const [importStats, setImportStats] = useState({ success: 0, skipped: 0, errors: 0 });
   const router = useRouter();
   const { toast } = useToast();
 
@@ -314,11 +316,14 @@ export default function ImportPage() {
     
     setIsImporting(true);
     setImportProgress(0);
+    setImportStats({ success: 0, skipped: 0, errors: 0 });
     let successCount = 0;
+    let skippedCount = 0;
     const errors: string[] = [];
 
     for (let i = 0; i < parsedStaff.length; i++) {
       const staff = parsedStaff[i];
+      setCurrentProcessingStaff(staff.name);
       let staffId: string | undefined;
       
       try {
@@ -327,6 +332,8 @@ export default function ImportPage() {
           
           if (!staffId) {
             console.log(`Skipping unmatched staff: ${staff.name}`);
+            skippedCount++;
+            setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
             setImportProgress(((i + 1) / parsedStaff.length) * 100);
             continue;
           }
@@ -349,6 +356,7 @@ export default function ImportPage() {
             const errorMsg = `Failed to create ${staff.name}: ${createError.message || createError}`;
             console.error(errorMsg, createError);
             errors.push(errorMsg);
+            setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
             setImportProgress(((i + 1) / parsedStaff.length) * 100);
             continue;
           }
@@ -376,10 +384,12 @@ export default function ImportPage() {
         console.log(`✓ ${staff.name}: imported ${importedAvailCount} unavailable days`);
         successCount++;
         setImportedCount(successCount);
+        setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
       } catch (error: any) {
         const errorMsg = `Failed to import ${staff.name}: ${error.message || error}`;
         console.error(errorMsg, error);
         errors.push(errorMsg);
+        setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
       }
 
       setImportProgress(((i + 1) / parsedStaff.length) * 100);
@@ -388,6 +398,7 @@ export default function ImportPage() {
 
     setIsImporting(false);
     setImportComplete(true);
+    setCurrentProcessingStaff("");
     
     const totalImportedDays = parsedStaff.reduce((sum, s) => 
       sum + s.availability.filter(a => a.status !== "available").length, 0
@@ -540,10 +551,49 @@ export default function ImportPage() {
                   </Alert>
 
                   {isImporting ? (
-                    <div className="space-y-2">
-                      <Progress value={importProgress} className="h-2" />
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm font-mono">
+                          <span className="text-muted-foreground">Progress</span>
+                          <span className="font-semibold">{Math.round(importProgress)}%</span>
+                        </div>
+                        <Progress value={importProgress} className="h-3" />
+                      </div>
+
+                      <div className="bg-muted/30 rounded-lg p-4 space-y-3">
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex h-4 w-4">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-4 w-4 bg-primary"></span>
+                          </div>
+                          <span className="text-sm font-mono text-muted-foreground">Processing:</span>
+                          <span className="text-sm font-semibold">{currentProcessingStaff}</span>
+                        </div>
+
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="bg-green-500/10 border border-green-500/30 rounded p-2">
+                            <div className="text-xs text-muted-foreground font-mono">Success</div>
+                            <div className="text-2xl font-bold text-green-600">{importStats.success}</div>
+                          </div>
+                          
+                          {importStats.skipped > 0 && (
+                            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-2">
+                              <div className="text-xs text-muted-foreground font-mono">Skipped</div>
+                              <div className="text-2xl font-bold text-yellow-600">{importStats.skipped}</div>
+                            </div>
+                          )}
+                          
+                          {importStats.errors > 0 && (
+                            <div className="bg-red-500/10 border border-red-500/30 rounded p-2">
+                              <div className="text-xs text-muted-foreground font-mono">Errors</div>
+                              <div className="text-2xl font-bold text-red-600">{importStats.errors}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       <p className="text-xs text-center text-muted-foreground font-mono">
-                        Importing {importedCount} / {parsedStaff.length}...
+                        Importing {importedCount} of {parsedStaff.length} staff members...
                       </p>
                     </div>
                   ) : (
