@@ -50,8 +50,12 @@ export function useStaff() {
       }
 
       const staffMembers: StaffMember[] = (staffData || []).map((s) => {
+        // CRITICAL FIX: Convert both IDs to strings for comparison
+        // Supabase might return UUIDs in different formats (UUID object vs string)
+        const staffIdStr = String(s.id);
+        
         const staffAvail = (availabilityData || [])
-          .filter((a) => a.staff_id === s.id)
+          .filter((a) => String(a.staff_id) === staffIdStr)
           .map((a) => ({
             date: a.date,
             type: a.type as "rest" | "holiday" | "sick" | "available",
@@ -63,35 +67,22 @@ export function useStaff() {
           console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
           console.log(`🔍 DETAILED FILTER DEBUG for: ${s.name}`);
           console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-          console.log(`Staff ID: ${s.id}`);
-          console.log(`Staff ID type: ${typeof s.id}`);
+          console.log(`Staff ID (original): ${s.id} (type: ${typeof s.id})`);
+          console.log(`Staff ID (string): ${staffIdStr}`);
           console.log(`Total availability records in database: ${availabilityData?.length || 0}`);
           
-          // Check how many records have matching staff_id
-          const matchingRecords = (availabilityData || []).filter(a => a.staff_id === s.id);
-          console.log(`Records matching this staff_id: ${matchingRecords.length}`);
+          // Check how many records have matching staff_id using string comparison
+          const matchingRecords = (availabilityData || []).filter(a => String(a.staff_id) === staffIdStr);
+          console.log(`Records matching this staff_id (STRING comparison): ${matchingRecords.length}`);
           
           // Show sample of availability staff_ids to check format
           const sampleAvailIds = (availabilityData || []).slice(0, 5).map(a => ({
-            staff_id: a.staff_id,
-            type: typeof a.staff_id,
-            equals_check: a.staff_id === s.id,
-            string_equals: String(a.staff_id) === String(s.id)
+            staff_id_original: a.staff_id,
+            staff_id_string: String(a.staff_id),
+            type_original: typeof a.staff_id,
+            matches_our_staff: String(a.staff_id) === staffIdStr,
           }));
           console.log(`Sample availability staff_ids:`, sampleAvailIds);
-          
-          // Check if this staff's ID appears in availability at all
-          const staffIdExists = (availabilityData || []).some(a => a.staff_id === s.id);
-          console.log(`This staff_id exists in availability table: ${staffIdExists}`);
-          
-          // If no match, try to find similar IDs
-          if (!staffIdExists && availabilityData && availabilityData.length > 0) {
-            const similarIds = availabilityData
-              .map(a => a.staff_id)
-              .filter((id, index, self) => self.indexOf(id) === index) // unique
-              .slice(0, 5);
-            console.log(`Sample of unique staff_ids in availability:`, similarIds);
-          }
           
           console.log(`Final filtered availability count: ${staffAvail.length}`);
           if (staffAvail.length > 0) {
