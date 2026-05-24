@@ -713,8 +713,8 @@ export default function StaffPage() {
               variant="outline"
               onClick={async () => {
                 toast({ title: "🔄 Refreshing data...", description: "Loading latest from database" });
-                await queryClient.invalidateQueries({ queryKey: ["staff"] });
-                await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
+                await queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
+                await queryClient.refetchQueries({ queryKey: ["staff", "v2"], type: "active" });
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 setRenderKey(prev => prev + 1);
                 toast({ title: "✅ Data Refreshed", description: "Loaded latest availability data" });
