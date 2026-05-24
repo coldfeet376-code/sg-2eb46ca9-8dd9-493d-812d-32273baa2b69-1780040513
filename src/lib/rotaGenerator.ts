@@ -250,9 +250,9 @@ export function generateWeeklyRota({
   const frozenTrainedStaff = staff.filter(s => 
     s.trainedTasks.includes("Frozen") && 
     !s.availability.some(a => 
-      a.date >= weekStart && 
+      a.date >= weekStart.toISOString().split('T')[0] && 
       a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0] &&
-      (a.type === "rest_day" || a.type === "holiday" || a.type === "sick_leave")
+      a.type !== "available"
     )
   );
 
@@ -260,7 +260,7 @@ export function generateWeeklyRota({
     const frozenAssignments = assignments.filter(a => 
       a.staffId === staffMember.id && 
       a.task === "Frozen" &&
-      a.date >= weekStart &&
+      a.date >= weekStart.toISOString().split('T')[0] &&
       a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0]
     );
 
@@ -283,7 +283,7 @@ export function generateWeeklyRota({
         // Check availability
         const unavailable = staffMember.availability.some(a => 
           a.date === dateStr && 
-          (a.type === "rest_day" || a.type === "holiday" || a.type === "sick_leave")
+          a.type !== "available"
         );
         if (unavailable) continue;
         
@@ -324,7 +324,7 @@ export function generateWeeklyRota({
     const unavailableDays = weekDates.filter(date => 
       s.availability.some(a => 
         a.date === date && 
-        (a.type === "rest_day" || a.type === "holiday" || a.type === "sick_leave")
+        a.type !== "available"
       )
     ).length;
     
@@ -336,7 +336,7 @@ export function generateWeeklyRota({
     const inboundAssignments = assignments.filter(a => 
       a.staffId === staffMember.id && 
       a.task === "Inbound" &&
-      a.date >= weekStart &&
+      a.date >= weekStart.toISOString().split('T')[0] &&
       a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0]
     );
 
@@ -387,7 +387,7 @@ export function generateWeeklyRota({
         // Check availability
         const unavailable = staffMember.availability.some(a => 
           a.date === dateStr && 
-          (a.type === "rest_day" || a.type === "holiday" || a.type === "sick_leave")
+          a.type !== "available"
         );
         if (unavailable) continue;
         
