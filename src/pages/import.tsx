@@ -37,6 +37,7 @@ export default function ImportPage() {
   const [importComplete, setImportComplete] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
   const [dateRange, setDateRange] = useState<string>("");
+  const [debugInfo, setDebugInfo] = useState<string>("");
   const router = useRouter();
   const { toast } = useToast();
 
@@ -90,6 +91,7 @@ export default function ImportPage() {
     // Parse staff rows
     const newStaff: ParsedStaff[] = [];
     const matches = new Map<string, string>();
+    const debugLines: string[] = [];
 
     for (let lineIdx = 1; lineIdx < lines.length; lineIdx++) {
       const cells = lines[lineIdx].split('\t');
@@ -111,10 +113,24 @@ export default function ImportPage() {
       // Parse availability for all date columns
       const availability: ParsedAvailability[] = [];
       
+      // Debug: Log first person's raw cell contents
+      if (lineIdx === 1) {
+        debugLines.push(`=== DEBUG: ${name} ===`);
+        debugLines.push(`Total cells in row: ${cells.length}`);
+        debugLines.push(`Date columns to check: ${dateColumns.length}`);
+        debugLines.push(`First 20 cells after phone:`);
+      }
+      
       for (const { index, date } of dateColumns) {
         if (index < cells.length) {
-          const statusText = cells[index]?.trim().toUpperCase() || "";
+          const rawCell = cells[index] || "";
+          const statusText = rawCell.trim().toUpperCase();
           let status: AvailabilityType = "available";
+
+          // Debug logging for first person
+          if (lineIdx === 1 && dateColumns.indexOf({ index, date }) < 20) {
+            debugLines.push(`  Cell ${index} (${date}): "${rawCell}" → "${statusText}" → ${status}`);
+          }
 
           // More robust pattern matching for statuses
           if (statusText === "REST" || statusText === "R" || statusText.startsWith("REST")) {
@@ -134,8 +150,18 @@ export default function ImportPage() {
             status = "available";
           }
 
+          // Update debug with final status
+          if (lineIdx === 1 && dateColumns.indexOf({ index, date }) < 20) {
+            debugLines[debugLines.length - 1] = `  Cell ${index} (${date}): "${rawCell}" → "${statusText}" → ${status}`;
+          }
+
           // Store ALL days (including available) for preview purposes
           availability.push({ date, status });
+        } else {
+          // Debug: cell index out of range
+          if (lineIdx === 1) {
+            debugLines.push(`  Cell ${index} (${date}): OUT OF RANGE (row has ${cells.length} cells)`);
+          }
         }
       }
 
@@ -161,6 +187,11 @@ export default function ImportPage() {
 
     setParsedStaff(newStaff);
     setMatchedStaff(matches);
+    setDebugInfo(debugLines.join('\n'));
+
+    // Log to console for easy copying
+    console.log("=== IMPORT DEBUG INFO ===");
+    console.log(debugLines.join('\n'));
 
     if (newStaff.length > 0 && dateColumns.length > 0) {
       const firstDate = dateColumns[0].date;
@@ -437,6 +468,23 @@ export default function ImportPage() {
                           <AlertDescription className="text-xs font-mono">
                             {parsedStaff.length - matchedStaff.size} staff will be skipped (not found in database). 
                             Turn off "Update Mode" to create them as new staff.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {debugInfo && (
+                        <Alert className="bg-muted/50">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            <div className="space-y-2">
+                              <div className="font-semibold text-xs">Debug Info (First Person):</div>
+                              <pre className="text-[9px] font-mono overflow-x-auto p-2 bg-background rounded max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all">
+{debugInfo}
+                              </pre>
+                              <div className="text-[10px] text-muted-foreground">
+                                Check the browser console (F12) for full debug output
+                              </div>
+                            </div>
                           </AlertDescription>
                         </Alert>
                       )}
