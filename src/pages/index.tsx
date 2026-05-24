@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SEO } from "@/components/SEO";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
@@ -20,10 +21,11 @@ import { rotaService } from "@/services/rotaService";
 import { rotaRealtimeService, type StoredRota } from "@/services/rotaRealtimeService";
 import { useNotifications } from "@/contexts/NotificationContext";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { useStaff, useTaskConfig } from "@/hooks/useSupabaseQueries";
+import { useStaff, useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
 import { Lock, Unlock, Save, Download, Copy, Calendar, History, RotateCcw, Zap, LayoutGrid, Printer, AlertCircle, TrendingUp } from "lucide-react";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
+import { useToast } from "@/hooks/use-toast";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -35,7 +37,7 @@ import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
 import { RecentChangesPanel } from "@/components/RecentChangesPanel";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Housekeeping"];
 
 function formatDateRange(start: Date, end: Date): string {
   if (!start || !end) return "";
@@ -89,6 +91,18 @@ export default function Home() {
   // React Query hooks - cached data with error handling
   const { data: staff = [], isLoading: staffLoading, error: staffError } = useStaff();
   const { data: taskConfig, isLoading: configLoading, error: configError } = useTaskConfig();
+  
+  const [activeTab, setActiveTab] = useState<string>("rota");
+  const [taskConfigData, setTaskConfigData] = useState<TaskConfig | null>(null);
+  const updateTaskConfig = useUpdateTaskConfig();
+  const { toast } = useToast();
+  
+  // Sync taskConfig to local state for editing
+  useEffect(() => {
+    if (taskConfig) {
+      setTaskConfigData(taskConfig);
+    }
+  }, [taskConfig]);
 
   // Debug logging
   useEffect(() => {
@@ -729,7 +743,13 @@ export default function Home() {
         description="Fair distribution work rotation system for warehouse operations"
       />
       
-      <div className="space-y-6">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="font-sans">
+          <TabsTrigger value="rota">Weekly Rota</TabsTrigger>
+          <TabsTrigger value="settings">Task Settings</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="rota" className="space-y-6">
         {/* Coverage Warning Modal */}
         {showCoverageWarning && coverageGaps.length > 0 && (
           <Alert className="bg-warning/10 border-warning">
@@ -1372,6 +1392,8 @@ export default function Home() {
 
         {/* Recent Changes Panel */}
         <RecentChangesPanel />
+        
+        </TabsContent>
 
         {/* Settings Tab - Task Requirements Configuration */}
         <TabsContent value="settings" className="space-y-4">
