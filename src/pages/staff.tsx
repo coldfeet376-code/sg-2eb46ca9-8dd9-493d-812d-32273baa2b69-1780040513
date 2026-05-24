@@ -880,6 +880,10 @@ export default function StaffPage() {
                                       <div className="flex-1 text-left">
                                         <div className="flex items-center gap-3 mb-2">
                                           <h3 className="font-condensed font-semibold text-lg">{member.name}</h3>
+                                          {/* DEBUG INDICATOR - Shows raw availability count */}
+                                          <Badge variant="outline" className="font-mono text-xs bg-amber-500/10 text-amber-700 border-amber-500/30">
+                                            📊 Loaded: {member.availability?.length || 0} entries
+                                          </Badge>
                                           {member.shiftStart && (
                                             <Badge variant="secondary" className="font-mono text-xs">
                                               <Clock className="h-3 w-3 mr-1" />
