@@ -49,6 +49,26 @@ export function useStaff() {
         throw availError;
       }
 
+      // CRITICAL: Check if Supabase returned ZERO availability records
+      if (!availabilityData || availabilityData.length === 0) {
+        console.error("🚨 CRITICAL: Supabase returned ZERO availability records!");
+        console.error("This means RLS is blocking reads or the table is actually empty.");
+        console.error("Database SQL confirmed 12,177 records exist, so this is an RLS/auth issue.");
+        
+        // Return staff with empty availability arrays
+        const staffMembers: StaffMember[] = (staffData || []).map((s) => ({
+          id: s.id,
+          name: s.name,
+          trainedTasks: (s.trained_tasks || []) as Task[],
+          shiftStart: (s.shift_start || "06:00") as ShiftStart,
+          shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
+          availability: [], // Empty because Supabase returned nothing
+        }));
+        
+        return staffMembers;
+      }
+
+      console.log(`✅ Supabase returned ${availabilityData.length} availability records - now filtering...`);
       const staffMembers: StaffMember[] = (staffData || []).map((s) => {
         // CRITICAL FIX: Convert both IDs to strings for comparison
         // Supabase might return UUIDs in different formats (UUID object vs string)
