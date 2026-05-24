@@ -9,7 +9,7 @@ interface TaskConfig {
 // Staff Query Hook
 export function useStaff() {
   return useQuery({
-    queryKey: ["staff"],
+    queryKey: ["staff", "v2"], // CHANGED: Add version to bust cache and force fresh fetch
     queryFn: async () => {
       console.log("🔍 Starting staff query...");
       
@@ -206,7 +206,7 @@ export function useAddStaff() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
     },
   });
 }
@@ -229,7 +229,7 @@ export function useUpdateStaff() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
     },
   });
 }
@@ -243,7 +243,7 @@ export function useDeleteStaff() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
     },
   });
 }
@@ -295,7 +295,7 @@ export function useAddAvailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
     },
   });
 }
@@ -313,7 +313,7 @@ export function useDeleteAvailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
     },
   });
 }
