@@ -307,7 +307,7 @@ export default function StaffPage() {
       }
 
       // Refresh data
-      await queryClient.refetchQueries({ queryKey: ["staff", "v3"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v4"] });
       
       // Force re-render
       setRenderKey(prev => prev + 1);
@@ -355,8 +355,8 @@ export default function StaffPage() {
       }
       
       // AGGRESSIVE CACHE REFRESH - invalidate, refetch, and wait
-      await queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "v3"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v4"], type: "active" });
       
       // Wait 800ms for cache to fully settle and propagate to component
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -477,8 +477,8 @@ export default function StaffPage() {
         }
       }
       
-      await queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "v3"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v4"], type: "active" });
       await new Promise(resolve => setTimeout(resolve, 800));
       setRenderKey(prev => prev + 1);
       
@@ -537,8 +537,8 @@ export default function StaffPage() {
         }
       }
       
-      await queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "v3"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v4"], type: "active" });
       await new Promise(resolve => setTimeout(resolve, 800));
       setRenderKey(prev => prev + 1);
       
@@ -568,8 +568,8 @@ export default function StaffPage() {
 
       await staffService.updateStaff(staffId, { trainedTasks: newTasks });
       
-      await queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "v3"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v4"], type: "active" });
       
       toast({
         title: currentTasks.includes(task) ? "✓ Training Removed" : "✓ Training Added",
@@ -758,8 +758,8 @@ export default function StaffPage() {
               variant="outline"
               onClick={async () => {
                 toast({ title: "🔄 Refreshing data...", description: "Loading latest from database" });
-                await queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
-                await queryClient.refetchQueries({ queryKey: ["staff", "v3"], type: "active" });
+                await queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
+                await queryClient.refetchQueries({ queryKey: ["staff", "v4"], type: "active" });
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 setRenderKey(prev => prev + 1);
                 toast({ title: "✅ Data Refreshed", description: "Loaded latest availability data" });

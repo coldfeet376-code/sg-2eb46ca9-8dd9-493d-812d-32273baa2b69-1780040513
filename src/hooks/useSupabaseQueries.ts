@@ -9,10 +9,10 @@ interface TaskConfig {
 // Staff Query Hook
 export function useStaff() {
   return useQuery({
-    queryKey: ["staff", "v3"], // Static version key - Date.now() was preventing proper caching
+    queryKey: ["staff", "v4"], // CHANGED: v4 forces complete cache refresh
     queryFn: async () => {
-      console.log("🔍 Starting staff query with v3...");
-      console.log("⚠️ CRITICAL: Fetching ALL availability records using .range(0, 50000)");
+      console.log("🔍 Starting staff query with v4...");
+      console.log("⚠️ CRITICAL: Fetching ALL availability records using .order().limit(100000)");
       
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -38,7 +38,8 @@ export function useStaff() {
       const { data: availabilityData, error: availError } = await supabase
         .from("availability")
         .select("*")
-        .range(0, 50000); // CRITICAL FIX: Use range() instead of limit() to fetch all records (bypasses cache)
+        .order('date', { ascending: true })
+        .limit(100000); // FINAL FIX: Complete query restructure with order + very high limit
 
       console.log("📅 Availability query result:", {
         availCount: availabilityData?.length || 0,
@@ -207,7 +208,7 @@ export function useAddStaff() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
     },
   });
 }
@@ -230,7 +231,7 @@ export function useUpdateStaff() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
     },
   });
 }
@@ -244,7 +245,7 @@ export function useDeleteStaff() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
     },
   });
 }
@@ -296,7 +297,7 @@ export function useAddAvailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
     },
   });
 }
@@ -314,7 +315,7 @@ export function useDeleteAvailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
     },
   });
 }
