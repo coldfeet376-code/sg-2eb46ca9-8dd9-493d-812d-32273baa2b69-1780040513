@@ -58,6 +58,15 @@ export default function ImportPage() {
   const handleParsePaste = () => {
     const lines = pasteText.split('\n').filter(l => l.trim());
     
+    const earlyDebug: string[] = [];
+    earlyDebug.push(`=== EARLY PARSING DEBUG ===`);
+    earlyDebug.push(`Total lines: ${lines.length}`);
+    earlyDebug.push(`First 5 lines:`);
+    lines.slice(0, 5).forEach((line, i) => {
+      const preview = line.length > 100 ? line.substring(0, 100) + "..." : line;
+      earlyDebug.push(`  Line ${i}: ${preview}`);
+    });
+    
     if (lines.length < 2) {
       toast({
         title: "Not enough data",
@@ -67,43 +76,86 @@ export default function ImportPage() {
       return;
     }
 
-    // First line should be the header with dates
-    const headerCells = lines[0].split('\t');
-    
-    // Find date columns - skip first few columns (Name, Start, End, Phone)
+    // Search ALL lines for the one with dates (not just first line)
+    let headerLineIndex = -1;
+    let headerCells: string[] = [];
     const dateColumns: { index: number; date: string }[] = [];
-    for (let i = 0; i < headerCells.length; i++) {
-      const date = parseDateFromHeader(headerCells[i]);
-      if (date) {
-        dateColumns.push({ index: i, date });
+    
+    for (let i = 0; i < Math.min(10, lines.length); i++) {
+      const cells = lines[i].split('\t');
+      let dateCount = 0;
+      
+      for (let j = 0; j < cells.length; j++) {
+        if (parseDateFromHeader(cells[j])) {
+          dateCount++;
+        }
+      }
+      
+      if (dateCount > 5) { // Found header with multiple dates
+        headerLineIndex = i;
+        headerCells = cells;
+        earlyDebug.push(`\n✓ Found date header at line ${i} (${dateCount} dates detected)`);
+        
+        // Extract date columns
+        for (let j = 0; j < cells.length; j++) {
+          const date = parseDateFromHeader(cells[j]);
+          if (date) {
+            dateColumns.push({ index: j, date });
+          }
+        }
+        break;
       }
     }
 
-    if (dateColumns.length === 0) {
+    if (headerLineIndex === -1 || dateColumns.length === 0) {
+      earlyDebug.push(`\n✗ ERROR: No date header found in first 10 lines`);
+      console.log(earlyDebug.join('\n'));
+      setDebugInfo(earlyDebug.join('\n'));
+      
       toast({
         title: "No dates found in header",
-        description: "Please ensure the first row contains date columns in DD/MM/YYYY format (e.g., 25/01/2026).",
+        description: "Could not find a row with dates in DD/MM/YYYY format. Check the debug panel below.",
         variant: "destructive",
       });
       return;
     }
 
-    // Parse staff rows
+    earlyDebug.push(`Date columns found: ${dateColumns.length}`);
+    earlyDebug.push(`First date: ${dateColumns[0].date}, Last date: ${dateColumns[dateColumns.length - 1].date}`);
+
+    // Parse staff rows (start after header line)
     const newStaff: ParsedStaff[] = [];
     const matches = new Map<string, string>();
-    const debugLines: string[] = [];
+    const debugLines: string[] = [...earlyDebug];
+    
+    debugLines.push(`\n=== STAFF ROW PARSING ===`);
+    debugLines.push(`Starting from line ${headerLineIndex + 1}`);
 
-    for (let lineIdx = 1; lineIdx < lines.length; lineIdx++) {
+    for (let lineIdx = headerLineIndex + 1; lineIdx < lines.length; lineIdx++) {
       const cells = lines[lineIdx].split('\t');
       
-      if (cells.length < 4) continue;
+      // Skip section headers or rows with too few cells
+      if (cells.length < 4) {
+        debugLines.push(`Line ${lineIdx}: SKIPPED (only ${cells.length} cells)`);
+        continue;
+      }
 
       const name = cells[0]?.trim();
       const startTime = cells[1]?.trim();
       const endTime = cells[2]?.trim();
       const phone = cells[3]?.trim();
 
-      if (!name || !startTime || !endTime) continue;
+      // Skip section headers like "LENZIEMILL DAYSHIFT"
+      if (!name || name.includes("DAYSHIFT") || name.includes("NIGHTSHIFT")) {
+        debugLines.push(`Line ${lineIdx}: SKIPPED (section header: "${name}")`);
+        continue;
+      }
+
+      // Skip if missing required fields
+      if (!startTime || !endTime) {
+        debugLines.push(`Line ${lineIdx}: SKIPPED "${name}" (missing shift times)`);
+        continue;
+      }
 
       // Build shift pattern (remove seconds if present)
       const start = startTime.substring(0, 5); // HH:MM
@@ -114,23 +166,21 @@ export default function ImportPage() {
       const availability: ParsedAvailability[] = [];
       
       // Debug: Log first person's raw cell contents
-      if (lineIdx === 1) {
-        debugLines.push(`=== DEBUG: ${name} ===`);
+      if (newStaff.length === 0) {
+        debugLines.push(`\n=== FIRST PERSON DETAIL: ${name} ===`);
+        debugLines.push(`Shift: ${shift}, Phone: ${phone || "none"}`);
         debugLines.push(`Total cells in row: ${cells.length}`);
         debugLines.push(`Date columns to check: ${dateColumns.length}`);
-        debugLines.push(`First 20 cells after phone:`);
+        debugLines.push(`First 20 availability cells:`);
       }
       
-      for (const { index, date } of dateColumns) {
+      for (let dcIdx = 0; dcIdx < dateColumns.length; dcIdx++) {
+        const { index, date } = dateColumns[dcIdx];
+        
         if (index < cells.length) {
           const rawCell = cells[index] || "";
           const statusText = rawCell.trim().toUpperCase();
           let status: AvailabilityType = "available";
-
-          // Debug logging for first person
-          if (lineIdx === 1 && dateColumns.indexOf({ index, date }) < 20) {
-            debugLines.push(`  Cell ${index} (${date}): "${rawCell}" → "${statusText}" → ${status}`);
-          }
 
           // More robust pattern matching for statuses
           if (statusText === "REST" || statusText === "R" || statusText.startsWith("REST")) {
@@ -150,17 +200,17 @@ export default function ImportPage() {
             status = "available";
           }
 
-          // Update debug with final status
-          if (lineIdx === 1 && dateColumns.indexOf({ index, date }) < 20) {
-            debugLines[debugLines.length - 1] = `  Cell ${index} (${date}): "${rawCell}" → "${statusText}" → ${status}`;
+          // Debug logging for first person, first 20 days
+          if (newStaff.length === 0 && dcIdx < 20) {
+            debugLines.push(`  Cell ${index} (${date}): "${rawCell}" → ${status}`);
           }
 
           // Store ALL days (including available) for preview purposes
           availability.push({ date, status });
         } else {
           // Debug: cell index out of range
-          if (lineIdx === 1) {
-            debugLines.push(`  Cell ${index} (${date}): OUT OF RANGE (row has ${cells.length} cells)`);
+          if (newStaff.length === 0 && dcIdx < 20) {
+            debugLines.push(`  Cell ${index} (${date}): OUT OF RANGE (row has only ${cells.length} cells)`);
           }
         }
       }
@@ -175,6 +225,8 @@ export default function ImportPage() {
         }
       }
 
+      debugLines.push(`Line ${lineIdx}: ✓ PARSED "${name}"`);
+
       newStaff.push({
         name,
         phone,
@@ -183,6 +235,13 @@ export default function ImportPage() {
         shift,
         availability
       });
+    }
+
+    debugLines.push(`\n=== SUMMARY ===`);
+    debugLines.push(`Total staff parsed: ${newStaff.length}`);
+    if (updateMode) {
+      debugLines.push(`Matched to database: ${matches.size}`);
+      debugLines.push(`Not found: ${newStaff.length - matches.size}`);
     }
 
     setParsedStaff(newStaff);
@@ -212,6 +271,12 @@ export default function ImportPage() {
         description: updateMode 
           ? `Found ${newStaff.length} staff (${matchCount} matched, ${unmatchedCount} not found) - ${totalUnavailableDays} total unavailable days across ${totalDays} days`
           : `Found ${newStaff.length} staff with ${totalUnavailableDays} total unavailable days across ${totalDays} days`,
+      });
+    } else if (newStaff.length === 0) {
+      toast({
+        title: "No staff found",
+        description: "Could not parse any staff rows. Check the debug panel below for details.",
+        variant: "destructive",
       });
     }
   };
@@ -360,6 +425,23 @@ export default function ImportPage() {
               </CardContent>
             </Card>
 
+            {debugInfo && (
+              <Alert className="bg-muted/50">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="space-y-2">
+                    <div className="font-semibold text-xs">Parsing Debug Info:</div>
+                    <pre className="text-[9px] font-mono overflow-x-auto p-2 bg-background rounded max-h-[300px] overflow-y-auto whitespace-pre-wrap break-all">
+{debugInfo}
+                    </pre>
+                    <div className="text-[10px] text-muted-foreground">
+                      Full output also in browser console (F12)
+                    </div>
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {parsedStaff.length > 0 && (
               <Card className="border-primary">
                 <CardHeader>
@@ -468,23 +550,6 @@ export default function ImportPage() {
                           <AlertDescription className="text-xs font-mono">
                             {parsedStaff.length - matchedStaff.size} staff will be skipped (not found in database). 
                             Turn off "Update Mode" to create them as new staff.
-                          </AlertDescription>
-                        </Alert>
-                      )}
-
-                      {debugInfo && (
-                        <Alert className="bg-muted/50">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            <div className="space-y-2">
-                              <div className="font-semibold text-xs">Debug Info (First Person):</div>
-                              <pre className="text-[9px] font-mono overflow-x-auto p-2 bg-background rounded max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all">
-{debugInfo}
-                              </pre>
-                              <div className="text-[10px] text-muted-foreground">
-                                Check the browser console (F12) for full debug output
-                              </div>
-                            </div>
                           </AlertDescription>
                         </Alert>
                       )}
