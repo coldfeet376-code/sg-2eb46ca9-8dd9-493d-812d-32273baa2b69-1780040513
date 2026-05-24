@@ -3,18 +3,44 @@ import type { Assignment, FairnessMetrics, StaffMember, Task } from "@/types";
 export function calculateFairnessMetrics(
   assignments: Assignment[],
   staff: StaffMember[]
-) {
+): FairnessMetrics {
   if (assignments.length === 0 || staff.length === 0) {
-    return { overallScore: 0, standardDeviation: 0 };
+    return { overallScore: 0, standardDeviation: 0, staffWorkload: [] };
   }
 
-  // Count assignments per staff member
-  const counts = staff.map((s) => {
-    return assignments.filter((a) => a.staffId === s.id).length;
+  // Calculate staff workload details
+  const staffWorkload = staff.map((s) => {
+    const staffAssignments = assignments.filter((a) => a.staffId === s.id);
+    const totalAssignments = staffAssignments.length;
+    
+    const taskBreakdown: Record<Task, number> = {
+      "Frozen": 0,
+      "Milk": 0,
+      "TWI": 0,
+      "Inbound": 0,
+      "Outbound": 0,
+      "Marshaling": 0,
+      "Housekeeping": 0,
+    };
+
+    staffAssignments.forEach((a) => {
+      if (a.task in taskBreakdown) {
+        taskBreakdown[a.task]++;
+      }
+    });
+
+    return {
+      staffId: s.id,
+      staffName: s.name,
+      totalAssignments,
+      taskBreakdown,
+    };
   });
 
+  const counts = staffWorkload.map(w => w.totalAssignments);
+
   if (counts.length === 0) {
-    return { overallScore: 0, standardDeviation: 0 };
+    return { overallScore: 0, standardDeviation: 0, staffWorkload: [] };
   }
 
   // Calculate standard deviation
@@ -26,7 +52,7 @@ export function calculateFairnessMetrics(
   // Fairness score: 100 means perfectly equal, lower means less fair
   // If stdDev is 0 (all equal), return 100
   if (stdDev === 0) {
-    return { overallScore: 100, standardDeviation: 0 };
+    return { overallScore: 100, standardDeviation: 0, staffWorkload };
   }
 
   // Normalize: lower stdDev = higher fairness
@@ -35,6 +61,7 @@ export function calculateFairnessMetrics(
 
   return {
     overallScore: Math.round(fairness),
-    standardDeviation: Number(stdDev.toFixed(2))
+    standardDeviation: Number(stdDev.toFixed(2)),
+    staffWorkload
   };
 }
