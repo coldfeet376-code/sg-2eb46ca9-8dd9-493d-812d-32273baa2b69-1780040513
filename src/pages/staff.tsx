@@ -39,8 +39,9 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
-const SHIFT_STARTS: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
+const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Housekeeping"];
+const SHIFT_STARTS: ShiftStart[] = ["06:00", "07:00", "08:00", "09:00", "10:00"];
+const SHIFT_PATTERNS = ["4on4off", "5on3off"];
 
 const DAY_SHIFT_PATTERNS: DayShiftPattern[] = [
   "06:00-14:30",
