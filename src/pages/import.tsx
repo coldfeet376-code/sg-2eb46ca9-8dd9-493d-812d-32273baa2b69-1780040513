@@ -38,12 +38,40 @@ export default function ImportPage() {
   const [importedCount, setImportedCount] = useState(0);
   const [dateRange, setDateRange] = useState<string>("");
   const [debugInfo, setDebugInfo] = useState<string>("");
+  const [isClearing, setIsClearing] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
   const { data: existingStaff = [] } = useStaff();
   const createStaffMutation = useSupabaseMutation("staff", "insert");
   const createAvailabilityMutation = useSupabaseMutation("availability", "insert");
+  const deleteAvailabilityMutation = useSupabaseMutation("availability", "delete");
+
+  const handleClearAllAvailability = async () => {
+    if (!confirm("⚠️ This will DELETE ALL availability entries for ALL staff members. This cannot be undone. Continue?")) {
+      return;
+    }
+
+    setIsClearing(true);
+    try {
+      // Delete all availability records
+      await deleteAvailabilityMutation.mutateAsync({} as any);
+      
+      toast({
+        title: "✓ Cleared all availability",
+        description: "All availability entries have been removed from the database",
+      });
+    } catch (error) {
+      console.error("Error clearing availability:", error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to clear availability data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   const parseDateFromHeader = (headerCell: string): string | null => {
     // Try to match DD/MM/YYYY format
@@ -386,6 +414,29 @@ export default function ImportPage() {
                 checked={updateMode}
                 onCheckedChange={setUpdateMode}
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="font-condensed font-semibold text-sm flex items-center gap-2 text-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  Danger Zone
+                </div>
+                <p className="text-xs text-muted-foreground font-mono">
+                  Clear all availability data for all staff members (cannot be undone)
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={handleClearAllAvailability}
+                disabled={isClearing}
+              >
+                {isClearing ? "Clearing..." : "Clear All Availability"}
+              </Button>
             </div>
           </CardContent>
         </Card>
