@@ -81,62 +81,67 @@ export default function AnalyticsPage() {
       const staffData = await staffService.getAllStaff();
       setStaff(staffData);
 
-      const { data: assignmentsData, error } = await supabase
-        .from("assignments")
+      const { data: rotasData, error: rotasError } = await supabase
+        .from("rotas")
         .select("*")
         .order("week_start", { ascending: false });
 
-      if (error) {
-        console.error("Error fetching assignments:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load rota data from database",
-          variant: "destructive",
-        });
-        return;
-      }
+      if (rotasError) throw rotasError;
 
-      const weekMap = new Map<string, WeekData>();
-      
-      (assignmentsData || []).forEach((a) => {
-        const weekKey = a.week_start;
-        if (!weekMap.has(weekKey)) {
-          weekMap.set(weekKey, {
-            weekKey,
-            weekStart: new Date(weekKey),
-            assignments: [],
-          });
-        }
+      if (rotasData && rotasData.length > 0) {
+        // Parse JSONB assignments from each rota
+        const allAssignments: Assignment[] = [];
         
-        weekMap.get(weekKey)!.assignments.push({
-          staffId: a.staff_id,
-          staffName: a.staff_name,
-          task: a.task as any,
-          date: a.date,
-          shiftPattern: a.shift_pattern as any,
+        rotasData.forEach((rota: any) => {
+          if (rota.assignments && Array.isArray(rota.assignments)) {
+            allAssignments.push(...rota.assignments);
+          }
         });
-      });
 
-      const weeks = Array.from(weekMap.values()).sort(
-        (a, b) => b.weekStart.getTime() - a.weekStart.getTime()
-      );
+        const weekMap = new Map<string, WeekData>();
+        
+        allAssignments.forEach((a) => {
+          const weekKey = a.week_start;
+          if (!weekMap.has(weekKey)) {
+            weekMap.set(weekKey, {
+              weekKey,
+              weekStart: new Date(weekKey),
+              assignments: [],
+            });
+          }
+          
+          weekMap.get(weekKey)!.assignments.push({
+            staffId: a.staff_id,
+            staffName: a.staff_name,
+            task: a.task as any,
+            date: a.date,
+            shiftPattern: a.shift_pattern as any,
+          });
+        });
 
-      setAllWeeks(weeks);
+        const weeks = Array.from(weekMap.values()).sort(
+          (a, b) => b.weekStart.getTime() - a.weekStart.getTime()
+        );
 
-      if (weeks.length > 0 && !selectedWeek) {
-        const mostRecent = weeks[0].weekKey;
-        setSelectedWeek(mostRecent);
-        calculateWeeklySummary(staffData, weeks[0].assignments);
-      } else if (weeks.length === 0) {
-        calculateWeeklySummary(staffData, []);
+        setAllWeeks(weeks);
+
+        if (weeks.length > 0 && !selectedWeek) {
+          const mostRecent = weeks[0].weekKey;
+          setSelectedWeek(mostRecent);
+          calculateWeeklySummary(staffData, weeks[0].assignments);
+        } else if (weeks.length === 0) {
+          calculateWeeklySummary(staffData, []);
+        }
+
+        calculateTurnHistory(staffData, weeks);
+
+        toast({
+          title: "Data refreshed",
+          description: `Loaded ${weeks.length} week(s) of data`,
+        });
+      } else {
+        setAllWeeks([]);
       }
-
-      calculateTurnHistory(staffData, weeks);
-
-      toast({
-        title: "Data refreshed",
-        description: `Loaded ${weeks.length} week(s) of data`,
-      });
     } catch (error) {
       console.error("Error loading analytics:", error);
       toast({
