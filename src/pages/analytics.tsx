@@ -507,56 +507,68 @@ export default function AnalyticsPage() {
             </TabsContent>
 
             <TabsContent value="fairness" className="space-y-6">
-              <Card className="shadow-sm">
-                <CardHeader className="border-b border-border/50 bg-muted/30">
-                  <CardTitle className="text-2xl font-condensed font-bold tracking-tight">
-                    Distribution Fairness
+              <Card className="shadow-sm border-primary/30 bg-primary/5">
+                <CardHeader className="border-b border-primary/20 bg-primary/10">
+                  <CardTitle className="text-xl font-condensed font-bold tracking-tight flex items-center gap-2">
+                    <Target className="h-5 w-5 text-primary" />
+                    Priority Assignments
                   </CardTitle>
                   <CardDescription className="text-sm font-sans">
-                    How evenly duties are distributed across the team (Expected: {getExpectedTurns()} turns each)
+                    Staff members who should be assigned next to balance the rotation
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6">
                   {turnHistory.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="font-sans text-sm">No data to analyze fairness</p>
+                    <div className="text-center py-4 text-muted-foreground">
+                      <p className="font-sans text-sm">No data available</p>
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      {turnHistory.map((history) => {
-                        const expected = getExpectedTurns();
-                        const variance = Math.abs(history.totalTurns - expected);
-                        const percentDiff = expected > 0 ? (variance / expected) * 100 : 0;
-                        
-                        return (
-                          <div key={history.staffId} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <p className="font-sans font-semibold text-sm">{history.staffName}</p>
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-sm text-muted-foreground">
-                                  {history.totalTurns} / {expected}
-                                </span>
-                                <Badge variant={percentDiff < 20 ? "default" : percentDiff < 40 ? "secondary" : "destructive"} className="text-xs font-mono">
-                                  {percentDiff < 20 ? "Fair" : percentDiff < 40 ? "Uneven" : "Skewed"}
-                                </Badge>
+                    <div className="space-y-3">
+                      {turnHistory
+                        .filter(h => h.fairnessScore < 100)
+                        .sort((a, b) => a.fairnessScore - b.fairnessScore)
+                        .slice(0, 5)
+                        .map((history, index) => {
+                          const expected = getExpectedTurns();
+                          const needed = expected - history.totalTurns;
+                          
+                          return (
+                            <div key={history.staffId} className="flex items-center gap-4 p-4 rounded-lg border border-primary/20 bg-card hover:bg-primary/5 transition-smooth">
+                              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-mono font-bold text-sm">
+                                {index + 1}
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-sans font-semibold text-base">{history.staffName}</p>
+                                <p className="text-xs font-sans text-muted-foreground mt-1">
+                                  Currently {history.totalTurns} turns • Needs {needed > 0 ? `+${needed}` : needed} to balance
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-xl font-mono font-bold text-primary">
+                                  {history.fairnessScore}
+                                </div>
+                                <p className="text-xs font-sans text-muted-foreground">score</p>
                               </div>
                             </div>
-                            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  percentDiff < 20 ? "bg-green-500" : percentDiff < 40 ? "bg-amber-500" : "bg-destructive"
-                                }`}
-                                style={{ width: `${Math.min(100, (history.totalTurns / (expected * 1.5)) * 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      {turnHistory.every(h => h.fairnessScore === 100) && (
+                        <div className="text-center py-8">
+                          <Target className="h-12 w-12 mx-auto mb-3 text-green-500" />
+                          <p className="font-sans font-semibold text-base text-green-600">
+                            Perfect Balance Achieved!
+                          </p>
+                          <p className="font-sans text-sm text-muted-foreground mt-1">
+                            All staff members have equal assignments
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
               </Card>
+
+              <Card className="shadow-sm">
             </TabsContent>
           </Tabs>
           )}
