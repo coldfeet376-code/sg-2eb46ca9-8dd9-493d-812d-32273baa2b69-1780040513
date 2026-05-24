@@ -4,7 +4,23 @@ export type ManagerDuty = "Intake" | "Out-loading" | "Admin" | "Floor";
 
 export type AvailabilityType = "available" | "rest" | "holiday" | "sick";
 
-export type ShiftStart = "06:00" | "08:30" | "09:00" | "09:30" | "10:00" | "11:00";
+export type ShiftStart = 
+  | "06:00" 
+  | "08:30" 
+  | "09:00" 
+  | "09:30" 
+  | "10:00" 
+  | "11:00";
+
+export type DayShiftPattern = 
+  | "06:00-14:30"
+  | "06:00-14:00"
+  | "08:30-17:00"
+  | "09:00-17:00"
+  | "09:30-18:00"
+  | "10:00-14:00"
+  | "10:00-16:30"
+  | "11:00-17:30";
 
 export type ManagerShiftStart = "06:00" | "08:00";
 
@@ -27,6 +43,7 @@ export interface StaffMember {
   trainedTasks: Task[];
   shiftStart?: ShiftStart;
   shiftPattern?: ShiftPattern;
+  dayShiftPattern?: DayShiftPattern; // Full shift pattern with end time
   restDays?: number[]; // Day of week (0-6)
   availability?: AvailabilityEntry[]; // Date-specific availability
   preferences?: StaffPreferences; // Task preferences

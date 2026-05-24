@@ -22,7 +22,7 @@ import { StaffBulkOperations } from "@/components/staff/StaffBulkOperations";
 import { StaffAvailabilityPanel } from "@/components/staff/StaffAvailabilityPanel";
 import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
-import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart } from "@/types";
+import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
 import { staffService } from "@/services/staffService";
@@ -33,10 +33,22 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const SHIFT_STARTS: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
 
+const DAY_SHIFT_PATTERNS: DayShiftPattern[] = [
+  "06:00-14:30",
+  "06:00-14:00",
+  "08:30-17:00",
+  "09:00-17:00",
+  "09:30-18:00",
+  "10:00-14:00",
+  "10:00-16:30",
+  "11:00-17:30",
+];
+
 export default function StaffPage() {
   const [name, setName] = useState("");
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
   const [shiftStart, setShiftStart] = useState<ShiftStart>("06:00");
+  const [dayShiftPattern, setDayShiftPattern] = useState<DayShiftPattern>("06:00-14:30");
   const [shiftPattern, setShiftPattern] = useState<"Early" | "Late" | "All">("All");
   const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -61,6 +73,7 @@ export default function StaffPage() {
   const [editName, setEditName] = useState("");
   const [editTasks, setEditTasks] = useState<Task[]>([]);
   const [editShift, setEditShift] = useState<ShiftStart>("06:00");
+  const [editDayShiftPattern, setEditDayShiftPattern] = useState<DayShiftPattern>("06:00-14:30");
   const [editShiftPattern, setEditShiftPattern] = useState<"Early" | "Late" | "All">("All");
   
   // Expanded staff IDs for collapsible sections
@@ -132,6 +145,7 @@ export default function StaffPage() {
         name: name.trim(),
         trainedTasks: selectedTasks,
         shiftStart,
+        dayShiftPattern,
         shiftPattern,
       } as any,
       {
@@ -145,6 +159,7 @@ export default function StaffPage() {
           });
           setName("");
           setSelectedTasks([]);
+          setDayShiftPattern("06:00-14:30");
           setShiftPattern("All");
           toast({
             title: "Staff added",
@@ -160,6 +175,7 @@ export default function StaffPage() {
     setEditName(member.name);
     setEditTasks([...member.trainedTasks]);
     setEditShift(member.shiftStart || "06:00");
+    setEditDayShiftPattern((member as any).dayShiftPattern || "06:00-14:30");
     setEditShiftPattern((member as any).shiftPattern || "All");
   };
 
@@ -168,6 +184,7 @@ export default function StaffPage() {
     setEditName("");
     setEditTasks([]);
     setEditShift("06:00");
+    setEditDayShiftPattern("06:00-14:30");
     setEditShiftPattern("All");
   };
 
@@ -181,6 +198,7 @@ export default function StaffPage() {
           name: editName.trim(),
           trainedTasks: editTasks,
           shiftStart: editShift,
+          dayShiftPattern: editDayShiftPattern,
           shiftPattern: editShiftPattern,
         } as any,
       },
@@ -612,6 +630,28 @@ export default function StaffPage() {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="dayShiftPattern" className="font-mono text-xs flex items-center gap-2">
+                <Clock className="h-3.5 w-3.5" />
+                Full Shift Pattern (Start - End)
+              </Label>
+              <Select value={dayShiftPattern} onValueChange={(v) => setDayShiftPattern(v as DayShiftPattern)}>
+                <SelectTrigger id="dayShiftPattern" className="rounded-lg font-mono text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAY_SHIFT_PATTERNS.map((pattern) => (
+                    <SelectItem key={pattern} value={pattern} className="font-mono text-xs">
+                      {pattern}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground font-mono">
+                Complete shift hours from the Lenziemill dayshift schedule
+              </p>
+            </div>
+
             <div className="grid gap-2">
               <label className="text-sm font-condensed font-semibold">
                 Shift Pattern
@@ -766,6 +806,11 @@ export default function StaffPage() {
                                               {member.shiftStart}
                                             </Badge>
                                           )}
+                                          {(member as any).dayShiftPattern && (
+                                            <Badge variant="outline" className="font-mono text-xs bg-accent/10 text-accent-foreground border-accent/30">
+                                              {(member as any).dayShiftPattern}
+                                            </Badge>
+                                          )}
                                         </div>
                                         <div className="flex flex-wrap gap-2">
                                           {member.trainedTasks.map((task) => (
@@ -826,6 +871,21 @@ export default function StaffPage() {
                                     <SelectContent>
                                       {SHIFT_STARTS.map((shift) => (
                                         <SelectItem key={shift} value={shift} className="font-mono text-xs">{shift}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="font-mono text-xs">Full Shift Pattern</Label>
+                                  <Select value={editDayShiftPattern} onValueChange={(v) => setEditDayShiftPattern(v as DayShiftPattern)}>
+                                    <SelectTrigger className="rounded-lg font-mono text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {DAY_SHIFT_PATTERNS.map((pattern) => (
+                                        <SelectItem key={pattern} value={pattern} className="font-mono text-xs">
+                                          {pattern}
+                                        </SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>
