@@ -12,6 +12,7 @@ import { useSupabaseMutation, useStaff } from "@/hooks/useSupabaseQueries";
 import { useToast } from "@/hooks/use-toast";
 import type { AvailabilityType, StaffMember } from "@/types";
 import { Switch } from "@/components/ui/switch";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ParsedAvailability {
   date: string; // YYYY-MM-DD
@@ -56,18 +57,25 @@ export default function ImportPage() {
 
     setIsClearing(true);
     try {
-      // Delete all availability records
-      await deleteAvailabilityMutation.mutateAsync({} as any);
+      // Delete all availability records using direct Supabase query
+      const { error } = await supabase
+        .from('availability')
+        .delete()
+        .gte('created_at', '1970-01-01'); // Match all records
+      
+      if (error) {
+        throw error;
+      }
       
       toast({
         title: "✓ Cleared all availability",
         description: "All availability entries have been removed from the database",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error clearing availability:", error);
       toast({
         title: "❌ Error",
-        description: "Failed to clear availability data",
+        description: error.message || "Failed to clear availability data",
         variant: "destructive",
       });
     } finally {
