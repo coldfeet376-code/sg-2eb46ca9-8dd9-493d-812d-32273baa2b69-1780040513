@@ -347,14 +347,20 @@ export default function ImportPage() {
             continue;
           }
         } else {
-          // Check for duplicates BEFORE creating
-          const existingMatch = existingStaff.find((s: StaffMember) => 
-            s.name.toLowerCase().trim() === staff.name.toLowerCase().trim()
-          );
+          // FRESH DATABASE QUERY - Check for duplicates in real-time
+          const { data: existingCheck, error: checkError } = await supabase
+            .from('staff')
+            .select('id, name')
+            .ilike('name', staff.name.trim())
+            .maybeSingle();
           
-          if (existingMatch) {
-            console.log(`✓ Found existing staff: ${staff.name}, using ID: ${existingMatch.id}`);
-            staffId = existingMatch.id;
+          if (checkError) {
+            console.error(`Database check failed for ${staff.name}:`, checkError);
+          }
+          
+          if (existingCheck) {
+            console.log(`✓ Found existing staff in database: ${staff.name} (ID: ${existingCheck.id})`);
+            staffId = existingCheck.id;
           } else {
             // Create new staff member
             const staffData = {
@@ -381,7 +387,7 @@ export default function ImportPage() {
           }
         }
         
-        // Create availability entries (only for non-available days)
+        // UPSERT availability entries (handles duplicates properly)
         let importedAvailCount = 0;
         let failedAvailCount = 0;
         
@@ -394,16 +400,27 @@ export default function ImportPage() {
           // Only import non-available days (REST/Holiday/Sick)
           if (avail.status !== "available") {
             try {
-              await createAvailabilityMutation.mutateAsync({
-                staff_id: staffId,
-                date: avail.date,
-                type: avail.status,
-              } as any);
+              // UPSERT: Insert or update if duplicate
+              const { error: upsertError } = await supabase
+                .from('availability')
+                .upsert({
+                  staff_id: staffId,
+                  date: avail.date,
+                  type: avail.status,
+                }, {
+                  onConflict: 'staff_id,date'
+                });
+              
+              if (upsertError) {
+                throw upsertError;
+              }
+              
               importedAvailCount++;
             } catch (error: any) {
-              // Track failures
+              // Track real failures (not duplicates anymore)
               failedAvailCount++;
-              console.warn(`Failed to import ${avail.status} on ${avail.date} for ${staff.name}: ${error.message}`);
+              console.error(`FAILED to import ${avail.status} on ${avail.date} for ${staff.name}: ${error.message}`);
+              console.error(`Full error:`, error);
             }
           }
         }
@@ -418,6 +435,7 @@ export default function ImportPage() {
         
         if (importedAvailCount === 0 && staff.availability.filter(a => a.status !== "available").length > 0) {
           console.error(`⚠️ WARNING: ${staff.name} has unavailable days but ZERO were imported!`);
+          console.error(`This usually means database connection or RLS policy issue.`);
         }
         
         successCount++;
@@ -445,26 +463,27 @@ export default function ImportPage() {
     });
     
     const totalImported = availabilityStats.reduce((sum, s) => sum + s.imported, 0);
-    const zeroImported = availabilityStats.filter(s => s.imported === 0).map(s => s.name);
+    const totalFailed = availabilityStats.reduce((sum, s) => sum + s.failed, 0);
+    const zeroImported = availabilityStats.filter(s => s.imported === 0 && s.failed > 0).map(s => s.name);
     
     if (zeroImported.length > 0) {
-      console.error("\n⚠️ STAFF WITH ZERO AVAILABILITY IMPORTED:");
+      console.error("\n⚠️ STAFF WITH ZERO AVAILABILITY IMPORTED (but had failures):");
       zeroImported.forEach(name => console.error(`  - ${name}`));
     }
     
     // Show errors if any
-    if (errors.length > 0) {
+    if (errors.length > 0 || totalFailed > 0) {
       console.error("\n=== IMPORT ERRORS ===");
       errors.forEach(err => console.error(err));
       
       toast({
         title: "Import completed with errors",
-        description: `${successCount} succeeded, ${errors.length} failed. Check console (F12) for details.`,
+        description: `${successCount} staff processed, ${totalImported} availability saved, ${totalFailed} failed. Check console (F12) for details.`,
         variant: "destructive",
       });
     } else {
       toast({
-        title: "Import complete",
+        title: "✅ Import complete",
         description: updateMode 
           ? `Updated ${totalImported} availability entries for ${successCount} staff members`
           : `Successfully imported ${successCount} staff with ${totalImported} availability entries`,
