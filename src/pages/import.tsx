@@ -328,6 +328,7 @@ export default function ImportPage() {
     let successCount = 0;
     let skippedCount = 0;
     const errors: string[] = [];
+    const availabilityStats: { name: string; imported: number; failed: number }[] = [];
 
     for (let i = 0; i < parsedStaff.length; i++) {
       const staff = parsedStaff[i];
@@ -346,32 +347,49 @@ export default function ImportPage() {
             continue;
           }
         } else {
-          // Create new staff member
-          const staffData = {
-            name: staff.name,
-            trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"],
-            shift_start: staff.startTime,
-            shift_pattern: "All",
-          };
+          // Check for duplicates BEFORE creating
+          const existingMatch = existingStaff.find((s: StaffMember) => 
+            s.name.toLowerCase().trim() === staff.name.toLowerCase().trim()
+          );
           
-          console.log(`Creating staff: ${staff.name}`, staffData);
-          
-          try {
-            const newStaff = await createStaffMutation.mutateAsync(staffData as any);
-            staffId = newStaff.id;
-            console.log(`✓ Created staff ${staff.name} with ID: ${staffId}`);
-          } catch (createError: any) {
-            const errorMsg = `Failed to create ${staff.name}: ${createError.message || createError}`;
-            console.error(errorMsg, createError);
-            errors.push(errorMsg);
-            setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
-            setImportProgress(((i + 1) / parsedStaff.length) * 100);
-            continue;
+          if (existingMatch) {
+            console.log(`✓ Found existing staff: ${staff.name}, using ID: ${existingMatch.id}`);
+            staffId = existingMatch.id;
+          } else {
+            // Create new staff member
+            const staffData = {
+              name: staff.name,
+              trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"],
+              shift_start: staff.startTime,
+              shift_pattern: "All",
+            };
+            
+            console.log(`Creating NEW staff: ${staff.name}`, staffData);
+            
+            try {
+              const newStaff = await createStaffMutation.mutateAsync(staffData as any);
+              staffId = newStaff.id;
+              console.log(`✓ Created staff ${staff.name} with ID: ${staffId}`);
+            } catch (createError: any) {
+              const errorMsg = `Failed to create ${staff.name}: ${createError.message || createError}`;
+              console.error(errorMsg, createError);
+              errors.push(errorMsg);
+              setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
+              setImportProgress(((i + 1) / parsedStaff.length) * 100);
+              continue;
+            }
           }
         }
         
         // Create availability entries (only for non-available days)
         let importedAvailCount = 0;
+        let failedAvailCount = 0;
+        
+        console.log(`\n=== IMPORTING AVAILABILITY FOR ${staff.name} ===`);
+        console.log(`Staff ID: ${staffId}`);
+        console.log(`Total availability entries to process: ${staff.availability.length}`);
+        console.log(`Unavailable days to import: ${staff.availability.filter(a => a.status !== "available").length}`);
+        
         for (const avail of staff.availability) {
           // Only import non-available days (REST/Holiday/Sick)
           if (avail.status !== "available") {
@@ -383,13 +401,25 @@ export default function ImportPage() {
               } as any);
               importedAvailCount++;
             } catch (error: any) {
-              // Log but continue - might be duplicate entry
-              console.warn(`Duplicate or error for ${staff.name} on ${avail.date}: ${error.message}`);
+              // Track failures
+              failedAvailCount++;
+              console.warn(`Failed to import ${avail.status} on ${avail.date} for ${staff.name}: ${error.message}`);
             }
           }
         }
         
-        console.log(`✓ ${staff.name}: imported ${importedAvailCount} unavailable days`);
+        availabilityStats.push({
+          name: staff.name,
+          imported: importedAvailCount,
+          failed: failedAvailCount
+        });
+        
+        console.log(`✓ ${staff.name}: imported ${importedAvailCount} days, failed ${failedAvailCount}`);
+        
+        if (importedAvailCount === 0 && staff.availability.filter(a => a.status !== "available").length > 0) {
+          console.error(`⚠️ WARNING: ${staff.name} has unavailable days but ZERO were imported!`);
+        }
+        
         successCount++;
         setImportedCount(successCount);
         setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
@@ -408,13 +438,23 @@ export default function ImportPage() {
     setImportComplete(true);
     setCurrentProcessingStaff("");
     
-    const totalImportedDays = parsedStaff.reduce((sum, s) => 
-      sum + s.availability.filter(a => a.status !== "available").length, 0
-    );
+    // Show detailed availability stats
+    console.log("\n=== AVAILABILITY IMPORT SUMMARY ===");
+    availabilityStats.forEach(stat => {
+      console.log(`${stat.name}: ${stat.imported} imported, ${stat.failed} failed`);
+    });
+    
+    const totalImported = availabilityStats.reduce((sum, s) => sum + s.imported, 0);
+    const zeroImported = availabilityStats.filter(s => s.imported === 0).map(s => s.name);
+    
+    if (zeroImported.length > 0) {
+      console.error("\n⚠️ STAFF WITH ZERO AVAILABILITY IMPORTED:");
+      zeroImported.forEach(name => console.error(`  - ${name}`));
+    }
     
     // Show errors if any
     if (errors.length > 0) {
-      console.error("=== IMPORT ERRORS ===");
+      console.error("\n=== IMPORT ERRORS ===");
       errors.forEach(err => console.error(err));
       
       toast({
@@ -426,8 +466,8 @@ export default function ImportPage() {
       toast({
         title: "Import complete",
         description: updateMode 
-          ? `Updated ${totalImportedDays} availability entries for ${successCount} staff members`
-          : `Successfully imported ${successCount} staff with ${totalImportedDays} availability entries`,
+          ? `Updated ${totalImported} availability entries for ${successCount} staff members`
+          : `Successfully imported ${successCount} staff with ${totalImported} availability entries`,
       });
     }
   };
