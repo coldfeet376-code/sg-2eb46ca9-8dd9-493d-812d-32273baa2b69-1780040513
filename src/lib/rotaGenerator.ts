@@ -306,8 +306,14 @@ export function generateWeeklyRota({
     }
   });
 
-  // Rule 2: 5-day workers must get at least 2 Inbound shifts per week
-  const fiveDayWorkers = staff.filter(s => {
+  // Rule 2: Staff trained on Frozen who work 5 days must get at least 2 Inbound shifts per week
+  const frozenFiveDayWorkers = staff.filter(s => {
+    // Must be trained on Frozen
+    if (!s.trainedTasks.includes("Frozen")) return false;
+    
+    // Must be trained on Inbound
+    if (!s.trainedTasks.includes("Inbound")) return false;
+    
     // Count how many days they're NOT unavailable this week
     const weekDates = Array.from({ length: 7 }, (_, d) => {
       const date = new Date(weekStart);
@@ -323,10 +329,10 @@ export function generateWeeklyRota({
     ).length;
     
     const workingDays = 7 - unavailableDays;
-    return workingDays >= 5 && s.trainedTasks.includes("Inbound");
+    return workingDays >= 5;
   });
 
-  fiveDayWorkers.forEach(staffMember => {
+  frozenFiveDayWorkers.forEach(staffMember => {
     const inboundAssignments = assignments.filter(a => 
       a.staffId === staffMember.id && 
       a.task === "Inbound" &&
@@ -336,7 +342,7 @@ export function generateWeeklyRota({
 
     if (inboundAssignments.length < 2) {
       const needed = 2 - inboundAssignments.length;
-      console.log(`  ⚠️ ${staffMember.name} (5-day worker) needs ${needed} more Inbound shift(s)...`);
+      console.log(`  ⚠️ ${staffMember.name} (Frozen-trained 5-day worker) needs ${needed} more Inbound shift(s)...`);
       
       // Find days where this staff member could be assigned to Inbound
       for (let d = 0; d < 7; d++) {
