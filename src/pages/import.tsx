@@ -330,17 +330,28 @@ export default function ImportPage() {
     const errors: string[] = [];
     const availabilityStats: { name: string; imported: number; failed: number }[] = [];
 
+    console.log("\n\n=== STARTING IMPORT PROCESS ===");
+    console.log(`Total staff to process: ${parsedStaff.length}`);
+    console.log(`Update mode: ${updateMode}`);
+
     for (let i = 0; i < parsedStaff.length; i++) {
       const staff = parsedStaff[i];
       setCurrentProcessingStaff(staff.name);
       let staffId: string | undefined;
       
+      console.log(`\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      console.log(`PROCESSING STAFF ${i + 1}/${parsedStaff.length}: ${staff.name}`);
+      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      
       try {
         if (updateMode) {
           staffId = matchedStaff.get(staff.name);
           
+          console.log(`[UPDATE MODE] Looking for match: "${staff.name}"`);
+          console.log(`Matched ID: ${staffId || "NOT FOUND"}`);
+          
           if (!staffId) {
-            console.log(`Skipping unmatched staff: ${staff.name}`);
+            console.log(`❌ SKIPPED: ${staff.name} (not found in database)`);
             skippedCount++;
             setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
             setImportProgress(((i + 1) / parsedStaff.length) * 100);
@@ -348,6 +359,8 @@ export default function ImportPage() {
           }
         } else {
           // FRESH DATABASE QUERY - Check for duplicates in real-time
+          console.log(`[CREATE MODE] Checking database for existing staff: "${staff.name}"`);
+          
           const { data: existingCheck, error: checkError } = await supabase
             .from('staff')
             .select('id, name')
@@ -355,11 +368,13 @@ export default function ImportPage() {
             .maybeSingle();
           
           if (checkError) {
-            console.error(`Database check failed for ${staff.name}:`, checkError);
+            console.error(`⚠️ Database check error:`, checkError);
           }
           
           if (existingCheck) {
-            console.log(`✓ Found existing staff in database: ${staff.name} (ID: ${existingCheck.id})`);
+            console.log(`✓ FOUND existing staff in database:`);
+            console.log(`  Name in DB: "${existingCheck.name}"`);
+            console.log(`  Staff ID: ${existingCheck.id}`);
             staffId = existingCheck.id;
           } else {
             // Create new staff member
@@ -370,15 +385,15 @@ export default function ImportPage() {
               shift_pattern: "All",
             };
             
-            console.log(`Creating NEW staff: ${staff.name}`, staffData);
+            console.log(`➕ CREATING NEW staff with data:`, staffData);
             
             try {
               const newStaff = await createStaffMutation.mutateAsync(staffData as any);
               staffId = newStaff.id;
-              console.log(`✓ Created staff ${staff.name} with ID: ${staffId}`);
+              console.log(`✓ Created staff successfully, ID: ${staffId}`);
             } catch (createError: any) {
               const errorMsg = `Failed to create ${staff.name}: ${createError.message || createError}`;
-              console.error(errorMsg, createError);
+              console.error(`❌ CREATE FAILED:`, createError);
               errors.push(errorMsg);
               setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
               setImportProgress(((i + 1) / parsedStaff.length) * 100);
@@ -391,10 +406,25 @@ export default function ImportPage() {
         let importedAvailCount = 0;
         let failedAvailCount = 0;
         
-        console.log(`\n=== IMPORTING AVAILABILITY FOR ${staff.name} ===`);
-        console.log(`Staff ID: ${staffId}`);
-        console.log(`Total availability entries to process: ${staff.availability.length}`);
-        console.log(`Unavailable days to import: ${staff.availability.filter(a => a.status !== "available").length}`);
+        const unavailableDays = staff.availability.filter(a => a.status !== "available");
+        
+        console.log(`\n--- AVAILABILITY IMPORT ---`);
+        console.log(`Staff ID being used: ${staffId}`);
+        console.log(`Total availability entries: ${staff.availability.length}`);
+        console.log(`Unavailable days (will import): ${unavailableDays.length}`);
+        console.log(`  Rest: ${unavailableDays.filter(a => a.status === "rest").length}`);
+        console.log(`  Holiday: ${unavailableDays.filter(a => a.status === "holiday").length}`);
+        console.log(`  Sick: ${unavailableDays.filter(a => a.status === "sick").length}`);
+        
+        // Show first 5 unavailable days for debugging
+        if (unavailableDays.length > 0) {
+          console.log(`\nFirst 5 unavailable days to import:`);
+          unavailableDays.slice(0, 5).forEach((avail, idx) => {
+            console.log(`  ${idx + 1}. ${avail.date} = ${avail.status.toUpperCase()}`);
+          });
+        }
+        
+        console.log(`\nStarting UPSERT operations...`);
         
         for (const avail of staff.availability) {
           // Only import non-available days (REST/Holiday/Sick)
@@ -416,11 +446,19 @@ export default function ImportPage() {
               }
               
               importedAvailCount++;
+              
+              // Log first 3 successful upserts for verification
+              if (importedAvailCount <= 3) {
+                console.log(`  ✓ Upserted: ${avail.date} = ${avail.status}`);
+              }
             } catch (error: any) {
               // Track real failures (not duplicates anymore)
               failedAvailCount++;
-              console.error(`FAILED to import ${avail.status} on ${avail.date} for ${staff.name}: ${error.message}`);
-              console.error(`Full error:`, error);
+              console.error(`  ❌ FAILED: ${avail.date} = ${avail.status}`);
+              console.error(`     Error: ${error.message}`);
+              if (failedAvailCount <= 3) {
+                console.error(`     Full error:`, error);
+              }
             }
           }
         }
@@ -431,11 +469,18 @@ export default function ImportPage() {
           failed: failedAvailCount
         });
         
-        console.log(`✓ ${staff.name}: imported ${importedAvailCount} days, failed ${failedAvailCount}`);
+        console.log(`\n✅ COMPLETED ${staff.name}:`);
+        console.log(`   Imported: ${importedAvailCount} days`);
+        console.log(`   Failed: ${failedAvailCount} days`);
         
-        if (importedAvailCount === 0 && staff.availability.filter(a => a.status !== "available").length > 0) {
-          console.error(`⚠️ WARNING: ${staff.name} has unavailable days but ZERO were imported!`);
-          console.error(`This usually means database connection or RLS policy issue.`);
+        if (importedAvailCount === 0 && unavailableDays.length > 0) {
+          console.error(`\n⚠️⚠️⚠️ WARNING ⚠️⚠️⚠️`);
+          console.error(`${staff.name} has ${unavailableDays.length} unavailable days but ZERO were imported!`);
+          console.error(`Possible causes:`);
+          console.error(`  - Database connection issue`);
+          console.error(`  - RLS policy blocking inserts`);
+          console.error(`  - Invalid staff_id: ${staffId}`);
+          console.error(`  - Invalid date format in parsed data`);
         }
         
         successCount++;
@@ -443,13 +488,13 @@ export default function ImportPage() {
         setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
       } catch (error: any) {
         const errorMsg = `Failed to import ${staff.name}: ${error.message || error}`;
-        console.error(errorMsg, error);
+        console.error(`\n❌ EXCEPTION for ${staff.name}:`, error);
         errors.push(errorMsg);
         setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
       }
 
       setImportProgress(((i + 1) / parsedStaff.length) * 100);
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 100)); // Slightly longer delay for console readability
     }
 
     setIsImporting(false);
@@ -457,14 +502,19 @@ export default function ImportPage() {
     setCurrentProcessingStaff("");
     
     // Show detailed availability stats
-    console.log("\n=== AVAILABILITY IMPORT SUMMARY ===");
+    console.log("\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("FINAL SUMMARY - AVAILABILITY IMPORT");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     availabilityStats.forEach(stat => {
-      console.log(`${stat.name}: ${stat.imported} imported, ${stat.failed} failed`);
+      const status = stat.imported > 0 ? "✅" : stat.failed > 0 ? "❌" : "⚠️";
+      console.log(`${status} ${stat.name}: ${stat.imported} imported, ${stat.failed} failed`);
     });
     
     const totalImported = availabilityStats.reduce((sum, s) => sum + s.imported, 0);
     const totalFailed = availabilityStats.reduce((sum, s) => sum + s.failed, 0);
     const zeroImported = availabilityStats.filter(s => s.imported === 0 && s.failed > 0).map(s => s.name);
+    
+    console.log(`\nTotals: ${totalImported} imported, ${totalFailed} failed`);
     
     if (zeroImported.length > 0) {
       console.error("\n⚠️ STAFF WITH ZERO AVAILABILITY IMPORTED (but had failures):");
