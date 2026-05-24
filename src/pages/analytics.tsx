@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RefreshCw, TrendingUp, TrendingDown, AlertCircle, Users, Target, Printer, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { staffService } from "@/services/staffService";
+import { rotaService } from "@/services/rotaService";
+import { supabase } from "@/integrations/supabase/client";
 import type { StaffMember, Assignment } from "@/types";
 
 interface WeeklySummary {
@@ -44,7 +46,6 @@ export default function AnalyticsPage() {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Add print-specific styles
     const style = document.createElement("style");
     style.textContent = `
       @media print {
@@ -77,36 +78,51 @@ export default function AnalyticsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load staff
       const staffData = await staffService.getAllStaff();
       setStaff(staffData);
 
-      // Get all stored weeks from localStorage
-      const weeks: WeekData[] = [];
-      const allKeys = Object.keys(localStorage).filter(k => k.startsWith("rota_"));
+      const { data: assignmentsData, error } = await supabase
+        .from("assignments")
+        .select("*")
+        .order("week_start", { ascending: false });
+
+      if (error) {
+        console.error("Error fetching assignments:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load rota data from database",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const weekMap = new Map<string, WeekData>();
       
-      allKeys.forEach(key => {
-        const stored = localStorage.getItem(key);
-        if (stored) {
-          try {
-            const data = JSON.parse(stored);
-            const weekKey = key.replace("rota_", "");
-            weeks.push({
-              weekKey,
-              weekStart: new Date(data.weekStart || weekKey),
-              assignments: data.assignments || [],
-            });
-          } catch (e) {
-            console.error("Error parsing stored rota:", e);
-          }
+      (assignmentsData || []).forEach((a) => {
+        const weekKey = a.week_start;
+        if (!weekMap.has(weekKey)) {
+          weekMap.set(weekKey, {
+            weekKey,
+            weekStart: new Date(weekKey),
+            assignments: [],
+          });
         }
+        
+        weekMap.get(weekKey)!.assignments.push({
+          staffId: a.staff_id,
+          staffName: a.staff_name,
+          task: a.task as any,
+          date: a.date,
+          shiftPattern: a.shift_pattern as any,
+        });
       });
 
-      // Sort weeks by date descending (most recent first)
-      weeks.sort((a, b) => b.weekStart.getTime() - a.weekStart.getTime());
+      const weeks = Array.from(weekMap.values()).sort(
+        (a, b) => b.weekStart.getTime() - a.weekStart.getTime()
+      );
+
       setAllWeeks(weeks);
 
-      // Auto-select most recent week
       if (weeks.length > 0 && !selectedWeek) {
         const mostRecent = weeks[0].weekKey;
         setSelectedWeek(mostRecent);
@@ -115,8 +131,7 @@ export default function AnalyticsPage() {
         calculateWeeklySummary(staffData, []);
       }
 
-      // Calculate turn history from all stored weeks
-      calculateTurnHistory(staffData);
+      calculateTurnHistory(staffData, weeks);
 
       toast({
         title: "Data refreshed",
@@ -148,7 +163,6 @@ export default function AnalyticsPage() {
     const summaryMap = new Map<string, WeeklySummary>();
     const assignedIds = new Set<string>();
 
-    // Count assignments per staff
     assignments.forEach((assignment) => {
       if (!summaryMap.has(assignment.staffId)) {
         const staffMember = staffData.find(s => s.id === assignment.staffId);
@@ -172,18 +186,15 @@ export default function AnalyticsPage() {
       assignedIds.add(assignment.staffId);
     });
 
-    // Find missed staff (not assigned this week)
     const missed = staffData.filter(s => {
       if (assignedIds.has(s.id)) return false;
       
-      // Check if they are on rest for the entire week
       const weekStart = getWeekStart(new Date());
       const isAvailable = Array.from({ length: 7 }).some((_, i) => {
         const d = new Date(weekStart);
         d.setDate(d.getDate() + i);
         const dateStr = d.toISOString().split("T")[0];
         
-        // Return true if they don't have a 'rest', 'holiday', or 'sick' entry for this date
         const entry = s.availability?.find(a => a.date === dateStr);
         return !entry || entry.type === "available";
       });
@@ -195,12 +206,9 @@ export default function AnalyticsPage() {
     setMissedStaff(missed);
   };
 
-  const calculateTurnHistory = (staffData: StaffMember[]) => {
+  const calculateTurnHistory = (staffData: StaffMember[], weeks: WeekData[]) => {
     const historyMap = new Map<string, TurnHistory>();
 
-    // Get all stored weeks from localStorage
-    const allKeys = Object.keys(localStorage).filter(k => k.startsWith("rota_"));
-    
     staffData.forEach(staff => {
       historyMap.set(staff.id, {
         staffId: staff.id,
@@ -211,33 +219,21 @@ export default function AnalyticsPage() {
       });
     });
 
-    // Count assignments across all weeks
-    allKeys.forEach(key => {
-      const stored = localStorage.getItem(key);
-      if (stored) {
-        try {
-          const { assignments } = JSON.parse(stored);
-          const weekDate = key.replace("rota_", "");
-          
-          assignments.forEach((assignment: Assignment) => {
-            const history = historyMap.get(assignment.staffId);
-            if (history) {
-              history.totalTurns++;
-              const weekEntry = history.weeklyBreakdown.find(w => w.week === weekDate);
-              if (weekEntry) {
-                weekEntry.count++;
-              } else {
-                history.weeklyBreakdown.push({ week: weekDate, count: 1 });
-              }
-            }
-          });
-        } catch (e) {
-          console.error("Error parsing stored rota:", e);
+    weeks.forEach((week) => {
+      week.assignments.forEach((assignment) => {
+        const history = historyMap.get(assignment.staffId);
+        if (history) {
+          history.totalTurns++;
+          const weekEntry = history.weeklyBreakdown.find(w => w.week === week.weekKey);
+          if (weekEntry) {
+            weekEntry.count++;
+          } else {
+            history.weeklyBreakdown.push({ week: week.weekKey, count: 1 });
+          }
         }
-      }
+      });
     });
 
-    // Calculate fairness scores
     const avgTurns = Array.from(historyMap.values()).reduce((sum, h) => sum + h.totalTurns, 0) / historyMap.size;
     historyMap.forEach(history => {
       const variance = Math.abs(history.totalTurns - avgTurns);
@@ -245,8 +241,7 @@ export default function AnalyticsPage() {
     });
 
     setTurnHistory(
-      Array.from(historyMap.values())
-        .sort((a, b) => b.totalTurns - a.totalTurns)
+      Array.from(historyMap.values()).sort((a, b) => b.totalTurns - a.totalTurns)
     );
   };
 
@@ -262,7 +257,6 @@ export default function AnalyticsPage() {
       </Head>
       <Layout>
         <div className="space-y-6">
-          {/* Print-only header */}
           <div className="hidden print:block mb-6">
             <h1 className="font-condensed text-3xl font-bold mb-2">
               WAREHOUSE ANALYTICS REPORT
@@ -370,7 +364,6 @@ export default function AnalyticsPage() {
               </TabsTrigger>
             </TabsList>
 
-            {/* This Week Summary */}
             <TabsContent value="summary" className="space-y-6">
               <div className="grid gap-6 md:grid-cols-2">
                 <Card className="shadow-sm">
@@ -451,7 +444,6 @@ export default function AnalyticsPage() {
               </div>
             </TabsContent>
 
-            {/* Turn History */}
             <TabsContent value="history" className="space-y-6">
               <Card className="shadow-sm">
                 <CardHeader className="border-b border-border/50 bg-muted/30">
@@ -514,7 +506,6 @@ export default function AnalyticsPage() {
               </Card>
             </TabsContent>
 
-            {/* Fairness Tracker */}
             <TabsContent value="fairness" className="space-y-6">
               <Card className="shadow-sm">
                 <CardHeader className="border-b border-border/50 bg-muted/30">
