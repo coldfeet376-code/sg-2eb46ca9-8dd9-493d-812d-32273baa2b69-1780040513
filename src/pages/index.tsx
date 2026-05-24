@@ -37,7 +37,7 @@ import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
 import { RecentChangesPanel } from "@/components/RecentChangesPanel";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Housekeeping"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"];
 
 function formatDateRange(start: Date, end: Date): string {
   if (!start || !end) return "";
@@ -1407,7 +1407,7 @@ export default function Home() {
             <CardContent>
               {taskConfigData && (
                 <div className="space-y-6">
-                  {["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Housekeeping"].map((task) => (
+                  {["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"].map((task) => (
                     <div key={task} className="space-y-2">
                       <h3 className="font-condensed font-semibold">{task}</h3>
                       <div className="grid grid-cols-7 gap-2">

@@ -18,6 +18,7 @@ export function calculateFairnessMetrics(
       "Milk": 0,
       "TWI": 0,
       "Inbound": 0,
+      "Inbound Late": 0,
       "Outbound": 0,
       "Marshaling": 0,
       "Housekeeping": 0,

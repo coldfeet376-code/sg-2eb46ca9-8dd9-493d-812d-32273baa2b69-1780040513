@@ -45,6 +45,7 @@ export function generateWeeklyRota({
       "Milk": 0,
       "TWI": 0,
       "Inbound": 0,
+      "Inbound Late": 0,
       "Outbound": 0,
       "Marshaling": 0,
       "Housekeeping": 0,
@@ -161,6 +162,23 @@ export function generateWeeklyRota({
         }
       }
 
+      // Filter candidates for this specific task AND day
+      const candidates = availableStaff.filter((s) => {
+        // Must be trained for this task
+        // For Inbound Late, staff must be trained in regular "Inbound"
+        const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
+        if (!s.trainedTasks.includes(taskToCheck)) return false;
+        
+        // Shift time filtering for Inbound vs Inbound Late
+        if (task === "Inbound") {
+          // Early Inbound: only 06:00 starters
+          if (s.shiftStart !== "06:00") return false;
+        } else if (task === "Inbound Late") {
+          // Late Inbound: 09:00, 10:00, 11:00 starters (avoid 06:00)
+          if (!["09:00", "10:00", "11:00"].includes(s.shiftStart)) return false;
+        }
+      });
+
       // Distribute assignments across shifts proportionally
       const allAvailable = Object.entries(availableByShift).flatMap(([shift, staffList]) =>
         staffList.map(s => ({ ...s, shift: shift as ShiftStart }))
@@ -182,10 +200,10 @@ export function generateWeeklyRota({
         const aPrevTask = staffTasksByDate[a.id]?.[prevDateStr];
         const bPrevTask = staffTasksByDate[b.id]?.[prevDateStr];
         
-        // SPECIAL RULE FOR INBOUND: Absolute block on consecutive Inbound days
-        if (task === "Inbound") {
-          const aHadInboundYesterday = aPrevTask === "Inbound";
-          const bHadInboundYesterday = bPrevTask === "Inbound";
+        // SPECIAL RULE FOR INBOUND: Absolute block on consecutive Inbound days (both types)
+        if (task === "Inbound" || task === "Inbound Late") {
+          const aHadInboundYesterday = aPrevTask === "Inbound" || aPrevTask === "Inbound Late";
+          const bHadInboundYesterday = bPrevTask === "Inbound" || bPrevTask === "Inbound Late";
           
           // If A had Inbound yesterday but B didn't, B goes first (A is blocked)
           if (aHadInboundYesterday && !bHadInboundYesterday) return 1;
@@ -333,9 +351,10 @@ export function generateWeeklyRota({
   });
 
   frozenFiveDayWorkers.forEach(staffMember => {
+    // Count BOTH Inbound and Inbound Late assignments
     const inboundAssignments = assignments.filter(a => 
       a.staffId === staffMember.id && 
-      a.task === "Inbound" &&
+      (a.task === "Inbound" || a.task === "Inbound Late") &&
       a.date >= weekStart.toISOString().split('T')[0] &&
       a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0]
     );
@@ -356,14 +375,14 @@ export function generateWeeklyRota({
         const alreadyAssigned = assignments.some(a => a.staffId === staffMember.id && a.date === dateStr);
         if (alreadyAssigned) continue;
         
-        // CRITICAL: Check if they had Inbound on the previous day (NO CONSECUTIVE INBOUND)
+        // CRITICAL: Check if they had Inbound (either type) on the previous day (NO CONSECUTIVE INBOUND)
         const prevDate = new Date(checkDate);
         prevDate.setDate(prevDate.getDate() - 1);
         const prevDateStr = prevDate.toISOString().split("T")[0];
         const hadInboundYesterday = assignments.some(a => 
           a.staffId === staffMember.id && 
           a.date === prevDateStr && 
-          a.task === "Inbound"
+          (a.task === "Inbound" || a.task === "Inbound Late")
         );
         if (hadInboundYesterday) {
           console.log(`    ✗ Skipping ${dateStr} - ${staffMember.name} had Inbound on ${prevDateStr} (no consecutive)`);
@@ -377,7 +396,7 @@ export function generateWeeklyRota({
         const hasInboundTomorrow = assignments.some(a => 
           a.staffId === staffMember.id && 
           a.date === nextDateStr && 
-          a.task === "Inbound"
+          (a.task === "Inbound" || a.task === "Inbound Late")
         );
         if (hasInboundTomorrow) {
           console.log(`    ✗ Skipping ${dateStr} - ${staffMember.name} has Inbound on ${nextDateStr} (no consecutive)`);
@@ -391,20 +410,46 @@ export function generateWeeklyRota({
         );
         if (unavailable) continue;
         
-        // Check if Inbound needs more staff on this day
-        const inboundNeeded = taskConfig["Inbound"][d];
-        const inboundAssigned = assignments.filter(a => a.date === dateStr && a.task === "Inbound").length;
+        // Try to assign to either Inbound or Inbound Late based on their shift time
+        const isEarlyStarter = staffMember.shiftStart === "06:00";
+        const isLateStarter = ["09:00", "10:00", "11:00"].includes(staffMember.shiftStart);
         
-        if (inboundAssigned < inboundNeeded) {
-          // Add assignment
-          assignments.push({
-            staffId: staffMember.id,
-            staffName: staffMember.name,
-            task: "Inbound",
-            date: dateStr,
-          });
-          inboundAssignments.push(assignments[assignments.length - 1]);
-          console.log(`    ✓ Added ${staffMember.name} to Inbound on ${dateStr}`);
+        let assigned = false;
+        
+        // Try Inbound first if early starter
+        if (isEarlyStarter) {
+          const inboundNeeded = taskConfig["Inbound"]?.[d] || 0;
+          const inboundAssigned = assignments.filter(a => a.date === dateStr && a.task === "Inbound").length;
+          
+          if (inboundAssigned < inboundNeeded) {
+            assignments.push({
+              staffId: staffMember.id,
+              staffName: staffMember.name,
+              task: "Inbound",
+              date: dateStr,
+            });
+            inboundAssignments.push(assignments[assignments.length - 1]);
+            console.log(`    ✓ Added ${staffMember.name} to Inbound on ${dateStr}`);
+            assigned = true;
+          }
+        }
+        
+        // Try Inbound Late if late starter or if early Inbound was full
+        if (!assigned && isLateStarter) {
+          const inboundLateNeeded = taskConfig["Inbound Late"]?.[d] || 0;
+          const inboundLateAssigned = assignments.filter(a => a.date === dateStr && a.task === "Inbound Late").length;
+          
+          if (inboundLateAssigned < inboundLateNeeded) {
+            assignments.push({
+              staffId: staffMember.id,
+              staffName: staffMember.name,
+              task: "Inbound Late",
+              date: dateStr,
+            });
+            inboundAssignments.push(assignments[assignments.length - 1]);
+            console.log(`    ✓ Added ${staffMember.name} to Inbound Late on ${dateStr}`);
+            assigned = true;
+          }
         }
       }
     }
