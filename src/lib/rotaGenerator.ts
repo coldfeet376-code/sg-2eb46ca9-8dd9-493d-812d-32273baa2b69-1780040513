@@ -173,15 +173,26 @@ export function generateWeeklyRota({
 
       // Sort by priority:
       // 1. Avoid consecutive same task (CRITICAL - prevents burnout)
-      // 2. Fewest times doing THIS SPECIFIC task (task rotation fairness)
-      // 3. Fewest overall assignments (general fairness)
-      // 4. Shift start time (earlier shifts get slight priority)
+      // 2. SPECIAL: For Inbound, NEVER assign if they had Inbound yesterday (hard rule)
+      // 3. Fewest times doing THIS SPECIFIC task (task rotation fairness)
+      // 4. Fewest overall assignments (general fairness)
+      // 5. Shift start time (earlier shifts get slight priority)
       const sorted = shuffled.sort((a, b) => {
         // PRIORITY #1: Check what task they did on the previous day
         const aPrevTask = staffTasksByDate[a.id]?.[prevDateStr];
         const bPrevTask = staffTasksByDate[b.id]?.[prevDateStr];
         
-        // If A did this task yesterday but B didn't, B goes first
+        // SPECIAL RULE FOR INBOUND: Absolute block on consecutive Inbound days
+        if (task === "Inbound") {
+          const aHadInboundYesterday = aPrevTask === "Inbound";
+          const bHadInboundYesterday = bPrevTask === "Inbound";
+          
+          // If A had Inbound yesterday but B didn't, B goes first (A is blocked)
+          if (aHadInboundYesterday && !bHadInboundYesterday) return 1;
+          if (!aHadInboundYesterday && bHadInboundYesterday) return -1;
+        }
+        
+        // General rule: If A did this task yesterday but B didn't, B goes first
         if (aPrevTask === task && bPrevTask !== task) return 1;
         if (aPrevTask !== task && bPrevTask === task) return -1;
 
@@ -338,6 +349,34 @@ export function generateWeeklyRota({
         // Check if already assigned on this day
         const alreadyAssigned = assignments.some(a => a.staffId === staffMember.id && a.date === dateStr);
         if (alreadyAssigned) continue;
+        
+        // CRITICAL: Check if they had Inbound on the previous day (NO CONSECUTIVE INBOUND)
+        const prevDate = new Date(checkDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevDateStr = prevDate.toISOString().split("T")[0];
+        const hadInboundYesterday = assignments.some(a => 
+          a.staffId === staffMember.id && 
+          a.date === prevDateStr && 
+          a.task === "Inbound"
+        );
+        if (hadInboundYesterday) {
+          console.log(`    ✗ Skipping ${dateStr} - ${staffMember.name} had Inbound on ${prevDateStr} (no consecutive)`);
+          continue;
+        }
+        
+        // Also check next day to avoid creating consecutive Inbound
+        const nextDate = new Date(checkDate);
+        nextDate.setDate(nextDate.getDate() + 1);
+        const nextDateStr = nextDate.toISOString().split("T")[0];
+        const hasInboundTomorrow = assignments.some(a => 
+          a.staffId === staffMember.id && 
+          a.date === nextDateStr && 
+          a.task === "Inbound"
+        );
+        if (hasInboundTomorrow) {
+          console.log(`    ✗ Skipping ${dateStr} - ${staffMember.name} has Inbound on ${nextDateStr} (no consecutive)`);
+          continue;
+        }
         
         // Check availability
         const unavailable = staffMember.availability.some(a => 
