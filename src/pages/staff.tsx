@@ -881,8 +881,8 @@ export default function StaffPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            {/* DEBUG PANEL - Remove this after fixing the issue */}
-            {staff.length > 0 && (
+            {/* DEBUG PANEL - Hidden in production */}
+            {/* {staff.length > 0 && (
               <Alert className="mb-4 bg-amber-50 border-amber-200">
                 <AlertCircle className="h-4 w-4 text-amber-600" />
                 <AlertDescription className="text-xs font-mono space-y-1">
@@ -919,7 +919,7 @@ export default function StaffPage() {
                   })()}
                 </AlertDescription>
               </Alert>
-            )}
+            )} */}
             
             {staffLoading && (
               <div className="space-y-3">
