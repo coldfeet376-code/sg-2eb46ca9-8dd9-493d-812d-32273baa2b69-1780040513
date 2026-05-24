@@ -35,22 +35,48 @@ export function useStaff() {
         return [];
       }
 
-      const { data: availabilityData, error: availError } = await supabase
-        .from("availability")
-        .select("*")
-        .order('date', { ascending: true })
-        .limit(100000); // FINAL FIX: Complete query restructure with order + very high limit
+      // CRITICAL FIX: Fetch ALL availability records using pagination
+      // Supabase has a server-side limit of 1000 rows per query
+      console.log("📅 Fetching availability data with pagination...");
+      let allAvailability: any[] = [];
+      let currentPage = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data: pageData, error: pageError } = await supabase
+          .from("availability")
+          .select("*")
+          .order('date', { ascending: true })
+          .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1);
+
+        if (pageError) {
+          console.error(`❌ Availability query error on page ${currentPage}:`, pageError);
+          throw pageError;
+        }
+
+        if (pageData && pageData.length > 0) {
+          allAvailability = allAvailability.concat(pageData);
+          console.log(`  ✓ Fetched page ${currentPage + 1}: ${pageData.length} records (total so far: ${allAvailability.length})`);
+          
+          // If we got less than pageSize, we've reached the end
+          if (pageData.length < pageSize) {
+            hasMore = false;
+          } else {
+            currentPage++;
+          }
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const availabilityData = allAvailability;
+      console.log(`✅ PAGINATION COMPLETE: Fetched ${availabilityData.length} total availability records`);
 
       console.log("📅 Availability query result:", {
         availCount: availabilityData?.length || 0,
-        error: availError?.message,
         sampleStaffIds: availabilityData?.slice(0, 3).map(a => ({ staff_id: a.staff_id, date: a.date }))
       });
-
-      if (availError) {
-        console.error("❌ Availability query error:", availError);
-        throw availError;
-      }
 
       // CRITICAL: Check if Supabase returned ZERO availability records
       if (!availabilityData || availabilityData.length === 0) {
