@@ -631,13 +631,29 @@ export default function StaffPage() {
               Configure team members and training assignments
             </p>
           </div>
-          <Button
-            onClick={handleAddStaff}
-            className="font-sans font-medium"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Staff
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={async () => {
+                toast({ title: "🔄 Refreshing data...", description: "Loading latest from database" });
+                await queryClient.invalidateQueries({ queryKey: ["staff"] });
+                await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                setRenderKey(prev => prev + 1);
+                toast({ title: "✅ Data Refreshed", description: "Loaded latest availability data" });
+              }}
+              className="font-sans font-medium"
+            >
+              🔄 Refresh Data
+            </Button>
+            <Button
+              onClick={handleAddStaff}
+              className="font-sans font-medium"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Staff
+            </Button>
+          </div>
         </div>
 
         <Card className="shadow-sm hover:shadow-md transition-smooth">
