@@ -89,19 +89,10 @@ export default function AnalyticsPage() {
       if (rotasError) throw rotasError;
 
       if (rotasData && rotasData.length > 0) {
-        // Parse JSONB assignments from each rota
-        const allAssignments: Assignment[] = [];
-        
-        rotasData.forEach((rota: any) => {
-          if (rota.assignments && Array.isArray(rota.assignments)) {
-            allAssignments.push(...rota.assignments);
-          }
-        });
-
         const weekMap = new Map<string, WeekData>();
         
-        allAssignments.forEach((a) => {
-          const weekKey = a.week_start;
+        rotasData.forEach((rota: any) => {
+          const weekKey = rota.week_start;
           if (!weekMap.has(weekKey)) {
             weekMap.set(weekKey, {
               weekKey,
@@ -110,13 +101,17 @@ export default function AnalyticsPage() {
             });
           }
           
-          weekMap.get(weekKey)!.assignments.push({
-            staffId: a.staff_id,
-            staffName: a.staff_name,
-            task: a.task as any,
-            date: a.date,
-            shiftPattern: a.shift_pattern as any,
-          });
+          if (rota.assignments && Array.isArray(rota.assignments)) {
+            rota.assignments.forEach((a: any) => {
+              weekMap.get(weekKey)!.assignments.push({
+                staffId: a.staffId || a.staff_id,
+                staffName: a.staffName || a.staff_name,
+                task: a.task,
+                date: a.date,
+                shiftPattern: a.shiftPattern || a.shift_pattern,
+              });
+            });
+          }
         });
 
         const weeks = Array.from(weekMap.values()).sort(
