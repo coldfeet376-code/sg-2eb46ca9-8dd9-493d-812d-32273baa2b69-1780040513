@@ -6,6 +6,8 @@ export type AvailabilityType = "available" | "rest" | "holiday" | "sick";
 
 export type ShiftStart = 
   | "06:00" 
+  | "07:00"
+  | "08:00"
   | "08:30" 
   | "09:00" 
   | "09:30" 
