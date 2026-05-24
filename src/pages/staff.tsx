@@ -403,11 +403,25 @@ export default function StaffPage() {
 
   const getAvailabilityStats = (staffMember: StaffMember) => {
     const availability = staffMember.availability || [];
-    return {
+    const stats = {
       rest: availability.filter((a) => a.type === "rest").length,
       holiday: availability.filter((a) => a.type === "holiday").length,
       sick: availability.filter((a) => a.type === "sick").length,
     };
+    
+    // DEBUG LOGGING - Log stats for specific staff
+    if (staffMember.name.toLowerCase().includes('wilson') || staffMember.name.toLowerCase().includes('allison')) {
+      console.log(`📊 AVAILABILITY STATS for ${staffMember.name}:`);
+      console.log(`   Raw availability array length: ${availability.length}`);
+      console.log(`   Rest: ${stats.rest}, Holiday: ${stats.holiday}, Sick: ${stats.sick}`);
+      if (availability.length > 0) {
+        console.log(`   First 5 entries:`, availability.slice(0, 5));
+      } else {
+        console.log(`   ⚠️ availability array is EMPTY!`);
+      }
+    }
+    
+    return stats;
   };
 
   const getDayColor = (type: AvailabilityType | null) => {
