@@ -47,6 +47,7 @@ export function generateWeeklyRota({
       "Inbound": 0,
       "Outbound": 0,
       "Marshaling": 0,
+      "Housekeeping": 0,
     };
     
     // For 06:00 shift staff, calculate working days in the week

@@ -1,48 +1,31 @@
 import type { Assignment, FairnessMetrics, StaffMember, Task } from "@/types";
 
-export function calculateFairnessMetrics(
+export function calculateFairness(
   assignments: Assignment[],
   staff: StaffMember[]
-): FairnessMetrics {
+): number {
+  if (assignments.length === 0 || staff.length === 0) return 0;
+
   // Count assignments per staff member
-  const staffWorkload = staff.map(s => {
-    const staffAssignments = assignments.filter(a => a.staffId === s.id);
-    const taskBreakdown: Record<Task, number> = {
-      Frozen: 0,
-      Milk: 0,
-      TWI: 0,
-      Inbound: 0,
-      Outbound: 0,
-      Marshaling: 0
-    };
-
-    staffAssignments.forEach(a => {
-      taskBreakdown[a.task] = (taskBreakdown[a.task] || 0) + 1;
-    });
-
-    return {
-      staffId: s.id,
-      staffName: s.name,
-      totalAssignments: staffAssignments.length,
-      taskBreakdown
-    };
+  const counts = staff.map((s) => {
+    return assignments.filter((a) => a.staffId === s.id).length;
   });
 
+  if (counts.length === 0) return 0;
+
   // Calculate standard deviation
-  const assignmentCounts = staffWorkload.map(s => s.totalAssignments);
-  const mean = assignmentCounts.reduce((a, b) => a + b, 0) / assignmentCounts.length;
-  const variance = assignmentCounts.reduce((sum, count) => sum + Math.pow(count - mean, 2), 0) / assignmentCounts.length;
-  const standardDeviation = Math.sqrt(variance);
+  const mean = counts.reduce((sum, c) => sum + c, 0) / counts.length;
+  const variance =
+    counts.reduce((sum, c) => sum + Math.pow(c - mean, 2), 0) / counts.length;
+  const stdDev = Math.sqrt(variance);
 
-  // Calculate overall fairness score (0-100)
-  // Lower standard deviation = higher fairness
-  // Perfect fairness (SD=0) = 100, high SD = lower score
-  const maxReasonableSD = mean * 0.5; // If SD is 50% of mean, score is 0
-  const overallScore = Math.max(0, Math.min(100, 100 - (standardDeviation / maxReasonableSD) * 100));
+  // Fairness score: 100 means perfectly equal, lower means less fair
+  // If stdDev is 0 (all equal), return 100
+  if (stdDev === 0) return 100;
 
-  return {
-    overallScore: Math.round(overallScore),
-    staffWorkload,
-    standardDeviation: Math.round(standardDeviation * 100) / 100
-  };
+  // Normalize: lower stdDev = higher fairness
+  const maxPossibleStdDev = mean; // worst case: some have all, some have none
+  const fairness = Math.max(0, 100 - (stdDev / maxPossibleStdDev) * 100);
+
+  return Math.round(fairness);
 }

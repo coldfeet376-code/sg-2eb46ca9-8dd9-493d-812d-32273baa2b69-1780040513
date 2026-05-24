@@ -1372,18 +1372,59 @@ export default function Home() {
 
         {/* Recent Changes Panel */}
         <RecentChangesPanel />
-      </div>
 
-      {/* Print Preview Dialog */}
-      <StaffRotaPrintPreview
-        open={showPrintPreview}
-        onClose={() => setShowPrintPreview(false)}
-        weekStart={weekStart}
-        assignments={assignments}
-        staff={staff}
-        fairnessMetrics={fairnessMetrics}
-        lockedCount={lockedAssignments.length}
-      />
+        {/* Settings Tab - Task Requirements Configuration */}
+        <TabsContent value="settings" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="font-condensed">Task Requirements Configuration</CardTitle>
+              <CardDescription className="font-sans">
+                Set how many staff are needed for each task on each day of the week
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {taskConfigData && (
+                <div className="space-y-6">
+                  {["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Housekeeping"].map((task) => (
+                    <div key={task} className="space-y-2">
+                      <h3 className="font-condensed font-semibold">{task}</h3>
+                      <div className="grid grid-cols-7 gap-2">
+                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
+                          <div key={day}>
+                            <label className="text-xs text-muted-foreground font-sans">{day}</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={taskConfigData[task]?.[idx] || 0}
+                              onChange={(e) => {
+                                const newConfig = { ...taskConfigData };
+                                if (!newConfig[task]) newConfig[task] = [0, 0, 0, 0, 0, 0, 0];
+                                newConfig[task][idx] = parseInt(e.target.value) || 0;
+                                setTaskConfigData(newConfig);
+                              }}
+                              className="font-mono text-center"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    onClick={() => {
+                      updateTaskConfig.mutate(taskConfigData);
+                      toast({ title: "✅ Configuration Saved", description: "Task requirements updated" });
+                    }}
+                    disabled={updateTaskConfig.isPending}
+                    className="font-sans font-medium"
+                  >
+                    {updateTaskConfig.isPending ? "Saving..." : "Save Configuration"}
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </Layout>
   );
 }

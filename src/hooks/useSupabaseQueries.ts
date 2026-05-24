@@ -282,7 +282,7 @@ export function useUpdateTaskConfig() {
 
   return useMutation({
     mutationFn: async (taskConfig: TaskConfig) => {
-      const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
+      const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Housekeeping"];
       
       for (const task of TASKS) {
         const { error } = await supabase

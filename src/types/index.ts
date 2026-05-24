@@ -1,4 +1,4 @@
-export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Outbound" | "Marshaling";
+export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Outbound" | "Marshaling" | "Housekeeping";
 
 export type ManagerDuty = "Intake" | "Out-loading" | "Admin" | "Floor";
 
