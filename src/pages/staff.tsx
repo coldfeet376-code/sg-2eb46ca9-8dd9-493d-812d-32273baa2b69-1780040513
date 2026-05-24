@@ -893,6 +893,36 @@ export default function StaffPage() {
                                   </Button>
                                 </CollapsibleTrigger>
                               </div>
+                              <div className="flex gap-2 shrink-0">
+                                {!isEditing && (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditStaff(member);
+                                      }}
+                                      className="h-8 px-3 font-mono text-xs"
+                                    >
+                                      <Edit className="h-3.5 w-3.5 mr-1" />
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteConfirmId(member.id);
+                                      }}
+                                      className="h-8 px-3 font-mono text-xs"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                      Delete
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
                             </div>
 
                             <ConfirmDialog
