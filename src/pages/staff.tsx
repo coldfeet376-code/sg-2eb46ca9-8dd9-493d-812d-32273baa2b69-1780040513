@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { StaffBulkOperations } from "@/components/staff/StaffBulkOperations";
 import { StaffAvailabilityPanel } from "@/components/staff/StaffAvailabilityPanel";
+import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
@@ -735,6 +736,24 @@ export default function StaffPage() {
               <span className="text-xs text-muted-foreground font-mono">
                 Showing {staff.filter((member) => filterShift === "all" || member.shiftStart === filterShift).length} of {staff.length} staff
               </span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Week Navigation */}
+        <Card className="shadow-sm bg-accent/5 border-accent/30">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5 text-accent" />
+                <span className="font-condensed font-semibold text-sm">Availability Calendar</span>
+              </div>
+              <RotaWeekNavigator
+                weekStart={currentWeekStart}
+                onPreviousWeek={() => navigateWeek("prev")}
+                onNextWeek={() => navigateWeek("next")}
+                onTodayClick={goToToday}
+              />
             </div>
           </CardContent>
         </Card>
