@@ -845,6 +845,46 @@ export default function StaffPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
+            {/* DEBUG PANEL - Remove this after fixing the issue */}
+            {staff.length > 0 && (
+              <Alert className="mb-4 bg-amber-50 border-amber-200">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-xs font-mono space-y-1">
+                  <div className="font-bold text-amber-900 mb-2">🔍 DATABASE DEBUG INFO:</div>
+                  {(() => {
+                    const wilsonStaff = staff.find(s => s.name.toLowerCase().includes('wilson'));
+                    const allisonStaff = staff.find(s => s.name.toLowerCase().includes('allison'));
+                    
+                    return (
+                      <>
+                        <div>Total Staff Loaded: {staff.length}</div>
+                        {wilsonStaff && (
+                          <>
+                            <div className="text-blue-700 font-bold mt-2">WILSON I:</div>
+                            <div className="pl-2">Staff ID: {wilsonStaff.id}</div>
+                            <div className="pl-2">Availability Array Length: {wilsonStaff.availability?.length || 0}</div>
+                            <div className="pl-2">Rest: {wilsonStaff.availability?.filter(a => a.type === 'rest').length || 0}</div>
+                          </>
+                        )}
+                        {allisonStaff && (
+                          <>
+                            <div className="text-purple-700 font-bold mt-2">ALLISON G:</div>
+                            <div className="pl-2">Staff ID: {allisonStaff.id}</div>
+                            <div className="pl-2">Availability Array Length: {allisonStaff.availability?.length || 0}</div>
+                            <div className="pl-2">Rest: {allisonStaff.availability?.filter(a => a.type === 'rest').length || 0}</div>
+                          </>
+                        )}
+                        <div className="mt-2 pt-2 border-t border-amber-300 text-amber-900">
+                          If Wilson I shows 0 but Allison G shows data, this confirms a filtering bug in the query hook.
+                          The database HAS the data (238 entries confirmed by SQL), but JavaScript filter is failing.
+                        </div>
+                      </>
+                    );
+                  })()}
+                </AlertDescription>
+              </Alert>
+            )}
+            
             {staffLoading && (
               <div className="space-y-3">
                 {[1, 2, 3].map(i => (
