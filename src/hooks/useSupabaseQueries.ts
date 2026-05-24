@@ -58,8 +58,50 @@ export function useStaff() {
             notes: a.notes || undefined,
           }));
         
-        // Log availability count per staff for debugging
-        if (staffAvail.length > 0) {
+        // ULTRA-DETAILED DEBUG LOGGING for Wilson I and Allison G
+        if (s.name.toLowerCase().includes('wilson') || s.name.toLowerCase().includes('allison')) {
+          console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+          console.log(`🔍 DETAILED FILTER DEBUG for: ${s.name}`);
+          console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+          console.log(`Staff ID: ${s.id}`);
+          console.log(`Staff ID type: ${typeof s.id}`);
+          console.log(`Total availability records in database: ${availabilityData?.length || 0}`);
+          
+          // Check how many records have matching staff_id
+          const matchingRecords = (availabilityData || []).filter(a => a.staff_id === s.id);
+          console.log(`Records matching this staff_id: ${matchingRecords.length}`);
+          
+          // Show sample of availability staff_ids to check format
+          const sampleAvailIds = (availabilityData || []).slice(0, 5).map(a => ({
+            staff_id: a.staff_id,
+            type: typeof a.staff_id,
+            equals_check: a.staff_id === s.id,
+            string_equals: String(a.staff_id) === String(s.id)
+          }));
+          console.log(`Sample availability staff_ids:`, sampleAvailIds);
+          
+          // Check if this staff's ID appears in availability at all
+          const staffIdExists = (availabilityData || []).some(a => a.staff_id === s.id);
+          console.log(`This staff_id exists in availability table: ${staffIdExists}`);
+          
+          // If no match, try to find similar IDs
+          if (!staffIdExists && availabilityData && availabilityData.length > 0) {
+            const similarIds = availabilityData
+              .map(a => a.staff_id)
+              .filter((id, index, self) => self.indexOf(id) === index) // unique
+              .slice(0, 5);
+            console.log(`Sample of unique staff_ids in availability:`, similarIds);
+          }
+          
+          console.log(`Final filtered availability count: ${staffAvail.length}`);
+          if (staffAvail.length > 0) {
+            console.log(`First 3 filtered entries:`, staffAvail.slice(0, 3));
+          } else {
+            console.log(`❌ NO ENTRIES MATCHED - FILTER FAILED!`);
+          }
+          console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+        } else if (staffAvail.length > 0) {
+          // For other staff, just log the count
           console.log(`  ${s.name}: ${staffAvail.length} availability entries`);
         }
         
