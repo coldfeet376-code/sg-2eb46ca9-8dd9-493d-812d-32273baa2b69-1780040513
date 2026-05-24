@@ -253,7 +253,7 @@ export function useDeleteAvailability() {
 }
 
 // Generic Mutation Hook for arbitrary tables
-export function useSupabaseMutation(table: string, type: "insert" | "update" | "delete") {
+export function useSupabaseMutation(table: "staff" | "availability" | "assignments" | "audit_log" | "invitations" | "manager_availability" | "managers" | "profiles" | "rota_backups" | "rotas" | "task_config", type: "insert" | "update" | "delete") {
   const queryClient = useQueryClient();
 
   return useMutation({
