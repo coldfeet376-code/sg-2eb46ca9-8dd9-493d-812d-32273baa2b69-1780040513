@@ -37,7 +37,7 @@ export function useStaff() {
       const { data: availabilityData, error: availError } = await supabase
         .from("availability")
         .select("*")
-        .limit(20000); // CRITICAL: Supabase defaults to 1000 rows - increase to fetch all records
+        .range(0, 50000); // CRITICAL FIX: Use range() instead of limit() to fetch all records (bypasses cache)
 
       console.log("📅 Availability query result:", {
         availCount: availabilityData?.length || 0,
