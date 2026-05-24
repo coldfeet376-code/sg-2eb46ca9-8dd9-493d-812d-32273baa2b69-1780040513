@@ -307,7 +307,7 @@ export default function StaffPage() {
       }
 
       // Refresh data
-      await queryClient.refetchQueries({ queryKey: ["staff"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v3"] });
       
       // Force re-render
       setRenderKey(prev => prev + 1);
@@ -355,8 +355,8 @@ export default function StaffPage() {
       }
       
       // AGGRESSIVE CACHE REFRESH - invalidate, refetch, and wait
-      await queryClient.invalidateQueries({ queryKey: ["staff"] });
-      await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v3"], type: "active" });
       
       // Wait 800ms for cache to fully settle and propagate to component
       await new Promise(resolve => setTimeout(resolve, 800));
@@ -477,8 +477,8 @@ export default function StaffPage() {
         }
       }
       
-      await queryClient.invalidateQueries({ queryKey: ["staff"] });
-      await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v3"], type: "active" });
       await new Promise(resolve => setTimeout(resolve, 800));
       setRenderKey(prev => prev + 1);
       
@@ -537,8 +537,8 @@ export default function StaffPage() {
         }
       }
       
-      await queryClient.invalidateQueries({ queryKey: ["staff"] });
-      await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v3"], type: "active" });
       await new Promise(resolve => setTimeout(resolve, 800));
       setRenderKey(prev => prev + 1);
       
@@ -568,8 +568,8 @@ export default function StaffPage() {
 
       await staffService.updateStaff(staffId, { trainedTasks: newTasks });
       
-      await queryClient.invalidateQueries({ queryKey: ["staff"] });
-      await queryClient.refetchQueries({ queryKey: ["staff"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v3"], type: "active" });
       
       toast({
         title: currentTasks.includes(task) ? "✓ Training Removed" : "✓ Training Added",
@@ -746,6 +746,13 @@ export default function StaffPage() {
               className="font-sans font-medium"
             >
               🔄 Refresh Data
+            </Button>
+            <Button
+              onClick={handleAddStaff}
+              className="font-sans font-medium"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Staff
             </Button>
           </div>
         </div>

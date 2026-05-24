@@ -207,7 +207,7 @@ export function useAddStaff() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
     },
   });
 }
@@ -230,7 +230,7 @@ export function useUpdateStaff() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
     },
   });
 }
@@ -244,7 +244,7 @@ export function useDeleteStaff() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
     },
   });
 }
@@ -296,7 +296,7 @@ export function useAddAvailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
     },
   });
 }
@@ -314,7 +314,7 @@ export function useDeleteAvailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v2"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v3"] });
     },
   });
 }
