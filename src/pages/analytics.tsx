@@ -569,6 +569,50 @@ export default function AnalyticsPage() {
               </Card>
 
               <Card className="shadow-sm">
+                <CardHeader className="border-b border-border/50 bg-muted/30">
+                  <CardTitle className="text-2xl font-condensed font-bold tracking-tight">
+                    Distribution Fairness
+                  </CardTitle>
+                  <CardDescription className="text-sm font-sans">
+                    Fairness score based on variance from average turns
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  {turnHistory.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="font-sans text-sm">No historical data available</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {turnHistory.map((history) => (
+                        <div key={history.staffId} className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <p className="font-sans font-semibold text-sm">{history.staffName}</p>
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-muted-foreground">
+                                {history.totalTurns} / {getExpectedTurns()} turns
+                              </span>
+                              <Badge 
+                                variant={history.fairnessScore >= 80 ? "default" : history.fairnessScore >= 60 ? "secondary" : "destructive"} 
+                                className={`text-xs font-mono ${history.fairnessScore >= 80 ? "bg-green-500 hover:bg-green-600" : history.fairnessScore >= 60 ? "bg-amber-500 hover:bg-amber-600 text-white" : ""}`}
+                              >
+                                {history.fairnessScore >= 80 ? "Fair" : history.fairnessScore >= 60 ? "Uneven" : "Skewed"}
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full ${history.fairnessScore >= 80 ? "bg-green-500" : history.fairnessScore >= 60 ? "bg-amber-500" : "bg-destructive"}`}
+                              style={{ width: `${history.fairnessScore}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
           )}
