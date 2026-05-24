@@ -11,6 +11,7 @@ import { AuditProvider } from "@/contexts/AuditContext";
 import { authService } from "@/services/authService";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -74,6 +75,7 @@ export default function App({ Component, pageProps }: AppProps) {
               <AuditProvider>
                 <Component {...pageProps} />
                 <Toaster />
+                <InstallPrompt />
               </AuditProvider>
             </UndoRedoProvider>
           </TourProvider>
