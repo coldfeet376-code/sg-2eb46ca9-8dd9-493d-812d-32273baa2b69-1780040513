@@ -40,7 +40,8 @@ export function useStaff() {
 
       console.log("📅 Availability query result:", {
         availCount: availabilityData?.length || 0,
-        error: availError?.message
+        error: availError?.message,
+        sampleStaffIds: availabilityData?.slice(0, 3).map(a => ({ staff_id: a.staff_id, date: a.date }))
       });
 
       if (availError) {
@@ -48,26 +49,37 @@ export function useStaff() {
         throw availError;
       }
 
-      const staffMembers: StaffMember[] = (staffData || []).map((s) => ({
-        id: s.id,
-        name: s.name,
-        trainedTasks: (s.trained_tasks || []) as Task[],
-        shiftStart: (s.shift_start || "06:00") as ShiftStart,
-        shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
-        availability: (availabilityData || [])
+      const staffMembers: StaffMember[] = (staffData || []).map((s) => {
+        const staffAvail = (availabilityData || [])
           .filter((a) => a.staff_id === s.id)
           .map((a) => ({
             date: a.date,
             type: a.type as "rest" | "holiday" | "sick" | "available",
             notes: a.notes || undefined,
-          })),
-      }));
+          }));
+        
+        // Log availability count per staff for debugging
+        if (staffAvail.length > 0) {
+          console.log(`  ${s.name}: ${staffAvail.length} availability entries`);
+        }
+        
+        return {
+          id: s.id,
+          name: s.name,
+          trainedTasks: (s.trained_tasks || []) as Task[],
+          shiftStart: (s.shift_start || "06:00") as ShiftStart,
+          shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
+          availability: staffAvail,
+        };
+      });
 
       console.log("✅ Staff members mapped:", staffMembers.length);
       return staffMembers;
     },
     retry: 1,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 1000 * 30, // Cache for only 30 seconds (was 5 minutes)
+    refetchOnMount: "always", // Always fetch fresh data when component mounts
+    refetchOnWindowFocus: true, // Refetch when user returns to browser tab
   });
 }
 
