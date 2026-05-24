@@ -315,6 +315,7 @@ export default function ImportPage() {
     setIsImporting(true);
     setImportProgress(0);
     let successCount = 0;
+    const errors: string[] = [];
 
     for (let i = 0; i < parsedStaff.length; i++) {
       const staff = parsedStaff[i];
@@ -330,14 +331,27 @@ export default function ImportPage() {
             continue;
           }
         } else {
-          const newStaff = await createStaffMutation.mutateAsync({
+          // Create new staff member
+          const staffData = {
             name: staff.name,
             trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"],
             shift_start: staff.startTime,
-            day_shift_pattern: staff.shift,
             shift_pattern: "All",
-          } as any);
-          staffId = newStaff.id;
+          };
+          
+          console.log(`Creating staff: ${staff.name}`, staffData);
+          
+          try {
+            const newStaff = await createStaffMutation.mutateAsync(staffData as any);
+            staffId = newStaff.id;
+            console.log(`✓ Created staff ${staff.name} with ID: ${staffId}`);
+          } catch (createError: any) {
+            const errorMsg = `Failed to create ${staff.name}: ${createError.message || createError}`;
+            console.error(errorMsg, createError);
+            errors.push(errorMsg);
+            setImportProgress(((i + 1) / parsedStaff.length) * 100);
+            continue;
+          }
         }
         
         // Create availability entries (only for non-available days)
@@ -362,8 +376,10 @@ export default function ImportPage() {
         console.log(`✓ ${staff.name}: imported ${importedAvailCount} unavailable days`);
         successCount++;
         setImportedCount(successCount);
-      } catch (error) {
-        console.error(`Failed to import ${staff.name}:`, error);
+      } catch (error: any) {
+        const errorMsg = `Failed to import ${staff.name}: ${error.message || error}`;
+        console.error(errorMsg, error);
+        errors.push(errorMsg);
       }
 
       setImportProgress(((i + 1) / parsedStaff.length) * 100);
@@ -377,12 +393,24 @@ export default function ImportPage() {
       sum + s.availability.filter(a => a.status !== "available").length, 0
     );
     
-    toast({
-      title: "Import complete",
-      description: updateMode 
-        ? `Updated ${totalImportedDays} availability entries for ${successCount} staff members`
-        : `Successfully imported ${successCount} staff with ${totalImportedDays} availability entries`,
-    });
+    // Show errors if any
+    if (errors.length > 0) {
+      console.error("=== IMPORT ERRORS ===");
+      errors.forEach(err => console.error(err));
+      
+      toast({
+        title: "Import completed with errors",
+        description: `${successCount} succeeded, ${errors.length} failed. Check console (F12) for details.`,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Import complete",
+        description: updateMode 
+          ? `Updated ${totalImportedDays} availability entries for ${successCount} staff members`
+          : `Successfully imported ${successCount} staff with ${totalImportedDays} availability entries`,
+      });
+    }
   };
 
   return (
