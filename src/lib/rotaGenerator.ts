@@ -232,6 +232,141 @@ export function generateWeeklyRota({
     }, {} as Record<string, number>)
   });
 
+  // CONSTRAINT ENFORCEMENT: Ensure minimum assignments
+  console.log("🔒 Enforcing minimum assignment constraints...");
+  
+  // Rule 1: All Frozen-trained staff must get at least 2 Frozen shifts per week
+  const frozenTrainedStaff = staff.filter(s => 
+    s.trainedTasks.includes("Frozen") && 
+    !s.availability.some(a => 
+      a.date >= weekStart && 
+      a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0] &&
+      (a.type === "rest_day" || a.type === "holiday" || a.type === "sick_leave")
+    )
+  );
+
+  frozenTrainedStaff.forEach(staffMember => {
+    const frozenAssignments = assignments.filter(a => 
+      a.staffId === staffMember.id && 
+      a.task === "Frozen" &&
+      a.date >= weekStart &&
+      a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0]
+    );
+
+    if (frozenAssignments.length < 2) {
+      const needed = 2 - frozenAssignments.length;
+      console.log(`  ⚠️ ${staffMember.name} needs ${needed} more Frozen shift(s) - searching for opportunities...`);
+      
+      // Find days where this staff member could be assigned to Frozen
+      for (let d = 0; d < 7; d++) {
+        if (frozenAssignments.length >= 2) break;
+        
+        const checkDate = new Date(weekStart);
+        checkDate.setDate(checkDate.getDate() + d);
+        const dateStr = checkDate.toISOString().split("T")[0];
+        
+        // Check if already assigned on this day
+        const alreadyAssigned = assignments.some(a => a.staffId === staffMember.id && a.date === dateStr);
+        if (alreadyAssigned) continue;
+        
+        // Check availability
+        const unavailable = staffMember.availability.some(a => 
+          a.date === dateStr && 
+          (a.type === "rest_day" || a.type === "holiday" || a.type === "sick_leave")
+        );
+        if (unavailable) continue;
+        
+        // Check if Frozen needs more staff on this day
+        const frozenNeeded = taskConfig["Frozen"][d];
+        const frozenAssigned = assignments.filter(a => a.date === dateStr && a.task === "Frozen").length;
+        
+        if (frozenAssigned < frozenNeeded) {
+          // Add assignment
+          assignments.push({
+            staffId: staffMember.id,
+            staffName: staffMember.name,
+            task: "Frozen",
+            date: dateStr,
+          });
+          frozenAssignments.push(assignments[assignments.length - 1]);
+          console.log(`    ✓ Added ${staffMember.name} to Frozen on ${dateStr}`);
+        }
+      }
+    }
+  });
+
+  // Rule 2: 5-day workers must get at least 2 Inbound shifts per week
+  const fiveDayWorkers = staff.filter(s => {
+    // Count how many days they're NOT unavailable this week
+    const weekDates = Array.from({ length: 7 }, (_, d) => {
+      const date = new Date(weekStart);
+      date.setDate(date.getDate() + d);
+      return date.toISOString().split('T')[0];
+    });
+    
+    const unavailableDays = weekDates.filter(date => 
+      s.availability.some(a => 
+        a.date === date && 
+        (a.type === "rest_day" || a.type === "holiday" || a.type === "sick_leave")
+      )
+    ).length;
+    
+    const workingDays = 7 - unavailableDays;
+    return workingDays >= 5 && s.trainedTasks.includes("Inbound");
+  });
+
+  fiveDayWorkers.forEach(staffMember => {
+    const inboundAssignments = assignments.filter(a => 
+      a.staffId === staffMember.id && 
+      a.task === "Inbound" &&
+      a.date >= weekStart &&
+      a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0]
+    );
+
+    if (inboundAssignments.length < 2) {
+      const needed = 2 - inboundAssignments.length;
+      console.log(`  ⚠️ ${staffMember.name} (5-day worker) needs ${needed} more Inbound shift(s)...`);
+      
+      // Find days where this staff member could be assigned to Inbound
+      for (let d = 0; d < 7; d++) {
+        if (inboundAssignments.length >= 2) break;
+        
+        const checkDate = new Date(weekStart);
+        checkDate.setDate(checkDate.getDate() + d);
+        const dateStr = checkDate.toISOString().split("T")[0];
+        
+        // Check if already assigned on this day
+        const alreadyAssigned = assignments.some(a => a.staffId === staffMember.id && a.date === dateStr);
+        if (alreadyAssigned) continue;
+        
+        // Check availability
+        const unavailable = staffMember.availability.some(a => 
+          a.date === dateStr && 
+          (a.type === "rest_day" || a.type === "holiday" || a.type === "sick_leave")
+        );
+        if (unavailable) continue;
+        
+        // Check if Inbound needs more staff on this day
+        const inboundNeeded = taskConfig["Inbound"][d];
+        const inboundAssigned = assignments.filter(a => a.date === dateStr && a.task === "Inbound").length;
+        
+        if (inboundAssigned < inboundNeeded) {
+          // Add assignment
+          assignments.push({
+            staffId: staffMember.id,
+            staffName: staffMember.name,
+            task: "Inbound",
+            date: dateStr,
+          });
+          inboundAssignments.push(assignments[assignments.length - 1]);
+          console.log(`    ✓ Added ${staffMember.name} to Inbound on ${dateStr}`);
+        }
+      }
+    }
+  });
+
+  console.log("✅ Constraint enforcement complete");
+
   return assignments;
 }
 
