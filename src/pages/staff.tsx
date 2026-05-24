@@ -15,6 +15,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { SEO } from "@/components/SEO";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -99,6 +107,11 @@ export default function StaffPage() {
   // Bulk operations state
   const [bulkData, setBulkData] = useState<string>("");
   const [bulkAvailability, setBulkAvailability] = useState<AvailabilityType>("available");
+
+  // Edit availability dialog state
+  const [editAvailabilityStaff, setEditAvailabilityStaff] = useState<{ id: string; name: string } | null>(null);
+  const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
+  const [editAvailabilityType, setEditAvailabilityType] = useState<AvailabilityType>("rest");
 
   // React Query hooks
   const { data: staff = [], isLoading: staffLoading } = useStaff();
@@ -556,6 +569,38 @@ export default function StaffPage() {
     }
   };
 
+  const openEditAvailabilityDialog = (staffId: string, staffName: string) => {
+    setEditAvailabilityStaff({ id: staffId, name: staffName });
+    // Set default date to today
+    const today = new Date().toISOString().split("T")[0];
+    setEditAvailabilityDate(today);
+    setEditAvailabilityType("rest");
+  };
+
+  const closeEditAvailabilityDialog = () => {
+    setEditAvailabilityStaff(null);
+    setEditAvailabilityDate("");
+    setEditAvailabilityType("rest");
+  };
+
+  const handleSaveEditAvailability = async () => {
+    if (!editAvailabilityStaff || !editAvailabilityDate) {
+      toast({
+        title: "Missing information",
+        description: "Please select a date",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      await setDayAvailability(editAvailabilityStaff.id, editAvailabilityDate, editAvailabilityType);
+      closeEditAvailabilityDialog();
+    } catch (error) {
+      console.error("Error saving availability:", error);
+    }
+  };
+
   return (
     <Layout>
       <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
@@ -947,15 +992,26 @@ export default function StaffPage() {
                                   <div className="text-xs font-mono text-muted-foreground">
                                     Click any day to set availability
                                   </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => clearAllAvailability(member.id, member.name)}
-                                    className="h-7 text-xs font-mono text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  >
-                                    <X className="h-3 w-3 mr-1" />
-                                    Clear All Availability
-                                  </Button>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openEditAvailabilityDialog(member.id, member.name)}
+                                      className="h-7 text-xs font-mono"
+                                    >
+                                      <Edit className="h-3 w-3 mr-1" />
+                                      Edit Availability
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => clearAllAvailability(member.id, member.name)}
+                                      className="h-7 text-xs font-mono text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    >
+                                      <X className="h-3 w-3 mr-1" />
+                                      Clear All
+                                    </Button>
+                                  </div>
                                 </div>
 
                                 {/* Calendar grid */}
@@ -1072,6 +1128,109 @@ export default function StaffPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Availability Dialog */}
+      <Dialog open={editAvailabilityStaff !== null} onOpenChange={(open) => !open && closeEditAvailabilityDialog()}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="font-condensed text-xl">
+              Edit Availability - {editAvailabilityStaff?.name}
+            </DialogTitle>
+            <DialogDescription className="font-mono text-xs">
+              Set availability for a specific date
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-date" className="font-mono text-xs">
+                Select Date
+              </Label>
+              <Input
+                id="edit-date"
+                type="date"
+                value={editAvailabilityDate}
+                onChange={(e) => setEditAvailabilityDate(e.target.value)}
+                className="rounded-lg font-mono"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="font-mono text-xs">Availability Status</Label>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setEditAvailabilityType("rest")}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all",
+                    editAvailabilityType === "rest"
+                      ? "border-blue-500 bg-blue-500/10"
+                      : "border-border hover:border-blue-500/50"
+                  )}
+                >
+                  <span className="w-8 h-8 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                    R
+                  </span>
+                  <span className="font-mono font-semibold">Rest Day</span>
+                </button>
+
+                <button
+                  onClick={() => setEditAvailabilityType("holiday")}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all",
+                    editAvailabilityType === "holiday"
+                      ? "border-purple-500 bg-purple-500/10"
+                      : "border-border hover:border-purple-500/50"
+                  )}
+                >
+                  <span className="w-8 h-8 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                    H
+                  </span>
+                  <span className="font-mono font-semibold">Holiday</span>
+                </button>
+
+                <button
+                  onClick={() => setEditAvailabilityType("sick")}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all",
+                    editAvailabilityType === "sick"
+                      ? "border-red-500 bg-red-500/10"
+                      : "border-border hover:border-red-500/50"
+                  )}
+                >
+                  <span className="w-8 h-8 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                    S
+                  </span>
+                  <span className="font-mono font-semibold">Sick Leave</span>
+                </button>
+
+                <button
+                  onClick={() => setEditAvailabilityType("available")}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all",
+                    editAvailabilityType === "available"
+                      ? "border-green-500 bg-green-500/10"
+                      : "border-border hover:border-green-500/50"
+                  )}
+                >
+                  <span className="w-8 h-8 rounded bg-green-500 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                    A
+                  </span>
+                  <span className="font-mono font-semibold">Available (Clear)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={closeEditAvailabilityDialog}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEditAvailability}>
+              Save Availability
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
