@@ -9,10 +9,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/router";
-import { Upload, CheckCircle2, AlertCircle, Users, Clock, Phone, FileText, Calendar } from "lucide-react";
-import { useSupabaseMutation } from "@/hooks/useSupabaseQueries";
+import { Upload, CheckCircle2, AlertCircle, Users, Clock, Phone, FileText, Calendar, RefreshCw } from "lucide-react";
+import { useSupabaseMutation, useStaff } from "@/hooks/useSupabaseQueries";
 import { useToast } from "@/hooks/use-toast";
-import type { DayShiftPattern, AvailabilityType } from "@/types";
+import type { DayShiftPattern, AvailabilityType, StaffMember } from "@/types";
+import { Switch } from "@/components/ui/switch";
 
 interface ParsedStaff {
   name: string;
@@ -28,6 +29,8 @@ export default function ImportPage() {
   const [pasteText, setPasteText] = useState("");
   const [weekStartDate, setWeekStartDate] = useState(""); // User inputs the Sunday date
   const [parsedStaff, setParsedStaff] = useState<ParsedStaff[]>([]);
+  const [updateMode, setUpdateMode] = useState(true); // Default to update mode
+  const [matchedStaff, setMatchedStaff] = useState<Map<string, string>>(new Map()); // parsedName -> staffId
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importComplete, setImportComplete] = useState(false);
@@ -35,6 +38,7 @@ export default function ImportPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const { data: existingStaff = [] } = useStaff();
   const createStaffMutation = useSupabaseMutation("staff", "insert");
   const createAvailabilityMutation = useSupabaseMutation("availability", "insert");
 
@@ -50,6 +54,7 @@ export default function ImportPage() {
 
     const lines = pasteText.split('\n');
     const newStaff: ParsedStaff[] = [];
+    const matches = new Map<string, string>();
     
     for (const line of lines) {
       if (!line.trim()) continue;
@@ -104,6 +109,16 @@ export default function ImportPage() {
         name = name.trim().replace(/\s+/g, ' ');
         
         if (name.length > 2) {
+          // Try to match with existing staff in update mode
+          if (updateMode && existingStaff.length > 0) {
+            const matchedExisting = existingStaff.find((s: StaffMember) => 
+              s.name.toLowerCase().trim() === name.toLowerCase().trim()
+            );
+            if (matchedExisting) {
+              matches.set(name, matchedExisting.id);
+            }
+          }
+          
           newStaff.push({
             name,
             phone: phoneMatch ? phoneMatch[0] : "",
@@ -115,11 +130,17 @@ export default function ImportPage() {
     }
     
     setParsedStaff(newStaff);
+    setMatchedStaff(matches);
     
     if (newStaff.length > 0) {
+      const matchCount = matches.size;
+      const unmatchedCount = newStaff.length - matchCount;
+      
       toast({
         title: "Data parsed successfully",
-        description: `Found ${newStaff.length} staff members with availability data.`,
+        description: updateMode 
+          ? `Found ${newStaff.length} staff (${matchCount} matched, ${unmatchedCount} not found)`
+          : `Found ${newStaff.length} staff members with availability data.`,
       });
     } else {
       toast({
@@ -151,18 +172,31 @@ export default function ImportPage() {
 
     for (let i = 0; i < parsedStaff.length; i++) {
       const staff = parsedStaff[i];
+      let staffId: string | undefined;
       
       try {
-        // 1. Create staff member
-        const newStaff = await createStaffMutation.mutateAsync({
-          name: staff.name,
-          trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"],
-          shift_start: staff.shift.split("-")[0],
-          day_shift_pattern: staff.shift,
-          shift_pattern: "All",
-        } as any);
+        if (updateMode) {
+          // Update mode: only add availability for matched staff
+          staffId = matchedStaff.get(staff.name);
+          
+          if (!staffId) {
+            console.log(`Skipping unmatched staff: ${staff.name}`);
+            setImportProgress(((i + 1) / parsedStaff.length) * 100);
+            continue;
+          }
+        } else {
+          // Create mode: create new staff member
+          const newStaff = await createStaffMutation.mutateAsync({
+            name: staff.name,
+            trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"],
+            shift_start: staff.shift.split("-")[0],
+            day_shift_pattern: staff.shift,
+            shift_pattern: "All",
+          } as any);
+          staffId = newStaff.id;
+        }
         
-        // 2. Create availability entries for each day
+        // Create availability entries for each day
         for (let dayIdx = 0; dayIdx < staff.availability.length; dayIdx++) {
           const avail = staff.availability[dayIdx];
           
@@ -173,7 +207,7 @@ export default function ImportPage() {
             const dateStr = date.toISOString().split('T')[0];
             
             await createAvailabilityMutation.mutateAsync({
-              staff_id: newStaff.id,
+              staff_id: staffId,
               date: dateStr,
               type: avail.status,
             } as any);
@@ -187,14 +221,16 @@ export default function ImportPage() {
       }
 
       setImportProgress(((i + 1) / parsedStaff.length) * 100);
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     setIsImporting(false);
     setImportComplete(true);
     toast({
       title: "Import complete",
-      description: `Successfully imported ${successCount} staff with availability data`,
+      description: updateMode 
+        ? `Updated availability for ${successCount} existing staff`
+        : `Successfully imported ${successCount} staff with availability data`,
     });
   };
 
@@ -207,6 +243,30 @@ export default function ImportPage() {
             Import staff with full weekly availability (IN/REST/Holiday/Sick)
           </p>
         </div>
+
+        <Card className="border-accent/30 bg-accent/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label htmlFor="updateMode" className="font-condensed font-semibold text-sm flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Update Existing Staff Mode
+                </Label>
+                <p className="text-xs text-muted-foreground font-mono">
+                  {updateMode 
+                    ? "Will only update availability for staff already in database (matched by name)"
+                    : "Will create new staff members with availability data"
+                  }
+                </p>
+              </div>
+              <Switch
+                id="updateMode"
+                checked={updateMode}
+                onCheckedChange={setUpdateMode}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         {!importComplete ? (
           <>
@@ -284,59 +344,86 @@ export default function ImportPage() {
                   </Alert>
 
                   <div className="max-h-[400px] overflow-y-auto space-y-3 pr-2">
-                    {parsedStaff.map((staff, idx) => (
-                      <div key={idx} className="border rounded p-3 bg-muted/30 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="font-semibold text-sm">{staff.name}</div>
-                          <div className="flex items-center gap-2">
-                            {staff.phone && (
-                              <Badge variant="outline" className="font-mono text-[10px] px-1 py-0 h-4">
-                                <Phone className="h-2 w-2 mr-1" />
-                                {staff.phone}
+                    {parsedStaff.map((staff, idx) => {
+                      const isMatched = matchedStaff.has(staff.name);
+                      const willBeSkipped = updateMode && !isMatched;
+                      
+                      return (
+                        <div 
+                          key={idx} 
+                          className={`border rounded p-3 space-y-2 ${
+                            willBeSkipped 
+                              ? "bg-muted/10 opacity-50" 
+                              : "bg-muted/30"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="font-semibold text-sm">{staff.name}</div>
+                              {updateMode && (
+                                <Badge 
+                                  variant={isMatched ? "default" : "destructive"} 
+                                  className="text-[9px] px-1.5 py-0 h-4"
+                                >
+                                  {isMatched ? "MATCHED" : "NOT FOUND"}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {staff.phone && (
+                                <Badge variant="outline" className="font-mono text-[10px] px-1 py-0 h-4">
+                                  <Phone className="h-2 w-2 mr-1" />
+                                  {staff.phone}
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="font-mono text-[10px] px-1 py-0 h-4 bg-primary/10 text-primary">
+                                <Clock className="h-2 w-2 mr-1" />
+                                {staff.shift}
                               </Badge>
-                            )}
-                            <Badge variant="secondary" className="font-mono text-[10px] px-1 py-0 h-4 bg-primary/10 text-primary">
-                              <Clock className="h-2 w-2 mr-1" />
-                              {staff.shift}
-                            </Badge>
+                            </div>
                           </div>
+                          
+                          {staff.availability.length > 0 && (
+                            <div className="flex gap-1 flex-wrap">
+                              {staff.availability.map((avail, dayIdx) => (
+                                <Badge 
+                                  key={dayIdx} 
+                                  variant={avail.status === "available" ? "default" : avail.status === "rest" ? "secondary" : "destructive"}
+                                  className="font-mono text-[9px] px-1.5 py-0 h-5"
+                                >
+                                  {avail.day}: {avail.status === "available" ? "IN" : avail.status.toUpperCase()}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        
-                        {staff.availability.length > 0 && (
-                          <div className="flex gap-1 flex-wrap">
-                            {staff.availability.map((avail, dayIdx) => (
-                              <Badge 
-                                key={dayIdx} 
-                                variant={avail.status === "available" ? "default" : avail.status === "rest" ? "secondary" : "destructive"}
-                                className="font-mono text-[9px] px-1.5 py-0 h-5"
-                              >
-                                {avail.day}: {avail.status === "available" ? "IN" : avail.status.toUpperCase()}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
 
-                  {isImporting && (
-                    <div className="space-y-2 pt-4 border-t">
-                      <div className="flex justify-between text-xs font-mono">
-                        <span>Importing staff and availability...</span>
-                        <span>{importedCount} / {parsedStaff.length}</span>
-                      </div>
-                      <Progress value={importProgress} />
-                    </div>
+                  {updateMode && matchedStaff.size < parsedStaff.length && (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-xs font-mono">
+                        {parsedStaff.length - matchedStaff.size} staff will be skipped (not found in database). 
+                        Turn off "Update Mode" to create them as new staff.
+                      </AlertDescription>
+                    </Alert>
                   )}
                   
                   <Button
                     onClick={handleImport}
-                    disabled={isImporting || !weekStartDate}
+                    disabled={isImporting || !weekStartDate || (updateMode && matchedStaff.size === 0)}
                     className="w-full mt-4"
                     size="lg"
                   >
                     <Upload className="h-4 w-4 mr-2" />
-                    {isImporting ? "Importing..." : `Import ${parsedStaff.length} Staff with Availability`}
+                    {isImporting 
+                      ? "Importing..." 
+                      : updateMode 
+                        ? `Update Availability for ${matchedStaff.size} Matched Staff`
+                        : `Import ${parsedStaff.length} Staff with Availability`
+                    }
                   </Button>
                 </CardContent>
               </Card>
