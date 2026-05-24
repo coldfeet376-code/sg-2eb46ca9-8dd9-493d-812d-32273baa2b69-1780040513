@@ -622,6 +622,51 @@ export default function StaffPage() {
       <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
 
       <div className="space-y-6">
+        {/* FORCE RELOAD - Clear all caches and reload with fresh code */}
+        <Alert className="bg-destructive/10 border-destructive/50 border-2">
+          <AlertCircle className="h-5 w-5 text-destructive" />
+          <AlertDescription className="space-y-3">
+            <div className="font-bold text-destructive text-base">
+              🔴 MOBILE CACHE ISSUE DETECTED
+            </div>
+            <div className="text-sm">
+              Your browser is showing old code. Tap the button below to force download the latest version:
+            </div>
+            <Button
+              variant="destructive"
+              size="lg"
+              className="w-full font-bold text-base"
+              onClick={async () => {
+                toast({ title: "🧹 Clearing cache...", description: "Page will reload in 1 second" });
+                
+                // Clear service worker caches
+                if ('serviceWorker' in navigator && 'caches' in window) {
+                  try {
+                    const cacheNames = await caches.keys();
+                    await Promise.all(cacheNames.map(name => caches.delete(name)));
+                    console.log('✅ Service worker caches cleared');
+                  } catch (e) {
+                    console.error('Cache clear error:', e);
+                  }
+                }
+                
+                // Clear React Query cache
+                queryClient.clear();
+                
+                // Force hard reload with cache bypass - add timestamp to URL
+                setTimeout(() => {
+                  window.location.href = window.location.pathname + '?cache_bust=' + Date.now();
+                }, 1000);
+              }}
+            >
+              🧹 TAP HERE TO FORCE RELOAD WITH NEW CODE
+            </Button>
+            <div className="text-xs text-muted-foreground">
+              This will clear all caches and force your browser to download the latest JavaScript with the .range(0, 50000) fix.
+            </div>
+          </AlertDescription>
+        </Alert>
+
         {/* CRITICAL DEBUG BANNER - Shows what Supabase actually returned */}
         {staff.length > 0 && (
           <Alert className="bg-red-50 border-red-300 border-2">
@@ -709,30 +754,6 @@ export default function StaffPage() {
             </p>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="destructive"
-              onClick={async () => {
-                toast({ title: "🧹 Clearing ALL caches...", description: "This will force reload the app" });
-                
-                // Clear service worker caches
-                if ('serviceWorker' in navigator && 'caches' in window) {
-                  const cacheNames = await caches.keys();
-                  await Promise.all(cacheNames.map(name => caches.delete(name)));
-                  console.log('✅ Service worker caches cleared');
-                }
-                
-                // Clear React Query cache
-                queryClient.clear();
-                
-                // Force hard reload with cache bypass
-                setTimeout(() => {
-                  window.location.reload();
-                }, 500);
-              }}
-              className="font-sans font-medium"
-            >
-              🧹 Clear Cache & Reload
-            </Button>
             <Button
               variant="outline"
               onClick={async () => {
