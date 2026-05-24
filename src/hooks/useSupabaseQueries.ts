@@ -251,3 +251,27 @@ export function useDeleteAvailability() {
     },
   });
 }
+
+// Generic Mutation Hook for arbitrary tables
+export function useSupabaseMutation(table: string, type: "insert" | "update" | "delete") {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: any) => {
+      let result;
+      if (type === "insert") {
+        result = await supabase.from(table).insert(payload).select().single();
+      } else if (type === "update") {
+        result = await supabase.from(table).update(payload.updates).eq("id", payload.id).select().single();
+      } else {
+        result = await supabase.from(table).delete().eq("id", payload.id);
+      }
+
+      if (result.error) throw result.error;
+      return result.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [table] });
+    },
+  });
+}
