@@ -10,6 +10,7 @@ import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 import { AuditProvider } from "@/contexts/AuditContext";
 import { authService } from "@/services/authService";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
