@@ -113,21 +113,29 @@ export default function ImportPage() {
       
       for (const { index, date } of dateColumns) {
         if (index < cells.length) {
-          const statusText = cells[index]?.trim().toUpperCase();
+          const statusText = cells[index]?.trim().toUpperCase() || "";
           let status: AvailabilityType = "available";
 
-          if (statusText === "REST") {
+          // More robust pattern matching for statuses
+          if (statusText === "REST" || statusText === "R" || statusText.startsWith("REST")) {
             status = "rest";
-          } else if (statusText === "HOLIDAY") {
+          } else if (statusText === "HOLIDAY" || statusText === "HOL" || statusText.startsWith("HOLIDAY")) {
             status = "holiday";
-          } else if (statusText === "SICK" || statusText === "LEAVE" || statusText === "ABSENT") {
+          } else if (
+            statusText === "SICK" || 
+            statusText === "LEAVE" || 
+            statusText === "ABSENT" || 
+            statusText === "UNION" ||
+            statusText.startsWith("SICK") ||
+            statusText.startsWith("LEAVE")
+          ) {
             status = "sick";
+          } else if (statusText === "IN" || statusText === "WORK" || statusText === "") {
+            status = "available";
           }
 
-          // Only store non-available days
-          if (status !== "available") {
-            availability.push({ date, status });
-          }
+          // Store ALL days (including available) for preview purposes
+          availability.push({ date, status });
         }
       }
 
@@ -162,18 +170,17 @@ export default function ImportPage() {
       const matchCount = matches.size;
       const unmatchedCount = newStaff.length - matchCount;
       const totalDays = dateColumns.length;
+      
+      // Count total unavailable days across all staff
+      const totalUnavailableDays = newStaff.reduce((sum, s) => 
+        sum + s.availability.filter(a => a.status !== "available").length, 0
+      );
 
       toast({
         title: "Data parsed successfully",
         description: updateMode 
-          ? `Found ${newStaff.length} staff (${matchCount} matched, ${unmatchedCount} not found) with ${totalDays} days of availability`
-          : `Found ${newStaff.length} staff with ${totalDays} days of availability data`,
-      });
-    } else {
-      toast({
-        title: "No staff found",
-        description: "Could not parse staff data. Ensure format: Name [tab] Start [tab] End [tab] Phone [tab] Statuses...",
-        variant: "destructive",
+          ? `Found ${newStaff.length} staff (${matchCount} matched, ${unmatchedCount} not found) - ${totalUnavailableDays} total unavailable days across ${totalDays} days`
+          : `Found ${newStaff.length} staff with ${totalUnavailableDays} total unavailable days across ${totalDays} days`,
       });
     }
   };
@@ -209,15 +216,26 @@ export default function ImportPage() {
           staffId = newStaff.id;
         }
         
-        // Create availability entries
+        // Create availability entries (only for non-available days)
+        let importedAvailCount = 0;
         for (const avail of staff.availability) {
-          await createAvailabilityMutation.mutateAsync({
-            staff_id: staffId,
-            date: avail.date,
-            type: avail.status,
-          } as any);
+          // Only import non-available days (REST/Holiday/Sick)
+          if (avail.status !== "available") {
+            try {
+              await createAvailabilityMutation.mutateAsync({
+                staff_id: staffId,
+                date: avail.date,
+                type: avail.status,
+              } as any);
+              importedAvailCount++;
+            } catch (error: any) {
+              // Log but continue - might be duplicate entry
+              console.warn(`Duplicate or error for ${staff.name} on ${avail.date}: ${error.message}`);
+            }
+          }
         }
         
+        console.log(`✓ ${staff.name}: imported ${importedAvailCount} unavailable days`);
         successCount++;
         setImportedCount(successCount);
       } catch (error) {
@@ -230,11 +248,16 @@ export default function ImportPage() {
 
     setIsImporting(false);
     setImportComplete(true);
+    
+    const totalImportedDays = parsedStaff.reduce((sum, s) => 
+      sum + s.availability.filter(a => a.status !== "available").length, 0
+    );
+    
     toast({
       title: "Import complete",
       description: updateMode 
-        ? `Updated availability for ${successCount} existing staff`
-        : `Successfully imported ${successCount} staff with availability data`,
+        ? `Updated ${totalImportedDays} availability entries for ${successCount} staff members`
+        : `Successfully imported ${successCount} staff with ${totalImportedDays} availability entries`,
     });
   };
 
@@ -337,6 +360,10 @@ export default function ImportPage() {
                         {parsedStaff.slice(0, 10).map((staff, idx) => {
                           const isMatched = matchedStaff.has(staff.name);
                           const willBeSkipped = updateMode && !isMatched;
+                          const unavailableDays = staff.availability.filter(a => a.status !== "available");
+                          const restDays = unavailableDays.filter(a => a.status === "rest").length;
+                          const holidayDays = unavailableDays.filter(a => a.status === "holiday").length;
+                          const sickDays = unavailableDays.filter(a => a.status === "sick").length;
                           
                           return (
                             <div 
@@ -373,8 +400,26 @@ export default function ImportPage() {
                                 </div>
                               </div>
                               
-                              <div className="text-[10px] text-muted-foreground font-mono">
-                                {staff.availability.length} unavailable days (Rest/Holiday/Sick)
+                              <div className="flex gap-1 flex-wrap items-center">
+                                <span className="text-[10px] text-muted-foreground font-mono">Unavailable:</span>
+                                {restDays > 0 && (
+                                  <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4">
+                                    {restDays} REST
+                                  </Badge>
+                                )}
+                                {holidayDays > 0 && (
+                                  <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4 bg-orange-500">
+                                    {holidayDays} HOLIDAY
+                                  </Badge>
+                                )}
+                                {sickDays > 0 && (
+                                  <Badge variant="destructive" className="text-[9px] px-1.5 py-0 h-4">
+                                    {sickDays} SICK
+                                  </Badge>
+                                )}
+                                {unavailableDays.length === 0 && (
+                                  <span className="text-[10px] text-muted-foreground font-mono">None (all available)</span>
+                                )}
                               </div>
                             </div>
                           );
