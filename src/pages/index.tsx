@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Layout } from "@/components/Layout";
+import { useRouter } from "next/router";
+import Layout from "@/components/Layout";
+import SEO from "@/components/SEO";
+import { FairnessMeter } from "@/components/rota/FairnessMeter";
+import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +17,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SEO } from "@/components/SEO";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
 import { generateStaffRotaPDF } from "@/lib/pdfGenerator";
@@ -87,6 +90,13 @@ export default function Home() {
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<RealtimeChannel | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(getWeekStart(new Date()));
+  const [smartAssignDialog, setSmartAssignDialog] = useState<{
+    open: boolean;
+    task: Task | null;
+    date: string;
+  }>({ open: false, task: null, date: "" });
 
   // React Query hooks - cached data with error handling
   const { data: staff = [], isLoading: staffLoading, error: staffError } = useStaff();
@@ -1388,6 +1398,24 @@ export default function Home() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {activeTab === "rota" && (
+          <div className="space-y-4">
+            <RotaWeekNavigator
+              selectedWeekStart={selectedWeekStart}
+              onWeekChange={setSelectedWeekStart}
+            />
+
+            {/* Fairness Meter */}
+            {staff.length > 0 && assignments.length > 0 && (
+              <FairnessMeter
+                staff={staff}
+                assignments={assignments}
+                weekStart={selectedWeekStart}
+              />
+            )}
+          </div>
         )}
 
         {/* Recent Changes Panel */}
