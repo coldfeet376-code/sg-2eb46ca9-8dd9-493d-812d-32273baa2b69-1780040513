@@ -154,6 +154,29 @@ export function generateWeeklyRota({
 
   console.log(`📊 Week overview: ${totalSlotsNeeded} total slots, ${lockedSlots} locked, ${availableSlotsToFill} to fill`);
 
+  // Define task priority - higher priority tasks are filled first
+  const getTaskPriority = (task: Task): number => {
+    if (task === "Frozen") return 1; // Specialized training
+    if (task === "Inbound") return 1; // Early shift must be covered first
+    if (task === "Inbound Late") return 2; // Late shift fills after early
+    if (task === "Milk") return 3;
+    if (task === "TWI") return 3;
+    if (task === "Outbound") return 3;
+    if (task === "Marshaling") return 3;
+    if (task === "Housekeeping") return 4; // Lowest priority
+    return 5;
+  };
+
+  // Sort tasks by priority for processing order
+  const taskOrder = Object.keys(taskConfig).sort((a, b) => {
+    const aPriority = getTaskPriority(a as Task);
+    const bPriority = getTaskPriority(b as Task);
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    return a.localeCompare(b); // Alphabetical for same priority
+  });
+
+  console.log("📋 Task processing order:", taskOrder.join(" → "));
+
   // Calculate how many working days each staff member has
   const staffWorkingDays: Record<string, number> = {};
   staff.forEach(s => {
@@ -197,8 +220,8 @@ export function generateWeeklyRota({
     currentDate.setDate(currentDate.getDate() + dayIndex);
     const dateStr = currentDate.toISOString().split("T")[0];
 
-    // For each task on this day
-    for (const taskName of Object.keys(taskConfig)) {
+    // For each task on this day (in priority order)
+    for (const taskName of taskOrder) {
       const task = taskName as Task;
       const required = taskConfig[task][dayIndex] || 0;
       if (required === 0) continue;
@@ -259,8 +282,8 @@ export function generateWeeklyRota({
     currentDate.setDate(currentDate.getDate() + dayIndex);
     const dateStr = currentDate.toISOString().split("T")[0];
 
-    // Process each task
-    for (const taskName of Object.keys(taskConfig)) {
+    // Process each task (in priority order - Inbound before Inbound Late)
+    for (const taskName of taskOrder) {
       const task = taskName as Task;
       const required = taskConfig[task][dayIndex] || 0;
       if (required === 0) continue;
