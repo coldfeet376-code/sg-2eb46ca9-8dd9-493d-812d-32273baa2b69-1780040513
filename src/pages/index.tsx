@@ -76,7 +76,17 @@ interface TaskConfig {
 
 export default function Home() {
   const router = useRouter();
-  const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
+  
+  // Safe date initialization with fallback
+  const [weekStart, setWeekStart] = useState<Date>(() => {
+    try {
+      return getWeekStart(new Date());
+    } catch (e) {
+      console.error("Error initializing week start:", e);
+      return new Date();
+    }
+  });
+  
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [lockedAssignments, setLockedAssignments] = useState<Assignment[]>([]);
   const [history, setHistory] = useState<RotaSnapshot[]>([]);
@@ -107,11 +117,17 @@ export default function Home() {
   
   // Calculate week dates early - needed by multiple functions
   const weekDates = useMemo(() => {
-    return DAYS.map((_, i) => {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
-      return date;
-    });
+    try {
+      if (!weekStart) return [];
+      return DAYS.map((_, i) => {
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + i);
+        return date;
+      });
+    } catch (e) {
+      console.error("Error calculating week dates:", e);
+      return [];
+    }
   }, [weekStart]);
   
   // Sync taskConfig to local state for editing
@@ -140,17 +156,21 @@ export default function Home() {
   }, [taskConfig, configLoading, configError]);
 
   useEffect(() => {
-    // Load locked assignments and history from localStorage
-    const savedLocked = localStorage.getItem("warehouse-locked-assignments");
-    const savedHistory = localStorage.getItem("warehouse-rota-history");
-    
-    if (savedLocked) {
-      const parsed = JSON.parse(savedLocked);
-      setLockedAssignments(parsed);
-    }
-    if (savedHistory) {
-      const parsed = JSON.parse(savedHistory);
-      setHistory(parsed);
+    try {
+      // Load locked assignments and history from localStorage
+      const savedLocked = localStorage.getItem("warehouse-locked-assignments");
+      const savedHistory = localStorage.getItem("warehouse-rota-history");
+      
+      if (savedLocked) {
+        const parsed = JSON.parse(savedLocked);
+        setLockedAssignments(parsed);
+      }
+      if (savedHistory) {
+        const parsed = JSON.parse(savedHistory);
+        setHistory(parsed);
+      }
+    } catch (e) {
+      console.error("Error loading from localStorage:", e);
     }
   }, []);
 
