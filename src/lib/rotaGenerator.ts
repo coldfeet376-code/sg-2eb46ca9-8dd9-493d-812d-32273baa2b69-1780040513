@@ -15,7 +15,7 @@ export function generateWeeklyRota({
   weekStart: Date;
   lockedAssignments?: Assignment[];
 }): Assignment[] {
-  console.log("generateWeeklyRota called with:", {
+  console.log("🔄 generateWeeklyRota called with:", {
     staffCount: staff.length,
     staffNames: staff.map(s => s.name),
     taskConfig: Object.keys(taskConfig),
@@ -29,13 +29,8 @@ export function generateWeeklyRota({
   const staffAssignmentCounts: Record<string, number> = {};
   // Track what task each staff member did on each date
   const staffTasksByDate: Record<string, Record<string, Task>> = {};
-  
-  // NEW: Track how many times each staff member has done each specific task
+  // Track how many times each staff member has done each specific task
   const staffTaskCounts: Record<string, Record<Task, number>> = {};
-  
-  // NEW: Track Inbound assignments for 06:00 shift staff based on working days
-  const earlyShiftInboundCount: Record<string, number> = {};
-  const earlyShiftWorkingDays: Record<string, number> = {};
   
   staff.forEach((s) => {
     staffAssignmentCounts[s.id] = 0;
@@ -50,45 +45,18 @@ export function generateWeeklyRota({
       "Marshaling": 0,
       "Housekeeping": 0,
     };
-    
-    // For 06:00 shift staff, calculate working days in the week
-    if (s.shiftStart === "06:00") {
-      earlyShiftInboundCount[s.id] = 0;
-      
-      // Count working days (days without rest/holiday/sick)
-      let workingDays = 0;
-      for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-        const currentDate = new Date(weekStart);
-        currentDate.setDate(currentDate.getDate() + dayIndex);
-        const dateStr = currentDate.toISOString().split("T")[0];
-        
-        const availability = s.availability?.find((a) => a.date === dateStr);
-        if (!availability || availability.type === "available") {
-          workingDays++;
-        }
-      }
-      
-      earlyShiftWorkingDays[s.id] = workingDays;
-    }
   });
 
   // Count existing locked assignments and populate task history
   lockedAssignments.forEach((a) => {
-    // Fallback to finding staffId by name for backward compatibility with older locked assignments
     const staffMember = staff.find((s) => s.name === a.staffName);
     const staffId = a.staffId || staffMember?.id;
     if (staffId) {
       staffAssignmentCounts[staffId] = (staffAssignmentCounts[staffId] || 0) + 1;
       staffTasksByDate[staffId][a.date] = a.task as Task;
       
-      // Track task-specific counts
       if (staffTaskCounts[staffId]) {
         staffTaskCounts[staffId][a.task as Task] = (staffTaskCounts[staffId][a.task as Task] || 0) + 1;
-      }
-      
-      // Count existing Inbound assignments for 06:00 shift staff
-      if (a.task === "Inbound" && staffMember?.shiftStart === "06:00") {
-        earlyShiftInboundCount[staffId] = (earlyShiftInboundCount[staffId] || 0) + 1;
       }
     }
   });
@@ -101,127 +69,235 @@ export function generateWeeklyRota({
     return acc;
   }, {} as Record<ShiftStart, StaffMember[]>);
 
-  // Define shift priorities (earlier shifts get priority for task assignment)
+  // Define shift priorities
   const shiftOrder: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
 
-  // Process each day
+  // Helper: Get available staff for a specific task/day
+  const getAvailableStaff = (task: Task, dateStr: string, dayIndex: number): StaffMember[] => {
+    const allStaff: StaffMember[] = [];
+    
+    for (const shift of shiftOrder) {
+      const shiftStaff = staffByShift[shift] || [];
+      
+      const available = shiftStaff.filter((s) => {
+        // Must be trained for the task
+        const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
+        if (!s.trainedTasks.includes(taskToCheck)) return false;
+        
+        // Shift time filtering
+        if (task === "Inbound") {
+          if (s.shiftStart !== "06:00") return false;
+        } else if (task === "Inbound Late") {
+          if (!["09:00", "10:00", "11:00"].includes(s.shiftStart || "06:00")) return false;
+        }
+
+        // Check if already assigned on this day
+        const alreadyAssigned = assignments.some(
+          (a) => a.staffId === s.id && a.date === dateStr
+        );
+        if (alreadyAssigned) return false;
+
+        // Check availability
+        const availability = s.availability?.find((a) => a.date === dateStr);
+        if (availability && availability.type !== "available") return false;
+
+        return true;
+      });
+
+      allStaff.push(...available.map(s => ({ ...s, shift: shift as ShiftStart })));
+    }
+
+    return allStaff;
+  };
+
+  // Helper: Check if assigning this task would violate consecutive task rule
+  const wouldViolateConsecutive = (staffId: string, task: Task, dateStr: string): boolean => {
+    const currentDate = new Date(dateStr);
+    
+    // Check previous day
+    const prevDate = new Date(currentDate);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const prevDateStr = prevDate.toISOString().split("T")[0];
+    const prevTask = staffTasksByDate[staffId]?.[prevDateStr];
+    
+    // Special rule for Inbound: never allow consecutive
+    if (task === "Inbound" || task === "Inbound Late") {
+      if (prevTask === "Inbound" || prevTask === "Inbound Late") return true;
+    }
+    
+    // General rule: avoid same task on consecutive days
+    if (prevTask === task) return true;
+    
+    // Check next day to avoid creating a consecutive assignment
+    const nextDate = new Date(currentDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    const nextDateStr = nextDate.toISOString().split("T")[0];
+    const nextTask = staffTasksByDate[staffId]?.[nextDateStr];
+    
+    if (task === "Inbound" || task === "Inbound Late") {
+      if (nextTask === "Inbound" || nextTask === "Inbound Late") return true;
+    }
+    
+    if (nextTask === task) return true;
+    
+    return false;
+  };
+
+  // Calculate total slots needed for the week
+  const totalSlotsNeeded = Object.entries(taskConfig).reduce((total, [task, days]) => {
+    const taskTotal = days.reduce((sum, count) => sum + count, 0);
+    return total + taskTotal;
+  }, 0);
+
+  const lockedSlots = lockedAssignments.length;
+  const availableSlotsToFill = totalSlotsNeeded - lockedSlots;
+
+  console.log(`📊 Week overview: ${totalSlotsNeeded} total slots, ${lockedSlots} locked, ${availableSlotsToFill} to fill`);
+
+  // Calculate how many working days each staff member has
+  const staffWorkingDays: Record<string, number> = {};
+  staff.forEach(s => {
+    let workingDays = 0;
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(weekStart);
+      date.setDate(date.getDate() + d);
+      const dateStr = date.toISOString().split("T")[0];
+      
+      const availability = s.availability?.find(a => a.date === dateStr);
+      if (!availability || availability.type === "available") {
+        workingDays++;
+      }
+    }
+    staffWorkingDays[s.id] = workingDays;
+  });
+
+  console.log("👥 Staff working days:", Object.entries(staffWorkingDays).map(([id, days]) => {
+    const s = staff.find(x => x.id === id);
+    return `${s?.name}: ${days} days`;
+  }).join(", "));
+
+  // ============================================
+  // PHASE 1: GUARANTEED MINIMUM ASSIGNMENTS
+  // ============================================
+  console.log("📍 PHASE 1: Ensuring everyone gets at least 1 assignment...");
+
+  // Get staff who need assignments (excluding those already locked to full capacity)
+  const staffNeedingAssignments = staff.filter(s => {
+    const currentCount = staffAssignmentCounts[s.id] || 0;
+    const workingDays = staffWorkingDays[s.id] || 0;
+    // If they have fewer assignments than working days, they need more
+    return currentCount === 0 && workingDays > 0;
+  });
+
+  console.log(`  ${staffNeedingAssignments.length} staff need their first assignment`);
+
+  // Process each day to ensure round-robin distribution
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
     const currentDate = new Date(weekStart);
     currentDate.setDate(currentDate.getDate() + dayIndex);
     const dateStr = currentDate.toISOString().split("T")[0];
 
-    // Get previous day's date for checking consecutive tasks
-    const prevDate = new Date(currentDate);
-    prevDate.setDate(prevDate.getDate() - 1);
-    const prevDateStr = prevDate.toISOString().split("T")[0];
-
-    // taskConfig format: { "Frozen": [1,2,3,4,5,6,7], "Milk": [2,3,4,5,6,7,8], ... }
-    // Process each task
+    // For each task on this day
     for (const taskName of Object.keys(taskConfig)) {
       const task = taskName as Task;
-      const dayRequirements = taskConfig[task];
-      if (!dayRequirements || !Array.isArray(dayRequirements)) continue;
-      
-      const required = dayRequirements[dayIndex] || 0;
+      const required = taskConfig[task][dayIndex] || 0;
       if (required === 0) continue;
 
-      // Skip if already have locked assignments for this task/day
       const existingCount = assignments.filter(
         (a) => a.date === dateStr && a.task === task
       ).length;
-
       const needed = required - existingCount;
       if (needed <= 0) continue;
 
-      // Try to assign from each shift in order, distributing fairly
-      const availableByShift: Record<string, StaffMember[]> = {};
-
-      // First, collect available staff from each shift
-      for (const shift of shiftOrder) {
-        const shiftStaff = staffByShift[shift] || [];
-        
-        const available = shiftStaff.filter((s) => {
-          // Must be trained for the task
-          // For Inbound Late, staff must be trained in regular "Inbound"
-          const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
-          if (!s.trainedTasks.includes(taskToCheck)) return false;
+      // Get available staff for this task/day
+      const available = getAvailableStaff(task, dateStr, dayIndex);
+      
+      // Prioritize staff with zero assignments
+      const zeroAssignmentStaff = available.filter(s => staffAssignmentCounts[s.id] === 0);
+      
+      if (zeroAssignmentStaff.length > 0) {
+        // Sort by: no consecutive tasks > trained tasks count (versatility)
+        const sorted = zeroAssignmentStaff.sort((a, b) => {
+          const aViolates = wouldViolateConsecutive(a.id, task, dateStr);
+          const bViolates = wouldViolateConsecutive(b.id, task, dateStr);
+          if (aViolates && !bViolates) return 1;
+          if (!aViolates && bViolates) return -1;
           
-          // Shift time filtering for Inbound vs Inbound Late
-          if (task === "Inbound") {
-            // Early Inbound: only 06:00 starters
-            if (s.shiftStart !== "06:00") return false;
-          } else if (task === "Inbound Late") {
-            // Late Inbound: 09:00, 10:00, 11:00 starters
-            if (!["09:00", "10:00", "11:00"].includes(s.shiftStart || "06:00")) return false;
-          }
-
-          // Check if already assigned on this day
-          const alreadyAssigned = assignments.some(
-            (a) => a.staffId === s.id && a.date === dateStr
-          );
-          if (alreadyAssigned) return false;
-
-          // Check availability
-          const availability = s.availability?.find((a) => a.date === dateStr);
-          if (availability && availability.type !== "available") return false;
-
-          return true;
+          // Prefer more versatile staff (trained on more tasks)
+          return b.trainedTasks.length - a.trainedTasks.length;
         });
 
-        if (available.length > 0) {
-          availableByShift[shift] = available;
+        // Assign as many zero-assignment staff as possible
+        const toAssign = Math.min(needed, sorted.length);
+        for (let i = 0; i < toAssign; i++) {
+          const selectedStaff = sorted[i];
+          assignments.push({
+            staffId: selectedStaff.id,
+            staffName: selectedStaff.name,
+            task: task,
+            date: dateStr,
+          });
+          
+          staffAssignmentCounts[selectedStaff.id]++;
+          staffTasksByDate[selectedStaff.id][dateStr] = task;
+          staffTaskCounts[selectedStaff.id][task]++;
+          
+          console.log(`  ✓ Assigned ${selectedStaff.name} to ${task} on ${dateStr} (first assignment)`);
         }
       }
+    }
+  }
 
-      // Distribute assignments across shifts proportionally
-      const allAvailable = Object.entries(availableByShift).flatMap(([shift, staffList]) =>
-        staffList.map(s => ({ ...s, shift: shift as ShiftStart }))
-      );
+  // ============================================
+  // PHASE 2: FILL REMAINING SLOTS WITH FAIRNESS
+  // ============================================
+  console.log("📍 PHASE 2: Filling remaining slots with fairness algorithm...");
 
-      if (allAvailable.length === 0) continue;
+  // Process each day again to fill remaining capacity
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    const currentDate = new Date(weekStart);
+    currentDate.setDate(currentDate.getDate() + dayIndex);
+    const dateStr = currentDate.toISOString().split("T")[0];
 
-      // Randomize within each shift group, then sort by fairness
-      const shuffled = allAvailable.sort(() => Math.random() - 0.5);
+    // Process each task
+    for (const taskName of Object.keys(taskConfig)) {
+      const task = taskName as Task;
+      const required = taskConfig[task][dayIndex] || 0;
+      if (required === 0) continue;
 
-      // Sort by priority:
-      // 1. Avoid consecutive same task (CRITICAL - prevents burnout)
-      // 2. SPECIAL: For Inbound, NEVER assign if they had Inbound yesterday (hard rule)
-      // 3. Fewest times doing THIS SPECIFIC task (task rotation fairness)
-      // 4. Fewest overall assignments (general fairness)
-      // 5. Shift start time (earlier shifts get slight priority)
-      const sorted = shuffled.sort((a, b) => {
-        // PRIORITY #1: Check what task they did on the previous day
-        const aPrevTask = staffTasksByDate[a.id]?.[prevDateStr];
-        const bPrevTask = staffTasksByDate[b.id]?.[prevDateStr];
-        
-        // SPECIAL RULE FOR INBOUND: Absolute block on consecutive Inbound days (both types)
-        if (task === "Inbound" || task === "Inbound Late") {
-          const aHadInboundYesterday = aPrevTask === "Inbound" || aPrevTask === "Inbound Late";
-          const bHadInboundYesterday = bPrevTask === "Inbound" || bPrevTask === "Inbound Late";
-          
-          // If A had Inbound yesterday but B didn't, B goes first (A is blocked)
-          if (aHadInboundYesterday && !bHadInboundYesterday) return 1;
-          if (!aHadInboundYesterday && bHadInboundYesterday) return -1;
-        }
-        
-        // General rule: If A did this task yesterday but B didn't, B goes first
-        if (aPrevTask === task && bPrevTask !== task) return 1;
-        if (aPrevTask !== task && bPrevTask === task) return -1;
+      const existingCount = assignments.filter(
+        (a) => a.date === dateStr && a.task === task
+      ).length;
+      const needed = required - existingCount;
+      if (needed <= 0) continue;
 
-        // PRIORITY #2: How many times has each person done THIS SPECIFIC task?
-        // This ensures fair rotation through each task type
+      // Get available staff
+      const available = getAvailableStaff(task, dateStr, dayIndex);
+      if (available.length === 0) continue;
+
+      // Sort by fairness criteria
+      const sorted = available.sort((a, b) => {
+        // Priority 1: Avoid consecutive tasks
+        const aViolates = wouldViolateConsecutive(a.id, task, dateStr);
+        const bViolates = wouldViolateConsecutive(b.id, task, dateStr);
+        if (aViolates && !bViolates) return 1;
+        if (!aViolates && bViolates) return -1;
+
+        // Priority 2: Fewest times doing THIS specific task
         const aTaskCount = staffTaskCounts[a.id]?.[task] || 0;
         const bTaskCount = staffTaskCounts[b.id]?.[task] || 0;
         if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
 
-        // PRIORITY #3: Fewest assignments overall (general fairness)
+        // Priority 3: Fewest overall assignments
         const aCount = staffAssignmentCounts[a.id] || 0;
         const bCount = staffAssignmentCounts[b.id] || 0;
         if (aCount !== bCount) return aCount - bCount;
 
-        // PRIORITY #4: Slight preference for earlier shifts
-        const aShiftIndex = shiftOrder.indexOf(a.shift);
-        const bShiftIndex = shiftOrder.indexOf(b.shift);
+        // Priority 4: Earlier shifts get slight preference
+        const shiftA = a.shift || a.shiftStart;
+        const shiftB = b.shift || b.shiftStart;
+        const aShiftIndex = shiftOrder.indexOf(shiftA as ShiftStart);
+        const bShiftIndex = shiftOrder.indexOf(shiftB as ShiftStart);
         return aShiftIndex - bShiftIndex;
       });
 
@@ -236,313 +312,28 @@ export function generateWeeklyRota({
         });
         
         staffAssignmentCounts[selectedStaff.id]++;
-        // Track what task this staff member did on this date
         staffTasksByDate[selectedStaff.id][dateStr] = task;
-        
-        // Track this specific task count for fairness
-        if (staffTaskCounts[selectedStaff.id]) {
-          staffTaskCounts[selectedStaff.id][task] = (staffTaskCounts[selectedStaff.id][task] || 0) + 1;
-        }
+        staffTaskCounts[selectedStaff.id][task]++;
       }
     }
   }
 
-  console.log("generateWeeklyRota completed:", {
+  console.log("✅ generateWeeklyRota completed:", {
     totalAssignments: assignments.length,
-    assignmentsByStaff: assignments.reduce((acc, a) => {
-      acc[a.staffName] = (acc[a.staffName] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>)
+    assignmentsByStaff: Object.entries(staffAssignmentCounts).map(([id, count]) => {
+      const s = staff.find(x => x.id === id);
+      return `${s?.name}: ${count}`;
+    }).join(", ")
   });
 
-  // CONSTRAINT ENFORCEMENT: Ensure minimum assignments
-  console.log("🔒 Enforcing minimum assignment constraints...");
-  
-  // Rule 1: All Frozen-trained staff must get at least 2 Frozen shifts per week
-  const frozenTrainedStaff = staff.filter(s => 
-    s.trainedTasks.includes("Frozen") && 
-    !s.availability.some(a => 
-      a.date >= weekStart.toISOString().split('T')[0] && 
-      a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0] &&
-      a.type !== "available"
-    )
-  );
-
-  frozenTrainedStaff.forEach(staffMember => {
-    const frozenAssignments = assignments.filter(a => 
-      a.staffId === staffMember.id && 
-      a.task === "Frozen" &&
-      a.date >= weekStart.toISOString().split('T')[0] &&
-      a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0]
-    );
-
-    if (frozenAssignments.length < 2) {
-      const needed = 2 - frozenAssignments.length;
-      console.log(`  ⚠️ ${staffMember.name} needs ${needed} more Frozen shift(s) - searching for opportunities...`);
-      
-      // Find days where this staff member could be assigned to Frozen
-      for (let d = 0; d < 7; d++) {
-        if (frozenAssignments.length >= 2) break;
-        
-        const checkDate = new Date(weekStart);
-        checkDate.setDate(checkDate.getDate() + d);
-        const dateStr = checkDate.toISOString().split("T")[0];
-        
-        // Check if already assigned on this day
-        const alreadyAssigned = assignments.some(a => a.staffId === staffMember.id && a.date === dateStr);
-        if (alreadyAssigned) continue;
-        
-        // Check availability
-        const unavailable = staffMember.availability.some(a => 
-          a.date === dateStr && 
-          a.type !== "available"
-        );
-        if (unavailable) continue;
-        
-        // Check if Frozen needs more staff on this day
-        const frozenNeeded = taskConfig["Frozen"][d];
-        const frozenAssigned = assignments.filter(a => a.date === dateStr && a.task === "Frozen").length;
-        
-        if (frozenAssigned < frozenNeeded) {
-          // Add assignment
-          assignments.push({
-            staffId: staffMember.id,
-            staffName: staffMember.name,
-            task: "Frozen",
-            date: dateStr,
-          });
-          frozenAssignments.push(assignments[assignments.length - 1]);
-          console.log(`    ✓ Added ${staffMember.name} to Frozen on ${dateStr}`);
-        }
-      }
-    }
-  });
-
-  // Rule 2: Staff trained on Frozen who work 5 days must get at least 2 Inbound shifts per week
-  const frozenFiveDayWorkers = staff.filter(s => {
-    // Must be trained on Frozen
-    if (!s.trainedTasks.includes("Frozen")) return false;
-    
-    // Must be trained on Inbound
-    if (!s.trainedTasks.includes("Inbound")) return false;
-    
-    // Count how many days they're NOT unavailable this week
-    const weekDates = Array.from({ length: 7 }, (_, d) => {
-      const date = new Date(weekStart);
-      date.setDate(date.getDate() + d);
-      return date.toISOString().split('T')[0];
-    });
-    
-    const unavailableDays = weekDates.filter(date => 
-      s.availability.some(a => 
-        a.date === date && 
-        a.type !== "available"
-      )
-    ).length;
-    
-    const workingDays = 7 - unavailableDays;
-    return workingDays >= 5;
-  });
-
-  frozenFiveDayWorkers.forEach(staffMember => {
-    // Count BOTH Inbound and Inbound Late assignments
-    const inboundAssignments = assignments.filter(a => 
-      a.staffId === staffMember.id && 
-      (a.task === "Inbound" || a.task === "Inbound Late") &&
-      a.date >= weekStart.toISOString().split('T')[0] &&
-      a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0]
-    );
-
-    if (inboundAssignments.length < 2) {
-      const needed = 2 - inboundAssignments.length;
-      console.log(`  ⚠️ ${staffMember.name} (Frozen-trained 5-day worker) needs ${needed} more Inbound shift(s)...`);
-      
-      // Find days where this staff member could be assigned to Inbound
-      for (let d = 0; d < 7; d++) {
-        if (inboundAssignments.length >= 2) break;
-        
-        const checkDate = new Date(weekStart);
-        checkDate.setDate(checkDate.getDate() + d);
-        const dateStr = checkDate.toISOString().split("T")[0];
-        
-        // Check if already assigned on this day
-        const alreadyAssigned = assignments.some(a => a.staffId === staffMember.id && a.date === dateStr);
-        if (alreadyAssigned) continue;
-        
-        // CRITICAL: Check if they had Inbound (either type) on the previous day (NO CONSECUTIVE INBOUND)
-        const prevDate = new Date(checkDate);
-        prevDate.setDate(prevDate.getDate() - 1);
-        const prevDateStr = prevDate.toISOString().split("T")[0];
-        const hadInboundYesterday = assignments.some(a => 
-          a.staffId === staffMember.id && 
-          a.date === prevDateStr && 
-          (a.task === "Inbound" || a.task === "Inbound Late")
-        );
-        if (hadInboundYesterday) {
-          console.log(`    ✗ Skipping ${dateStr} - ${staffMember.name} had Inbound on ${prevDateStr} (no consecutive)`);
-          continue;
-        }
-        
-        // Also check next day to avoid creating consecutive Inbound
-        const nextDate = new Date(checkDate);
-        nextDate.setDate(nextDate.getDate() + 1);
-        const nextDateStr = nextDate.toISOString().split("T")[0];
-        const hasInboundTomorrow = assignments.some(a => 
-          a.staffId === staffMember.id && 
-          a.date === nextDateStr && 
-          (a.task === "Inbound" || a.task === "Inbound Late")
-        );
-        if (hasInboundTomorrow) {
-          console.log(`    ✗ Skipping ${dateStr} - ${staffMember.name} has Inbound on ${nextDateStr} (no consecutive)`);
-          continue;
-        }
-        
-        // Check availability
-        const unavailable = staffMember.availability.some(a => 
-          a.date === dateStr && 
-          a.type !== "available"
-        );
-        if (unavailable) continue;
-        
-        // Try to assign to either Inbound or Inbound Late based on their shift time
-        const isEarlyStarter = staffMember.shiftStart === "06:00";
-        const isLateStarter = ["09:00", "10:00", "11:00"].includes(staffMember.shiftStart);
-        
-        let assigned = false;
-        
-        // Try Inbound first if early starter
-        if (isEarlyStarter) {
-          const inboundNeeded = taskConfig["Inbound"]?.[d] || 0;
-          const inboundAssigned = assignments.filter(a => a.date === dateStr && a.task === "Inbound").length;
-          
-          if (inboundAssigned < inboundNeeded) {
-            assignments.push({
-              staffId: staffMember.id,
-              staffName: staffMember.name,
-              task: "Inbound",
-              date: dateStr,
-            });
-            inboundAssignments.push(assignments[assignments.length - 1]);
-            console.log(`    ✓ Added ${staffMember.name} to Inbound on ${dateStr}`);
-            assigned = true;
-          }
-        }
-        
-        // Try Inbound Late if late starter or if early Inbound was full
-        if (!assigned && isLateStarter) {
-          const inboundLateNeeded = taskConfig["Inbound Late"]?.[d] || 0;
-          const inboundLateAssigned = assignments.filter(a => a.date === dateStr && a.task === "Inbound Late").length;
-          
-          if (inboundLateAssigned < inboundLateNeeded) {
-            assignments.push({
-              staffId: staffMember.id,
-              staffName: staffMember.name,
-              task: "Inbound Late",
-              date: dateStr,
-            });
-            inboundAssignments.push(assignments[assignments.length - 1]);
-            console.log(`    ✓ Added ${staffMember.name} to Inbound Late on ${dateStr}`);
-            assigned = true;
-          }
-        }
-      }
-    }
-  });
-
-  // Rule 3: Non-Frozen staff who work 5 days should get at least 2 task assignments for fair distribution
-  const nonFrozenFiveDayWorkers = staff.filter(s => {
-    // Must NOT be trained on Frozen
-    if (s.trainedTasks.includes("Frozen")) return false;
-    
-    // Count how many days they're NOT unavailable this week
-    const weekDates = Array.from({ length: 7 }, (_, d) => {
-      const date = new Date(weekStart);
-      date.setDate(date.getDate() + d);
-      return date.toISOString().split('T')[0];
-    });
-    
-    const unavailableDays = weekDates.filter(date => 
-      s.availability.some(a => 
-        a.date === date && 
-        a.type !== "available"
-      )
-    ).length;
-    
-    const workingDays = 7 - unavailableDays;
-    return workingDays >= 5;
-  });
-
-  nonFrozenFiveDayWorkers.forEach(staffMember => {
-    const weekAssignments = assignments.filter(a => 
-      a.staffId === staffMember.id &&
-      a.date >= weekStart.toISOString().split('T')[0] &&
-      a.date < new Date(new Date(weekStart).setDate(new Date(weekStart).getDate() + 7)).toISOString().split('T')[0]
-    );
-
-    if (weekAssignments.length < 2) {
-      const needed = 2 - weekAssignments.length;
-      console.log(`  ⚠️ ${staffMember.name} (non-Frozen 5-day worker) needs ${needed} more assignment(s) for fairness...`);
-      
-      // Get their trained tasks (excluding Frozen)
-      const availableTasks = staffMember.trainedTasks.filter(t => t !== "Frozen");
-      
-      // Find days where this staff member could be assigned
-      for (let d = 0; d < 7; d++) {
-        if (weekAssignments.length >= 2) break;
-        
-        const checkDate = new Date(weekStart);
-        checkDate.setDate(checkDate.getDate() + d);
-        const dateStr = checkDate.toISOString().split("T")[0];
-        
-        // Check if already assigned on this day
-        const alreadyAssigned = assignments.some(a => a.staffId === staffMember.id && a.date === dateStr);
-        if (alreadyAssigned) continue;
-        
-        // Check availability
-        const unavailable = staffMember.availability.some(a => 
-          a.date === dateStr && 
-          a.type !== "available"
-        );
-        if (unavailable) continue;
-        
-        // Try each task they're trained for
-        let assigned = false;
-        for (const task of availableTasks) {
-          if (assigned) break;
-          
-          // Check previous day to avoid consecutive same task
-          const prevDate = new Date(checkDate);
-          prevDate.setDate(prevDate.getDate() - 1);
-          const prevDateStr = prevDate.toISOString().split("T")[0];
-          const hadSameTaskYesterday = assignments.some(a => 
-            a.staffId === staffMember.id && 
-            a.date === prevDateStr && 
-            a.task === task
-          );
-          if (hadSameTaskYesterday) continue;
-          
-          // Check if task needs more staff on this day
-          const taskNeeded = taskConfig[task]?.[d] || 0;
-          const taskAssigned = assignments.filter(a => a.date === dateStr && a.task === task).length;
-          
-          if (taskAssigned < taskNeeded) {
-            // Add assignment
-            assignments.push({
-              staffId: staffMember.id,
-              staffName: staffMember.name,
-              task: task as Task,
-              date: dateStr,
-            });
-            weekAssignments.push(assignments[assignments.length - 1]);
-            console.log(`    ✓ Added ${staffMember.name} to ${task} on ${dateStr}`);
-            assigned = true;
-          }
-        }
-      }
-    }
-  });
-
-  console.log("✅ Constraint enforcement complete");
+  // Log any staff with zero assignments
+  const zeroAssignments = staff.filter(s => staffAssignmentCounts[s.id] === 0);
+  if (zeroAssignments.length > 0) {
+    console.log("⚠️ Staff with ZERO assignments:", zeroAssignments.map(s => {
+      const workingDays = staffWorkingDays[s.id];
+      return `${s.name} (${workingDays} working days, trained: ${s.trainedTasks.join(", ")})`;
+    }).join(", "));
+  }
 
   return assignments;
 }
@@ -550,7 +341,7 @@ export function generateWeeklyRota({
 export function getWeekStart(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();
-  const diff = day; // Sunday = 0, so no adjustment needed
+  const diff = day;
   d.setDate(d.getDate() - diff);
   d.setHours(0, 0, 0, 0);
   return d;
