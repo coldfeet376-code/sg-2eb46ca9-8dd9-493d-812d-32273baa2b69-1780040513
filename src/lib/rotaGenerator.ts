@@ -84,15 +84,6 @@ export function generateWeeklyRota({
         const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
         if (!s.trainedTasks.includes(taskToCheck)) return false;
         
-        // Shift time filtering
-        if (task === "Inbound") {
-          // Inbound: early/mid shifts (06:00-09:00) ending around 14:00-17:00
-          if (!["06:00", "07:00", "08:00", "08:30", "09:00"].includes(s.shiftStart || "06:00")) return false;
-        } else if (task === "Inbound Late") {
-          // Inbound Late: late shifts (09:30-11:00) ending at 17:30-18:00
-          if (!["09:30", "10:00", "11:00"].includes(s.shiftStart || "06:00")) return false;
-        }
-
         // Check if already assigned on this day
         const alreadyAssigned = assignments.some(
           (a) => a.staffId === s.id && a.date === dateStr
