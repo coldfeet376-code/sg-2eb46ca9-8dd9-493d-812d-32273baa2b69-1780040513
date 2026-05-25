@@ -225,7 +225,8 @@ export function generateWeeklyRota({
       const available = getAvailableStaff(task, dateStr, dayIndex);
       
       // CRITICAL: If only 1-2 staff available for this task, assign immediately
-      if (available.length > 0 && available.length <= 2) {
+      // BUT: Skip "Inbound Late" - it's a subset of Inbound-trained staff and should be filled AFTER Inbound
+      if (task !== "Inbound Late" && available.length > 0 && available.length <= 2) {
         console.log(`  🚨 CRITICAL: Only ${available.length} staff available for ${task} on ${dateStr}: ${available.map(s => s.name).join(", ")}`);
         
         // Sort by: no consecutive tasks > fewest specific task count > fewest overall
