@@ -104,6 +104,15 @@ export default function Home() {
   const updateTaskConfig = useUpdateTaskConfig();
   const { toast } = useToast();
   
+  // Calculate week dates early - needed by multiple functions
+  const weekDates = useMemo(() => {
+    return DAYS.map((_, i) => {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + i);
+      return date;
+    });
+  }, [weekStart]);
+  
   // Sync taskConfig to local state for editing
   useEffect(() => {
     if (taskConfig) {
@@ -640,12 +649,6 @@ export default function Home() {
       type: "info",
     });
   };
-
-  const weekDates = DAYS.map((_, i) => {
-    const date = new Date(weekStart);
-    date.setDate(weekStart.getDate() + i);
-    return date;
-  });
 
   const getAssignmentsForTaskAndDay = (task: string, dateIndex: number): Assignment[] => {
     const date = weekDates[dateIndex];
