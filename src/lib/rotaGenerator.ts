@@ -364,6 +364,46 @@ export function generateWeeklyRota({
   // ============================================
   console.log("📍 PHASE 2: Filling remaining slots with fairness algorithm...");
 
+  // Helper: Calculate available staff pool size for each task on each day
+  const getTaskPoolSize = (task: Task, dateStr: string, dayIndex: number): number => {
+    return getAvailableStaff(task, dateStr, dayIndex).length;
+  };
+
+  // Helper: Calculate "opportunity cost" of assigning this person to this task
+  // Lower score = they're needed more elsewhere (should go to scarce tasks)
+  // Higher score = they have plenty of alternatives (can do common tasks)
+  const calculateOpportunityCost = (staffMember: StaffMember, currentTask: Task, dateStr: string, dayIndex: number): number => {
+    let totalAlternativePoolSize = 0;
+    let alternativeTaskCount = 0;
+
+    // Check all OTHER tasks this person could do on this day
+    for (const task of staffMember.trainedTasks) {
+      if (task === currentTask) continue; // Skip the task we're considering
+      
+      const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
+      if (!staffMember.trainedTasks.includes(taskToCheck)) continue;
+
+      // Check if this task needs staff on this day
+      const required = taskConfig[task][dayIndex] || 0;
+      if (required === 0) continue;
+
+      // Count how many other people could do this alternative task
+      const poolSize = getTaskPoolSize(task, dateStr, dayIndex);
+      if (poolSize > 0) {
+        totalAlternativePoolSize += poolSize;
+        alternativeTaskCount++;
+      }
+    }
+
+    // If they have no alternatives, return 0 (high priority for current task)
+    if (alternativeTaskCount === 0) return 0;
+
+    // Average pool size for their alternative tasks
+    // Higher = they have lots of options elsewhere = assign them to current task
+    // Lower = they're scarce elsewhere = save them for scarce tasks
+    return totalAlternativePoolSize / alternativeTaskCount;
+  };
+
   // Process each day again to fill remaining capacity
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
     const currentDate = new Date(weekStart);
@@ -409,17 +449,24 @@ export function generateWeeklyRota({
           if (!aNeedsVariety && bNeedsVariety) return 1;
         }
 
-        // Priority 3: Fewest times doing THIS specific task
+        // Priority 3: Resource scarcity - assign to tasks where they're most needed
+        // People with larger alternative pools go to common tasks, scarce specialists saved for scarce tasks
+        const aOpportunityCost = calculateOpportunityCost(a, task, dateStr, dayIndex);
+        const bOpportunityCost = calculateOpportunityCost(b, task, dateStr, dayIndex);
+        // Higher opportunity cost = more alternatives = lower priority for THIS task
+        if (aOpportunityCost !== bOpportunityCost) return bOpportunityCost - aOpportunityCost;
+
+        // Priority 4: Fewest times doing THIS specific task
         const aTaskCount = staffTaskCounts[a.id]?.[task] || 0;
         const bTaskCount = staffTaskCounts[b.id]?.[task] || 0;
         if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
 
-        // Priority 4: Fewest overall assignments
+        // Priority 5: Fewest overall assignments
         const aCount = staffAssignmentCounts[a.id] || 0;
         const bCount = staffAssignmentCounts[b.id] || 0;
         if (aCount !== bCount) return aCount - bCount;
 
-        // Priority 5: Earlier shifts get slight preference
+        // Priority 6: Earlier shifts get slight preference
         const shiftA = a.shiftStart || "06:00";
         const shiftB = b.shiftStart || "06:00";
         const aShiftIndex = shiftOrder.indexOf(shiftA as ShiftStart);
