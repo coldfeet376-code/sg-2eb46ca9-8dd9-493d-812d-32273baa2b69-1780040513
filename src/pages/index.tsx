@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import Layout from "@/components/Layout";
-import SEO from "@/components/SEO";
+import { Layout } from "@/components/Layout";
+import { SEO } from "@/components/SEO";
 import { FairnessMeter } from "@/components/rota/FairnessMeter";
 import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -91,7 +91,6 @@ export default function Home() {
   const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<RealtimeChannel | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-  const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(getWeekStart(new Date()));
   const [smartAssignDialog, setSmartAssignDialog] = useState<{
     open: boolean;
     task: Task | null;
@@ -1400,26 +1399,50 @@ export default function Home() {
           </Card>
         )}
 
-        {activeTab === "rota" && (
-          <div className="space-y-4">
-            <RotaWeekNavigator
-              selectedWeekStart={selectedWeekStart}
-              onWeekChange={setSelectedWeekStart}
-            />
-
-            {/* Fairness Meter */}
-            {staff.length > 0 && assignments.length > 0 && (
-              <FairnessMeter
-                staff={staff}
-                assignments={assignments}
-                weekStart={selectedWeekStart}
-              />
-            )}
-          </div>
+        {/* Fairness Meter */}
+        {staff.length > 0 && assignments.length > 0 && (
+          <FairnessMeter
+            staff={staff}
+            assignments={assignments}
+            weekStart={weekStart}
+          />
         )}
 
         {/* Recent Changes Panel */}
         <RecentChangesPanel />
+        
+        {/* Smart Assignment Dialog */}
+        <SmartAssignmentDialog
+          open={smartAssignDialog.open}
+          onClose={() => setSmartAssignDialog({ open: false, task: null, date: "" })}
+          task={smartAssignDialog.task || "Frozen"}
+          date={smartAssignDialog.date}
+          staff={staff}
+          assignments={assignments}
+          onAssign={(staffId) => {
+            if (smartAssignDialog.task && smartAssignDialog.date) {
+              const staffMember = staff.find((s) => s.id === staffId);
+              if (staffMember) {
+                const newAssignment = {
+                  staffId: staffId,
+                  staffName: staffMember.name,
+                  task: smartAssignDialog.task!,
+                  date: smartAssignDialog.date,
+                };
+                
+                setAssignments(prev => [...prev, newAssignment]);
+                
+                // Add to locked assignments automatically so it doesn't get wiped
+                setLockedAssignments(prev => {
+                  if (!prev.some(la => la.staffId === staffId && la.task === smartAssignDialog.task && la.date === smartAssignDialog.date)) {
+                    return [...prev, newAssignment];
+                  }
+                  return prev;
+                });
+              }
+            }
+          }}
+        />
         
         </TabsContent>
 
