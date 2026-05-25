@@ -104,7 +104,7 @@ export function generateWeeklyRota({
         return true;
       });
 
-      allStaff.push(...available.map(s => ({ ...s, shift: shift as ShiftStart })));
+      allStaff.push(...available);
     }
 
     return allStaff;
@@ -294,8 +294,8 @@ export function generateWeeklyRota({
         if (aCount !== bCount) return aCount - bCount;
 
         // Priority 4: Earlier shifts get slight preference
-        const shiftA = a.shift || a.shiftStart;
-        const shiftB = b.shift || b.shiftStart;
+        const shiftA = a.shiftStart || "06:00";
+        const shiftB = b.shiftStart || "06:00";
         const aShiftIndex = shiftOrder.indexOf(shiftA as ShiftStart);
         const bShiftIndex = shiftOrder.indexOf(shiftB as ShiftStart);
         return aShiftIndex - bShiftIndex;
