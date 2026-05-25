@@ -293,6 +293,18 @@ export function generateWeeklyRota({
       const required = taskConfig[task][dayIndex] || 0;
       if (required === 0) continue;
 
+      // DEPENDENCY: Inbound Late can only fill if Inbound is fully covered for this day
+      if (task === "Inbound Late") {
+        const inboundRequired = taskConfig["Inbound"]?.[dayIndex] || 0;
+        const inboundFilled = assignments.filter(
+          (a) => a.date === dateStr && a.task === "Inbound"
+        ).length;
+        if (inboundRequired > 0 && inboundFilled < inboundRequired) {
+          console.log(`  ⏸️ Skipping Inbound Late on ${dateStr} - Inbound not fully covered (${inboundFilled}/${inboundRequired})`);
+          continue; // Skip Inbound Late until Inbound is full
+        }
+      }
+
       const existingCount = assignments.filter(
         (a) => a.date === dateStr && a.task === task
       ).length;
@@ -354,6 +366,18 @@ export function generateWeeklyRota({
       const task = taskName as Task;
       const required = taskConfig[task][dayIndex] || 0;
       if (required === 0) continue;
+
+      // DEPENDENCY: Inbound Late can only fill if Inbound is fully covered for this day
+      if (task === "Inbound Late") {
+        const inboundRequired = taskConfig["Inbound"]?.[dayIndex] || 0;
+        const inboundFilled = assignments.filter(
+          (a) => a.date === dateStr && a.task === "Inbound"
+        ).length;
+        if (inboundRequired > 0 && inboundFilled < inboundRequired) {
+          console.log(`  ⏸️ Skipping Inbound Late on ${dateStr} - Inbound not fully covered (${inboundFilled}/${inboundRequired})`);
+          continue; // Skip Inbound Late until Inbound is full
+        }
+      }
 
       const existingCount = assignments.filter(
         (a) => a.date === dateStr && a.task === task
