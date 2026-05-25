@@ -1,31 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Layout } from "@/components/Layout";
 import { SEO } from "@/components/SEO";
-import { FairnessMeter } from "@/components/rota/FairnessMeter";
-import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
-import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
-import { generateStaffRotaPDF } from "@/lib/pdfGenerator";
-import { rotaService } from "@/services/rotaService";
-import { rotaRealtimeService, type StoredRota } from "@/services/rotaRealtimeService";
-import { useNotifications } from "@/contexts/NotificationContext";
-import type { RealtimeChannel } from "@supabase/supabase-js";
-import { useStaff, useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
-import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
-import { Lock, Unlock, Save, Download, Copy, Calendar, History, RotateCcw, Zap, LayoutGrid, Printer, AlertCircle, TrendingUp } from "lucide-react";
-import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
-import { useToast } from "@/hooks/use-toast";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -98,11 +76,6 @@ export default function Home() {
   const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<RealtimeChannel | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
-  const [smartAssignDialog, setSmartAssignDialog] = useState<{
-    open: boolean;
-    task: Task | null;
-    date: string;
-  }>({ open: false, task: null, date: "" });
 
   // React Query hooks - cached data with error handling
   const { data: staff = [], isLoading: staffLoading, error: staffError } = useStaff();
@@ -1237,9 +1210,9 @@ export default function Home() {
                               ))}
                               
                               {/* Empty state */}
-                              {dayAssignments.length === 0 && unavailableStaff.length === 0 && (
-                                <div className="text-xs font-mono text-muted-foreground">
-                                  —
+                              {dayAssignments.length === 0 && (
+                                <div className="text-center text-muted-foreground text-xs py-2 font-sans">
+                                  No assignments
                                 </div>
                               )}
                               
@@ -1419,50 +1392,8 @@ export default function Home() {
           </Card>
         )}
 
-        {/* Fairness Meter */}
-        {staff.length > 0 && assignments.length > 0 && (
-          <FairnessMeter
-            staff={staff}
-            assignments={assignments}
-            weekStart={weekStart}
-          />
-        )}
-
         {/* Recent Changes Panel */}
         <RecentChangesPanel />
-        
-        {/* Smart Assignment Dialog */}
-        <SmartAssignmentDialog
-          open={smartAssignDialog.open}
-          onClose={() => setSmartAssignDialog({ open: false, task: null, date: "" })}
-          task={smartAssignDialog.task || "Frozen"}
-          date={smartAssignDialog.date}
-          staff={staff}
-          assignments={assignments}
-          onAssign={(staffId) => {
-            if (smartAssignDialog.task && smartAssignDialog.date) {
-              const staffMember = staff.find((s) => s.id === staffId);
-              if (staffMember) {
-                const newAssignment = {
-                  staffId: staffId,
-                  staffName: staffMember.name,
-                  task: smartAssignDialog.task!,
-                  date: smartAssignDialog.date,
-                };
-                
-                setAssignments(prev => [...prev, newAssignment]);
-                
-                // Add to locked assignments automatically so it doesn't get wiped
-                setLockedAssignments(prev => {
-                  if (!prev.some(la => la.staffId === staffId && la.task === smartAssignDialog.task && la.date === smartAssignDialog.date)) {
-                    return [...prev, newAssignment];
-                  }
-                  return prev;
-                });
-              }
-            }
-          }}
-        />
         
         </TabsContent>
 
