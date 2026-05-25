@@ -1,9 +1,29 @@
-import { useMemo, useEffect, useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Layout } from "@/components/Layout";
 import { SEO } from "@/components/SEO";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
+import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
+import { generateStaffRotaPDF } from "@/lib/pdfGenerator";
+import { rotaService } from "@/services/rotaService";
+import { rotaRealtimeService, type StoredRota } from "@/services/rotaRealtimeService";
+import { useNotifications } from "@/contexts/NotificationContext";
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import { useStaff, useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
+import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
+import { Lock, Unlock, Save, Download, Copy, Calendar, History, RotateCcw, Zap, LayoutGrid, Printer, AlertCircle, TrendingUp } from "lucide-react";
+import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
+import { useToast } from "@/hooks/use-toast";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
