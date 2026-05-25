@@ -31,6 +31,8 @@ export function generateWeeklyRota({
   const staffTasksByDate: Record<string, Record<string, Task>> = {};
   // Track how many times each staff member has done each specific task
   const staffTaskCounts: Record<string, Record<Task, number>> = {};
+  // Track unique non-Frozen tasks for variety (5-day workers should get 2+ different tasks)
+  const staffTaskVariety: Record<string, Set<Task>> = {};
   
   staff.forEach((s) => {
     staffAssignmentCounts[s.id] = 0;
@@ -45,6 +47,7 @@ export function generateWeeklyRota({
       "Marshaling": 0,
       "Housekeeping": 0,
     };
+    staffTaskVariety[s.id] = new Set<Task>();
   });
 
   // Count existing locked assignments and populate task history
@@ -57,6 +60,10 @@ export function generateWeeklyRota({
       
       if (staffTaskCounts[staffId]) {
         staffTaskCounts[staffId][a.task as Task] = (staffTaskCounts[staffId][a.task as Task] || 0) + 1;
+      }
+      
+      if (a.task !== "Frozen") {
+        staffTaskVariety[staffId]?.add(a.task as Task);
       }
     }
   });
@@ -267,6 +274,9 @@ export function generateWeeklyRota({
           staffAssignmentCounts[selectedStaff.id]++;
           staffTasksByDate[selectedStaff.id][dateStr] = task;
           staffTaskCounts[selectedStaff.id][task]++;
+          if (task !== "Frozen") {
+            staffTaskVariety[selectedStaff.id].add(task);
+          }
           
           console.log(`  ✓ CRITICAL: Assigned ${selectedStaff.name} to ${task} on ${dateStr} (limited options)`);
         }
@@ -339,6 +349,9 @@ export function generateWeeklyRota({
           staffAssignmentCounts[selectedStaff.id]++;
           staffTasksByDate[selectedStaff.id][dateStr] = task;
           staffTaskCounts[selectedStaff.id][task]++;
+          if (task !== "Frozen") {
+            staffTaskVariety[selectedStaff.id].add(task);
+          }
           
           console.log(`  ✓ Assigned ${selectedStaff.name} to ${task} on ${dateStr} (first assignment)`);
         }
@@ -381,17 +394,32 @@ export function generateWeeklyRota({
         if (aViolates && !bViolates) return 1;
         if (!aViolates && bViolates) return -1;
 
-        // Priority 2: Fewest times doing THIS specific task
+        // Priority 2: Task variety for 5+ day workers (should get 2+ unique non-Frozen tasks)
+        if (task !== "Frozen") {
+          const aWorkingDays = staffWorkingDays[a.id] || 0;
+          const bWorkingDays = staffWorkingDays[b.id] || 0;
+          const aVariety = staffTaskVariety[a.id]?.size || 0;
+          const bVariety = staffTaskVariety[b.id]?.size || 0;
+          
+          // If staff works 5+ days and has <2 unique non-Frozen tasks, prioritize them
+          const aNeedsVariety = aWorkingDays >= 5 && aVariety < 2;
+          const bNeedsVariety = bWorkingDays >= 5 && bVariety < 2;
+          
+          if (aNeedsVariety && !bNeedsVariety) return -1;
+          if (!aNeedsVariety && bNeedsVariety) return 1;
+        }
+
+        // Priority 3: Fewest times doing THIS specific task
         const aTaskCount = staffTaskCounts[a.id]?.[task] || 0;
         const bTaskCount = staffTaskCounts[b.id]?.[task] || 0;
         if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
 
-        // Priority 3: Fewest overall assignments
+        // Priority 4: Fewest overall assignments
         const aCount = staffAssignmentCounts[a.id] || 0;
         const bCount = staffAssignmentCounts[b.id] || 0;
         if (aCount !== bCount) return aCount - bCount;
 
-        // Priority 4: Earlier shifts get slight preference
+        // Priority 5: Earlier shifts get slight preference
         const shiftA = a.shiftStart || "06:00";
         const shiftB = b.shiftStart || "06:00";
         const aShiftIndex = shiftOrder.indexOf(shiftA as ShiftStart);
@@ -412,6 +440,9 @@ export function generateWeeklyRota({
         staffAssignmentCounts[selectedStaff.id]++;
         staffTasksByDate[selectedStaff.id][dateStr] = task;
         staffTaskCounts[selectedStaff.id][task]++;
+        if (task !== "Frozen") {
+          staffTaskVariety[selectedStaff.id].add(task);
+        }
       }
     }
   }
