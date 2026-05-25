@@ -85,10 +85,25 @@ export function generateWeeklyRota({
         if (!s.trainedTasks.includes(taskToCheck)) return false;
         
         // Check if already assigned on this day
-        const alreadyAssigned = assignments.some(
+        const dayAssignments = assignments.filter(
           (a) => a.staffId === s.id && a.date === dateStr
         );
-        if (alreadyAssigned) return false;
+        
+        // SPECIAL RULE: Frozen finishes at 10:00, so staff can do Frozen + Inbound on same day
+        const hasFrozen = dayAssignments.some(a => a.task === "Frozen");
+        const hasInbound = dayAssignments.some(a => a.task === "Inbound" || a.task === "Inbound Late");
+        
+        if (dayAssignments.length > 0) {
+          // Allow Frozen + Inbound combination
+          if ((task === "Inbound" || task === "Inbound Late") && hasFrozen && !hasInbound) {
+            // This is OK - they have Frozen, now assigning Inbound
+          } else if (task === "Frozen" && hasInbound && !hasFrozen) {
+            // This is OK - they have Inbound, now assigning Frozen
+          } else {
+            // Any other combination = already assigned, skip
+            return false;
+          }
+        }
 
         // Check availability
         const availability = s.availability?.find((a) => a.date === dateStr);
