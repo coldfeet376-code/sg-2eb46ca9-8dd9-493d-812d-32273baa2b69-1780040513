@@ -200,6 +200,72 @@ export function generateWeeklyRota({
   }).join(", "));
 
   // ============================================
+  // PRE-PHASE: CRITICAL ASSIGNMENTS (Limited Options)
+  // ============================================
+  console.log("🎯 PRE-PHASE: Handling constrained tasks (only 1-2 staff available)...");
+
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    const currentDate = new Date(weekStart);
+    currentDate.setDate(currentDate.getDate() + dayIndex);
+    const dateStr = currentDate.toISOString().split("T")[0];
+
+    // Check each task on this day (in priority order)
+    for (const taskName of taskOrder) {
+      const task = taskName as Task;
+      const required = taskConfig[task][dayIndex] || 0;
+      if (required === 0) continue;
+
+      const existingCount = assignments.filter(
+        (a) => a.date === dateStr && a.task === task
+      ).length;
+      const needed = required - existingCount;
+      if (needed <= 0) continue;
+
+      // Get available staff for this task/day
+      const available = getAvailableStaff(task, dateStr, dayIndex);
+      
+      // CRITICAL: If only 1-2 staff available for this task, assign immediately
+      if (available.length > 0 && available.length <= 2) {
+        console.log(`  🚨 CRITICAL: Only ${available.length} staff available for ${task} on ${dateStr}: ${available.map(s => s.name).join(", ")}`);
+        
+        // Sort by: no consecutive tasks > fewest specific task count > fewest overall
+        const sorted = available.sort((a, b) => {
+          const aViolates = wouldViolateConsecutive(a.id, task, dateStr);
+          const bViolates = wouldViolateConsecutive(b.id, task, dateStr);
+          if (aViolates && !bViolates) return 1;
+          if (!aViolates && bViolates) return -1;
+          
+          const aTaskCount = staffTaskCounts[a.id]?.[task] || 0;
+          const bTaskCount = staffTaskCounts[b.id]?.[task] || 0;
+          if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
+          
+          const aCount = staffAssignmentCounts[a.id] || 0;
+          const bCount = staffAssignmentCounts[b.id] || 0;
+          return aCount - bCount;
+        });
+
+        // Assign as many as needed from the limited pool
+        const toAssign = Math.min(needed, sorted.length);
+        for (let i = 0; i < toAssign; i++) {
+          const selectedStaff = sorted[i];
+          assignments.push({
+            staffId: selectedStaff.id,
+            staffName: selectedStaff.name,
+            task: task,
+            date: dateStr,
+          });
+          
+          staffAssignmentCounts[selectedStaff.id]++;
+          staffTasksByDate[selectedStaff.id][dateStr] = task;
+          staffTaskCounts[selectedStaff.id][task]++;
+          
+          console.log(`  ✓ CRITICAL: Assigned ${selectedStaff.name} to ${task} on ${dateStr} (limited options)`);
+        }
+      }
+    }
+  }
+
+  // ============================================
   // PHASE 1: GUARANTEED MINIMUM ASSIGNMENTS
   // ============================================
   console.log("📍 PHASE 1: Ensuring everyone gets at least 1 assignment...");
