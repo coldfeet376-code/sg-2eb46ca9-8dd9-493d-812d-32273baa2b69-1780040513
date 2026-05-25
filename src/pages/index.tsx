@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter } from "next/router";
 import { Layout } from "@/components/Layout";
 import { SEO } from "@/components/SEO";
 import { FairnessMeter } from "@/components/rota/FairnessMeter";
@@ -75,7 +74,6 @@ interface TaskConfig {
 }
 
 export default function Home() {
-  const router = useRouter();
   
   // Safe date initialization with fallback
   const [weekStart, setWeekStart] = useState<Date>(() => {
