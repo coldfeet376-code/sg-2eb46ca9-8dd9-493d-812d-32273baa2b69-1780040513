@@ -142,7 +142,18 @@ export function generateWeeklyRota({
         
         const available = shiftStaff.filter((s) => {
           // Must be trained for the task
-          if (!s.trainedTasks.includes(task)) return false;
+          // For Inbound Late, staff must be trained in regular "Inbound"
+          const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
+          if (!s.trainedTasks.includes(taskToCheck)) return false;
+          
+          // Shift time filtering for Inbound vs Inbound Late
+          if (task === "Inbound") {
+            // Early Inbound: only 06:00 starters
+            if (s.shiftStart !== "06:00") return false;
+          } else if (task === "Inbound Late") {
+            // Late Inbound: 09:00, 10:00, 11:00 starters
+            if (!["09:00", "10:00", "11:00"].includes(s.shiftStart || "06:00")) return false;
+          }
 
           // Check if already assigned on this day
           const alreadyAssigned = assignments.some(
@@ -161,23 +172,6 @@ export function generateWeeklyRota({
           availableByShift[shift] = available;
         }
       }
-
-      // Filter candidates for this specific task AND day
-      const candidates = availableStaff.filter((s) => {
-        // Must be trained for this task
-        // For Inbound Late, staff must be trained in regular "Inbound"
-        const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
-        if (!s.trainedTasks.includes(taskToCheck)) return false;
-        
-        // Shift time filtering for Inbound vs Inbound Late
-        if (task === "Inbound") {
-          // Early Inbound: only 06:00 starters
-          if (s.shiftStart !== "06:00") return false;
-        } else if (task === "Inbound Late") {
-          // Late Inbound: 09:00, 10:00, 11:00 starters (avoid 06:00)
-          if (!["09:00", "10:00", "11:00"].includes(s.shiftStart)) return false;
-        }
-      });
 
       // Distribute assignments across shifts proportionally
       const allAvailable = Object.entries(availableByShift).flatMap(([shift, staffList]) =>
