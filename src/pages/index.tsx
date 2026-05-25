@@ -75,6 +75,7 @@ interface TaskConfig {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [lockedAssignments, setLockedAssignments] = useState<Assignment[]>([]);
