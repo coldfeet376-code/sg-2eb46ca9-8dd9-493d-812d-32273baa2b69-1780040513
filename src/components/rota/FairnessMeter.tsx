@@ -2,18 +2,30 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, ChevronUp, TrendingUp, AlertCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, TrendingUp, AlertCircle, ArrowRightLeft, CheckCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { StaffMember, Assignment } from "@/types";
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
+import { suggestSwaps, type SwapSuggestion } from "@/lib/swapSuggester";
 
 interface FairnessMeterProps {
   staff: StaffMember[];
   assignments: Assignment[];
   weekStart: Date;
+  onSwapApply?: (fromStaffId: string, toStaffId: string, task: string, date: string) => void;
 }
 
-export function FairnessMeter({ staff, assignments, weekStart }: FairnessMeterProps) {
+export function FairnessMeter({ staff, assignments, weekStart, onSwapApply }: FairnessMeterProps) {
   const [expanded, setExpanded] = useState(false);
+  const [showSwapDialog, setShowSwapDialog] = useState(false);
+  const [swapSuggestions, setSwapSuggestions] = useState<SwapSuggestion[]>([]);
 
   // Calculate fairness metrics using the corrected algorithm
   const metrics = calculateFairnessMetrics(assignments, staff);
@@ -70,6 +82,29 @@ export function FairnessMeter({ staff, assignments, weekStart }: FairnessMeterPr
     ...categorizeStaff()
   };
 
+  const handleSuggestSwaps = () => {
+    const suggestions = suggestSwaps(assignments, staff, 10);
+    setSwapSuggestions(suggestions);
+    setShowSwapDialog(true);
+  };
+
+  const handleApplySwap = (suggestion: SwapSuggestion) => {
+    if (onSwapApply) {
+      onSwapApply(suggestion.fromStaffId, suggestion.toStaffId, suggestion.task, suggestion.date);
+      setShowSwapDialog(false);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const localDate = new Date(year, month - 1, day);
+    return localDate.toLocaleDateString("en-GB", { 
+      weekday: "short", 
+      day: "2-digit", 
+      month: "short" 
+    });
+  };
+
   const getScoreColor = (score: number) => {
     if (score >= 90) return "text-green-600";
     if (score >= 70) return "text-blue-600";
@@ -92,24 +127,37 @@ export function FairnessMeter({ staff, assignments, weekStart }: FairnessMeterPr
             <TrendingUp className="h-5 w-5 text-primary" />
             Fairness Meter
           </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setExpanded(!expanded)}
-            className="gap-2 font-sans"
-          >
-            {expanded ? (
-              <>
-                <ChevronUp className="h-4 w-4" />
-                Hide Details
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-4 w-4" />
-                Show Details
-              </>
+          <div className="flex gap-2">
+            {fairness.score < 90 && assignments.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSuggestSwaps}
+                className="gap-2 font-sans"
+              >
+                <ArrowRightLeft className="h-4 w-4" />
+                Suggest Swaps
+              </Button>
             )}
-          </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setExpanded(!expanded)}
+              className="gap-2 font-sans"
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Hide Details
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Show Details
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="pt-6">
@@ -226,6 +274,95 @@ export function FairnessMeter({ staff, assignments, weekStart }: FairnessMeterPr
           </div>
         )}
       </CardContent>
+
+      {/* Swap Suggestions Dialog */}
+      <Dialog open={showSwapDialog} onOpenChange={setShowSwapDialog}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-condensed text-xl flex items-center gap-2">
+              <ArrowRightLeft className="h-5 w-5 text-primary" />
+              Suggested Shift Swaps
+            </DialogTitle>
+            <DialogDescription className="font-sans">
+              These swaps would improve fairness by balancing workload across staff
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[500px] pr-4">
+            {swapSuggestions.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p className="font-sans text-sm">
+                  No beneficial swaps found. The rota is already well-balanced!
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {swapSuggestions.map((suggestion) => (
+                  <div
+                    key={suggestion.id}
+                    className="border-2 rounded-lg p-4 transition-smooth hover:shadow-md bg-background"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="font-mono text-xs bg-green-50 text-green-700 border-green-200">
+                            +{suggestion.improvement.toFixed(1)} points
+                          </Badge>
+                          <span className="text-sm text-muted-foreground">
+                            {suggestion.currentFairness.toFixed(0)} → {suggestion.predictedFairness.toFixed(0)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3 mb-2 font-condensed">
+                          <span className="font-semibold">{suggestion.fromStaffName}</span>
+                          <ArrowRightLeft className="h-4 w-4 text-primary" />
+                          <span className="font-semibold">{suggestion.toStaffName}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-sm mb-2">
+                          <Badge className="font-mono">{suggestion.task}</Badge>
+                          <span className="text-muted-foreground">on {formatDate(suggestion.date)}</span>
+                        </div>
+
+                        <p className="text-sm text-muted-foreground font-sans">
+                          {suggestion.reason}
+                        </p>
+
+                        {suggestion.warnings.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {suggestion.warnings.map((warning, idx) => (
+                              <div key={idx} className="flex items-start gap-2 text-sm">
+                                <AlertCircle className="h-3.5 w-3.5 text-yellow-600 mt-0.5 shrink-0" />
+                                <span className="text-yellow-700 font-sans">{warning}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        onClick={() => handleApplySwap(suggestion)}
+                        size="sm"
+                        className="shrink-0"
+                        disabled={!onSwapApply}
+                      >
+                        Apply Swap
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+
+          <div className="flex justify-end pt-4 border-t">
+            <Button onClick={() => setShowSwapDialog(false)} variant="outline">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
