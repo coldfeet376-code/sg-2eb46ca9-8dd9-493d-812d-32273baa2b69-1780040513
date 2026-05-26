@@ -15,14 +15,6 @@ export function generateWeeklyRota({
   weekStart: Date;
   lockedAssignments?: Assignment[];
 }): Assignment[] {
-  console.log("🔄 generateWeeklyRota called with:", {
-    staffCount: staff.length,
-    staffNames: staff.map(s => s.name),
-    taskConfig: Object.keys(taskConfig),
-    weekStart: weekStart.toISOString(),
-    lockedCount: lockedAssignments.length
-  });
-
   const assignments: Assignment[] = [...lockedAssignments];
 
   // Track assignments per staff member for fairness
@@ -81,7 +73,6 @@ export function generateWeeklyRota({
 
   // Helper: Get available staff for a specific task/day
   const getAvailableStaff = (task: Task, dateStr: string, dayIndex: number): StaffMember[] => {
-    console.log(`🔍 getAvailableStaff called: task=${task}, date=${dateStr}, dayIndex=${dayIndex}`);
     const allStaff: StaffMember[] = [];
     
     for (const shift of shiftOrder) {
@@ -91,7 +82,6 @@ export function generateWeeklyRota({
         // Must be trained for the task
         const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
         if (!s.trainedTasks.includes(taskToCheck)) {
-          console.log(`  ❌ ${s.name}: not trained on ${taskToCheck}`);
           return false;
         }
         
@@ -108,34 +98,42 @@ export function generateWeeklyRota({
           // Allow Frozen + Inbound combination
           if ((task === "Inbound" || task === "Inbound Late") && hasFrozen && !hasInbound) {
             // This is OK - they have Frozen, now assigning Inbound
-            console.log(`  ✓ ${s.name}: has Frozen, can add ${task}`);
           } else if (task === "Frozen" && hasInbound && !hasFrozen) {
             // This is OK - they have Inbound, now assigning Frozen
-            console.log(`  ✓ ${s.name}: has Inbound, can add Frozen`);
           } else {
             // Any other combination = already assigned, skip
-            console.log(`  ❌ ${s.name}: already assigned on ${dateStr} (${dayAssignments.map(a => a.task).join(", ")})`);
             return false;
           }
         }
 
-        // Check availability - THIS IS THE CRITICAL CHECK
-        const availability = s.availability?.find((a) => a.date === dateStr);
-        console.log(`  🔍 ${s.name} availability check: dateStr=${dateStr}, found=${!!availability}, type=${availability?.type || 'none'}`);
+        // CRITICAL AVAILABILITY CHECK - strict matching
+        // Check if staff has ANY availability records first
+        const hasAvailabilityRecords = s.availability && s.availability.length > 0;
         
-        if (availability && availability.type !== "available") {
-          console.log(`  ❌ ${s.name}: NOT AVAILABLE on ${dateStr} (${availability.type})`);
-          return false;
+        if (hasAvailabilityRecords) {
+          // Find exact date match
+          const availability = s.availability?.find((a) => a.date === dateStr);
+          
+          if (!availability) {
+            // They have availability records but NOT for this date
+            // This means the date is not in their working schedule
+            return false;
+          }
+          
+          // They have a record for this date - check the type
+          if (availability.type !== "available") {
+            // Explicitly marked as rest day, holiday, or sick
+            return false;
+          }
         }
+        // If they have NO availability records at all, assume available (legacy behavior)
 
-        console.log(`  ✅ ${s.name}: AVAILABLE for ${task} on ${dateStr}`);
         return true;
       });
 
       allStaff.push(...available);
     }
 
-    console.log(`  📊 Total available staff for ${task} on ${dateStr}: ${allStaff.length} (${allStaff.map(s => s.name).join(", ")})`);
     return allStaff;
   };
 
@@ -181,8 +179,6 @@ export function generateWeeklyRota({
   const lockedSlots = lockedAssignments.length;
   const availableSlotsToFill = totalSlotsNeeded - lockedSlots;
 
-  console.log(`📊 Week overview: ${totalSlotsNeeded} total slots, ${lockedSlots} locked, ${availableSlotsToFill} to fill`);
-
   // Define task priority - higher priority tasks are filled first
   const getTaskPriority = (task: Task): number => {
     if (task === "Frozen") return 1; // Specialized training
@@ -204,8 +200,6 @@ export function generateWeeklyRota({
     return a.localeCompare(b); // Alphabetical for same priority
   });
 
-  console.log("📋 Task processing order:", taskOrder.join(" → "));
-
   // Calculate how many working days each staff member has
   const staffWorkingDays: Record<string, number> = {};
   staff.forEach(s => {
@@ -215,18 +209,22 @@ export function generateWeeklyRota({
       date.setDate(date.getDate() + d);
       const dateStr = date.toISOString().split("T")[0];
       
-      const availability = s.availability?.find(a => a.date === dateStr);
-      if (!availability || availability.type === "available") {
+      // Use same strict checking logic as getAvailableStaff
+      const hasAvailabilityRecords = s.availability && s.availability.length > 0;
+      
+      if (hasAvailabilityRecords) {
+        const availability = s.availability?.find(a => a.date === dateStr);
+        // Only count as working day if explicitly marked available or no record exists
+        if (availability && availability.type === "available") {
+          workingDays++;
+        }
+      } else {
+        // No availability records = assume all days are working days
         workingDays++;
       }
     }
     staffWorkingDays[s.id] = workingDays;
   });
-
-  console.log("👥 Staff working days:", Object.entries(staffWorkingDays).map(([id, days]) => {
-    const s = staff.find(x => x.id === id);
-    return `${s?.name}: ${days} days`;
-  }).join(", "));
 
   // ============================================
   // PRE-PHASE: CRITICAL ASSIGNMENTS (Limited Options)
