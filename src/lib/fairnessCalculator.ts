@@ -8,6 +8,9 @@ export function calculateFairnessMetrics(
     return { overallScore: 0, standardDeviation: 0, staffWorkload: [] };
   }
 
+  // Get all unique dates in the assignments (the week being analyzed)
+  const weekDates = [...new Set(assignments.map(a => a.date))].sort();
+
   // Calculate staff workload details
   const staffWorkload = staff.map((s) => {
     const staffAssignments = assignments.filter((a) => a.staffId === s.id);
@@ -30,34 +33,59 @@ export function calculateFairnessMetrics(
       }
     });
 
+    // Calculate available days (exclude rest days, holidays, sick leave)
+    let availableDays = 0;
+    weekDates.forEach(dateStr => {
+      const date = new Date(dateStr);
+      const dayOfWeek = date.getDay();
+      
+      // Check if staff has a rest day on this day of week
+      const isRestDay = s.restDays?.some(d => Number(d) === dayOfWeek);
+      
+      // Check if staff has special unavailability on this specific date
+      const availability = s.availability?.find(a => a.date === dateStr);
+      const isUnavailable = availability && availability.type !== 'available';
+      
+      // Count as available day only if NOT rest day AND NOT unavailable
+      if (!isRestDay && !isUnavailable) {
+        availableDays++;
+      }
+    });
+
     return {
       staffId: s.id,
       staffName: s.name,
       totalAssignments,
       taskBreakdown,
+      availableDays, // Track available days for rate calculation
     };
   });
 
-  const counts = staffWorkload.map(w => w.totalAssignments);
+  // Calculate assignment rates (assignments per available day) instead of raw counts
+  // Only include staff who had at least 1 available day
+  const rates = staffWorkload
+    .filter(w => w.availableDays > 0)
+    .map(w => w.totalAssignments / w.availableDays);
 
-  if (counts.length === 0) {
+  if (rates.length === 0) {
     return { overallScore: 0, standardDeviation: 0, staffWorkload: [] };
   }
 
-  // Calculate standard deviation
-  const mean = counts.reduce((sum, c) => sum + c, 0) / counts.length;
+  // Calculate standard deviation on rates, not raw counts
+  const mean = rates.reduce((sum, r) => sum + r, 0) / rates.length;
   const variance =
-    counts.reduce((sum, c) => sum + Math.pow(c - mean, 2), 0) / counts.length;
+    rates.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / rates.length;
   const stdDev = Math.sqrt(variance);
 
-  // Fairness score: 100 means perfectly equal, lower means less fair
-  // If stdDev is 0 (all equal), return 100
+  // Fairness score: 100 means perfectly equal rates, lower means less fair
+  // If stdDev is 0 (all equal rates), return 100
   if (stdDev === 0) {
     return { overallScore: 100, standardDeviation: 0, staffWorkload };
   }
 
   // Normalize: lower stdDev = higher fairness
-  const maxPossibleStdDev = mean > 0 ? mean : 1; // worst case: some have all, some have none
+  // Max possible stdDev is when one person has all assignments and others have none
+  const maxPossibleStdDev = mean > 0 ? mean : 1;
   const fairness = Math.max(0, 100 - (stdDev / maxPossibleStdDev) * 100);
 
   return {
