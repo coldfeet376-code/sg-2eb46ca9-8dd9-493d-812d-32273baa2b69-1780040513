@@ -137,11 +137,11 @@ export function generateWeeklyRota({
     return allStaff;
   };
 
-  // Helper: Check consecutive task violation
+  // Helper: Check consecutive task violation (soft preference)
   const wouldViolateConsecutive = (staffId: string, task: Task, dateStr: string): boolean => {
     const currentDate = new Date(dateStr);
     
-    // Check previous day
+    // Check previous day only
     const prevDate = new Date(currentDate);
     prevDate.setDate(prevDate.getDate() - 1);
     const prevDateStr = getLocalDateString(prevDate);
@@ -151,17 +151,6 @@ export function generateWeeklyRota({
       if (prevTask === "Inbound" || prevTask === "Inbound Late") return true;
     }
     if (prevTask === task) return true;
-    
-    // Check next day
-    const nextDate = new Date(currentDate);
-    nextDate.setDate(nextDate.getDate() + 1);
-    const nextDateStr = getLocalDateString(nextDate);
-    const nextTask = staffTasksByDate[staffId]?.[nextDateStr];
-    
-    if (task === "Inbound" || task === "Inbound Late") {
-      if (nextTask === "Inbound" || nextTask === "Inbound Late") return true;
-    }
-    if (nextTask === task) return true;
     
     return false;
   };
@@ -183,34 +172,25 @@ export function generateWeeklyRota({
   // Simplified sorting: 4 priorities only
   const sortByFairness = (available: StaffMember[], task: Task, dateStr: string): StaffMember[] => {
     return available.sort((a, b) => {
-      // Priority 1: Avoid consecutive tasks (hard constraint)
+      // Priority 1: Avoid consecutive tasks (soft preference, not blocker)
       const aViolates = wouldViolateConsecutive(a.id, task, dateStr);
       const bViolates = wouldViolateConsecutive(b.id, task, dateStr);
-      if (aViolates && !bViolates) return 1;
-      if (!aViolates && bViolates) return -1;
+      if (aViolates !== bViolates) return aViolates ? 1 : -1;
 
-      // Sort by priority
-      available.sort((a, b) => {
-        // Priority 0: Avoid consecutive tasks (soft preference, not blocker)
-        const aConsecutive = hasConsecutiveTask(a.id, task, dateStr);
-        const bConsecutive = hasConsecutiveTask(b.id, task, dateStr);
-        if (aConsecutive !== bConsecutive) return aConsecutive ? 1 : -1;
+      // Priority 2: Fewest times doing THIS task
+      const aTaskCount = staffTaskCounts[a.id][task] || 0;
+      const bTaskCount = staffTaskCounts[b.id][task] || 0;
+      if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
 
-        // Priority 1: Fewest times doing THIS task
-        const aTaskCount = taskCounts.get(a.id)?.get(task) || 0;
-        const bTaskCount = taskCounts.get(b.id)?.get(task) || 0;
-        if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
+      // Priority 3: Fewest overall assignments
+      const aTotal = staffAssignmentCounts[a.id] || 0;
+      const bTotal = staffAssignmentCounts[b.id] || 0;
+      if (aTotal !== bTotal) return aTotal - bTotal;
 
-        // Priority 2: Fewest overall assignments
-        const aTotal = totalCounts.get(a.id) || 0;
-        const bTotal = totalCounts.get(b.id) || 0;
-        if (aTotal !== bTotal) return aTotal - bTotal;
-
-        // Priority 3: Earlier shift preferred
-        const aShiftIdx = shiftOrder.indexOf(a.shiftStart || "06:00");
-        const bShiftIdx = shiftOrder.indexOf(b.shiftStart || "06:00");
-        return aShiftIdx - bShiftIdx;
-      });
+      // Priority 4: Earlier shift preferred
+      const aShiftIdx = shiftOrder.indexOf(a.shiftStart || "06:00");
+      const bShiftIdx = shiftOrder.indexOf(b.shiftStart || "06:00");
+      return aShiftIdx - bShiftIdx;
     });
   };
 
