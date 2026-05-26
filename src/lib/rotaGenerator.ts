@@ -23,11 +23,6 @@ export function generateWeeklyRota({
   weekStart: Date;
   lockedAssignments?: Assignment[];
 }): Assignment[] {
-  console.log("🚀 ROTA GENERATION STARTED");
-  console.log(`   Staff count: ${staff.length}`);
-  console.log(`   Week start: ${weekStart.toISOString()}`);
-  console.log(`   Locked assignments: ${lockedAssignments.length}`);
-  
   const assignments: Assignment[] = [...lockedAssignments];
 
   // Track assignments per staff member
@@ -96,17 +91,13 @@ export function generateWeeklyRota({
   const getAvailableStaff = (task: Task, dateStr: string, dayIndex: number): StaffMember[] => {
     const allStaff: StaffMember[] = [];
     
-    console.log(`  🔍 getAvailableStaff: task=${task}, date=${dateStr}, dayIndex=${dayIndex}`);
-    
     for (const shift of shiftOrder) {
       const shiftStaff = staffByShift[shift] || [];
-      console.log(`    Shift ${shift}: ${shiftStaff.length} staff`);
       
       const available = shiftStaff.filter((s) => {
         // Must be trained for the task
         const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
         if (!s.trainedTasks.includes(taskToCheck)) {
-          console.log(`      ❌ ${s.name}: not trained on ${taskToCheck} (has: ${s.trainedTasks.join(", ")})`);
           return false;
         }
         
@@ -123,13 +114,10 @@ export function generateWeeklyRota({
           // Allow Frozen + Inbound combination
           if ((task === "Inbound" || task === "Inbound Late") && hasFrozen && !hasInbound) {
             // This is OK - they have Frozen, now assigning Inbound
-            console.log(`      ✓ ${s.name}: has Frozen, can add ${task}`);
           } else if (task === "Frozen" && hasInbound && !hasFrozen) {
             // This is OK - they have Inbound, now assigning Frozen
-            console.log(`      ✓ ${s.name}: has Inbound, can add Frozen`);
           } else {
             // Any other combination = already assigned, skip
-            console.log(`      ❌ ${s.name}: already assigned on ${dateStr} (${dayAssignments.map(a => a.task).join(", ")})`);
             return false;
           }
         }
@@ -138,24 +126,18 @@ export function generateWeeklyRota({
         // Block ONLY if explicitly marked as unavailable (rest day, holiday, sick)
         const availability = s.availability?.find((a) => a.date === dateStr);
         
-        console.log(`      🔍 ${s.name} availability: dateStr=${dateStr}, found=${!!availability}, type=${availability?.type || 'none'}, hasRecords=${s.availability?.length || 0}`);
-        
         if (availability && availability.type !== "available") {
           // Explicitly marked as rest day, holiday, or sick leave - BLOCK
-          console.log(`      ❌ ${s.name}: NOT AVAILABLE (${availability.type})`);
           return false;
         }
         
-        console.log(`      ✅ ${s.name}: AVAILABLE`);
         // No record OR record says "available" - ALLOW
         return true;
       });
 
-      console.log(`    Available from shift ${shift}: ${available.length} (${available.map(s => s.name).join(", ")})`);
       allStaff.push(...available);
     }
 
-    console.log(`  📊 Total available: ${allStaff.length}`);
     return allStaff;
   };
 
@@ -163,9 +145,18 @@ export function generateWeeklyRota({
   const wouldViolateConsecutive = (staffId: string, task: Task, dateStr: string): boolean => {
     const currentDate = new Date(dateStr);
     
-    // Check previous day only
+    // Only check within the current week - don't look at previous week
+    const weekStartDate = new Date(baseYear, baseMonth, baseDay);
+    
+    // Check previous day only if it's within this week
     const prevDate = new Date(currentDate);
     prevDate.setDate(prevDate.getDate() - 1);
+    
+    // If previous day is before this week's start, don't check it
+    if (prevDate < weekStartDate) {
+      return false;
+    }
+    
     const prevDateStr = getLocalDateString(prevDate);
     const prevTask = staffTasksByDate[staffId]?.[prevDateStr];
     
@@ -238,7 +229,6 @@ export function generateWeeklyRota({
   // ============================================
   // PHASE A: CRITICAL + FIRST ASSIGNMENTS
   // ============================================
-  console.log("🎯 PHASE A: Critical tasks + ensuring everyone gets first assignment...");
 
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
     // Create date using local components only - no timezone conversion
@@ -291,7 +281,6 @@ export function generateWeeklyRota({
   // ============================================
   // PHASE B: FAIR DISTRIBUTION
   // ============================================
-  console.log("📍 PHASE B: Fair distribution with quotas...");
 
   // Step 1: Frozen-trained staff Inbound quota
   const frozenTrainedStaff = staff.filter(s => 
@@ -385,32 +374,6 @@ export function generateWeeklyRota({
   // ============================================
   // DIAGNOSTICS
   // ============================================
-  console.log("✅ Rota generation complete");
-  console.log(`   Total assignments: ${assignments.length}`);
-  
-  const zeroAssignments = staff.filter(s => staffAssignmentCounts[s.id] === 0);
-  if (zeroAssignments.length > 0) {
-    console.log("⚠️ Staff with ZERO assignments:");
-    zeroAssignments.forEach(s => {
-      const workingDays = staffWorkingDays[s.id];
-      const reasons: string[] = [];
-      
-      if (workingDays === 0) reasons.push("no working days this week");
-      if (s.trainedTasks.length === 0) reasons.push("not trained on any tasks");
-      if (s.trainedTasks.length > 0 && workingDays > 0) {
-        reasons.push(`trained on ${s.trainedTasks.join(", ")} but couldn't be assigned - check task requirements and availability conflicts`);
-      }
-      
-      console.log(`   - ${s.name}: ${reasons.join(", ")}`);
-    });
-  }
-
-  if (unfilledSlots.length > 0) {
-    console.log("⚠️ Unfilled slots:");
-    unfilledSlots.forEach(slot => {
-      console.log(`   - ${slot.task} on ${slot.date}: ${slot.reason}`);
-    });
-  }
 
   return assignments;
 }
