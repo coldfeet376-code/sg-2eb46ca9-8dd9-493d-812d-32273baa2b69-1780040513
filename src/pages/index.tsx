@@ -40,6 +40,14 @@ const OnboardingTour = dynamic(
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"];
 
+function getLocalDateString(date: Date): string {
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function formatDateRange(start: Date, end: Date): string {
   if (!start || !end) return "";
   return `${start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} - ${end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
@@ -272,7 +280,7 @@ export default function Home() {
     for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
       const currentDate = new Date(weekStart);
       currentDate.setDate(weekStart.getDate() + dayOffset);
-      const dateStr = currentDate.toISOString().split("T")[0];
+      const dateStr = getLocalDateString(currentDate);
 
       TASKS.forEach((task) => {
         const required = taskConfig[task]?.[dayOffset] || 0;
@@ -353,7 +361,7 @@ export default function Home() {
     await rotaRealtimeService.logAction(
       "generated",
       "rota",
-      weekStart.toISOString().split("T")[0],
+      getLocalDateString(weekStart),
       `Generated rota for week of ${weekStart.toLocaleDateString()} (auto-locked)`
     );
     
@@ -441,7 +449,7 @@ export default function Home() {
   };
 
   const toggleLockAssignment = async (task: string, dayIndex: number, staffName: string) => {
-    const dateStr = weekDates[dayIndex].toISOString().split("T")[0];
+    const dateStr = getLocalDateString(weekDates[dayIndex]);
     
     const assignment = assignments.find(
       (a) => a.task === task && a.date === dateStr && a.staffName === staffName
@@ -477,7 +485,7 @@ export default function Home() {
   };
 
   const isAssignmentLocked = (task: string, dayIndex: number, staffName: string) => {
-    const dateStr = weekDates[dayIndex].toISOString().split("T")[0];
+    const dateStr = getLocalDateString(weekDates[dayIndex]);
     return lockedAssignments.some(
       (la) => la.task === task && la.date === dateStr && la.staffName === staffName
     );
@@ -488,7 +496,7 @@ export default function Home() {
     await rotaRealtimeService.logAction(
       "locked",
       "rota",
-      weekStart.toISOString().split("T")[0],
+      getLocalDateString(weekStart),
       "Locked all assignments"
     );
   };
@@ -498,7 +506,7 @@ export default function Home() {
     await rotaRealtimeService.logAction(
       "unlocked_all",
       "rota",
-      weekStart.toISOString().split("T")[0],
+      getLocalDateString(weekStart),
       "Unlocked all assignments"
     );
     setShowUnlockConfirm(false);
@@ -602,7 +610,7 @@ export default function Home() {
                 <td class="task-cell">${task}</td>
                 ${DAYS.map((_, dayIdx) => {
                   const date = weekDates[dayIdx];
-                  const dateStr = date.toISOString().split("T")[0];
+                  const dateStr = getLocalDateString(date);
                   const dayAssignments = assignments.filter(a => a.task === task && a.date === dateStr);
                   
                   if (dayAssignments.length === 0) {
@@ -686,7 +694,7 @@ export default function Home() {
 
   const getAssignmentsForTaskAndDay = (task: string, dateIndex: number): Assignment[] => {
     const date = weekDates[dateIndex];
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = getLocalDateString(date);
     
     return assignments.filter(a => a.task === task && a.date === dateStr);
   };
@@ -719,7 +727,7 @@ export default function Home() {
     if (!staffMember) return null;
 
     const date = weekDates[dateIndex];
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = getLocalDateString(date);
     
     const availability = staffMember.availability?.find(a => a.date === dateStr);
     
@@ -741,7 +749,7 @@ export default function Home() {
 
   const getAllUnavailableStaff = (task: string, dateIndex: number): { name: string; reason: string; color: string }[] => {
     const date = weekDates[dateIndex];
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = getLocalDateString(date);
     
     return staff
       .filter(s => {
@@ -1403,7 +1411,7 @@ export default function Home() {
                                     setSmartAssignDialog({
                                       open: true,
                                       task: task as Task,
-                                      date: weekDates[dayIdx].toISOString().split("T")[0],
+                                      date: getLocalDateString(weekDates[dayIdx]),
                                     });
                                   }}
                                   title="Click for smart assignment suggestions"
@@ -1773,7 +1781,7 @@ export default function Home() {
                     
                     const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
                     const trainedStaff = staff.filter(s => 
-                      s.trainedTasks.includes(taskToCheck)
+                      s.trainedTasks.includes(taskToCheck as Task)
                     );
                     
                     return (
