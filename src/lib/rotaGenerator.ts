@@ -68,7 +68,7 @@ export function generateWeeklyRota({
     
     console.log(`\n${"=".repeat(60)}`);
     console.log(`📅 ${dayName} - ${dateStr}`);
-    console.log(${"=".repeat(60)}`);
+    console.log("=".repeat(60));
 
     // Process each task for this day
     for (const taskName of Object.keys(taskConfig)) {
