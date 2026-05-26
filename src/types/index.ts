@@ -104,6 +104,7 @@ export interface FairnessMetrics {
     staffName: string;
     totalAssignments: number;
     taskBreakdown: Record<Task, number>;
+    availableDays: number;
   }[];
   standardDeviation: number;
 }
