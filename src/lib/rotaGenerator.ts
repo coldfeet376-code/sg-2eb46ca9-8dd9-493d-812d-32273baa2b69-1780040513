@@ -4,7 +4,7 @@ interface TaskConfig {
   [task: string]: number[]; // 7 numbers for Sun-Sat
 }
 
-// Centralized date handling to prevent timezone bugs
+// Centralized date handling - use local components only
 function getLocalDateString(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -23,325 +23,192 @@ export function generateWeeklyRota({
   weekStart: Date;
   lockedAssignments?: Assignment[];
 }): Assignment[] {
+  console.log("=".repeat(60));
+  console.log("🚀 ROTA GENERATION STARTED");
+  console.log(`📅 Week: ${weekStart.toDateString()}`);
+  console.log(`👥 Staff: ${staff.length}`);
+  console.log(`🔒 Locked: ${lockedAssignments.length}`);
+  console.log("=".repeat(60));
+
   const assignments: Assignment[] = [...lockedAssignments];
-
-  // Track assignments per staff member
-  const staffAssignmentCounts: Record<string, number> = {};
-  const staffTasksByDate: Record<string, Record<string, Task>> = {};
-  const staffTaskCounts: Record<string, Record<Task, number>> = {};
   
-  staff.forEach((s) => {
-    staffAssignmentCounts[s.id] = 0;
-    staffTasksByDate[s.id] = {};
-    staffTaskCounts[s.id] = {
-      "Frozen": 0,
-      "Milk": 0,
-      "TWI": 0,
-      "Inbound": 0,
-      "Inbound Late": 0,
-      "Outbound": 0,
-      "Marshaling": 0,
-      "Housekeeping": 0,
-    };
-  });
-
-  // Count existing locked assignments
-  lockedAssignments.forEach((a) => {
-    const staffMember = staff.find((s) => s.name === a.staffName);
-    const staffId = a.staffId || staffMember?.id;
-    if (staffId) {
-      staffAssignmentCounts[staffId] = (staffAssignmentCounts[staffId] || 0) + 1;
-      staffTasksByDate[staffId][a.date] = a.task as Task;
-      staffTaskCounts[staffId][a.task as Task] = (staffTaskCounts[staffId][a.task as Task] || 0) + 1;
-    }
-  });
-
-  // Group staff by shift start time
-  const staffByShift = staff.reduce((acc, s) => {
-    const shift = s.shiftStart || "06:00";
-    if (!acc[shift]) acc[shift] = [];
-    acc[shift].push(s);
-    return acc;
-  }, {} as Record<ShiftStart, StaffMember[]>);
-
-  const shiftOrder: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
-
-  // Calculate working days per staff member - use local date arithmetic
-  const staffWorkingDays: Record<string, number> = {};
+  // Extract local date components once
   const baseYear = weekStart.getFullYear();
   const baseMonth = weekStart.getMonth();
   const baseDay = weekStart.getDate();
+
+  // Track how many times each person has been assigned
+  const assignmentCounts: Record<string, number> = {};
+  const taskCounts: Record<string, Record<Task, number>> = {};
   
   staff.forEach(s => {
-    let workingDays = 0;
-    for (let d = 0; d < 7; d++) {
-      // Create date using local components only - no timezone conversion
-      const currentDate = new Date(baseYear, baseMonth, baseDay + d);
-      const dateStr = getLocalDateString(currentDate);
-      
-      const availability = s.availability?.find(a => a.date === dateStr);
-      if (!availability || availability.type === "available") {
-        workingDays++;
-      }
-    }
-    staffWorkingDays[s.id] = workingDays;
+    assignmentCounts[s.id] = 0;
+    taskCounts[s.id] = {};
   });
 
-  // Helper: Get available staff for a specific task/day
-  const getAvailableStaff = (task: Task, dateStr: string, dayIndex: number): StaffMember[] => {
-    const allStaff: StaffMember[] = [];
+  // Count locked assignments
+  lockedAssignments.forEach(a => {
+    if (a.staffId) {
+      assignmentCounts[a.staffId] = (assignmentCounts[a.staffId] || 0) + 1;
+      taskCounts[a.staffId] = taskCounts[a.staffId] || {};
+      taskCounts[a.staffId][a.task as Task] = (taskCounts[a.staffId][a.task as Task] || 0) + 1;
+    }
+  });
+
+  console.log("\n📋 Initial assignment counts:");
+  staff.forEach(s => {
+    console.log(`   ${s.name}: ${assignmentCounts[s.id]} assignments`);
+  });
+
+  // Process each day
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    const currentDate = new Date(baseYear, baseMonth, baseDay + dayIndex);
+    const dateStr = getLocalDateString(currentDate);
+    const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dayIndex];
     
-    for (const shift of shiftOrder) {
-      const shiftStaff = staffByShift[shift] || [];
+    console.log(`\n${"=".repeat(60)}`);
+    console.log(`📅 ${dayName} - ${dateStr}`);
+    console.log(${"=".repeat(60)}`);
+
+    // Process each task for this day
+    for (const taskName of Object.keys(taskConfig)) {
+      const task = taskName as Task;
+      const required = taskConfig[task][dayIndex];
       
-      const available = shiftStaff.filter((s) => {
-        // Must be trained for the task
+      if (required === 0) {
+        console.log(`   ⏭️  ${task}: 0 required, skipping`);
+        continue;
+      }
+
+      console.log(`\n   🎯 ${task}: ${required} required`);
+
+      // Check how many are already assigned (locked)
+      const alreadyAssigned = assignments.filter(
+        a => a.date === dateStr && a.task === task
+      ).length;
+      
+      const needed = required - alreadyAssigned;
+      
+      if (needed <= 0) {
+        console.log(`   ✅ ${task}: Already filled (${alreadyAssigned}/${required})`);
+        continue;
+      }
+
+      console.log(`   🔍 Need to assign ${needed} more staff`);
+
+      // Find available staff for this task on this day
+      const availableStaff: StaffMember[] = [];
+
+      for (const staffMember of staff) {
+        // Check 1: Is staff trained for this task?
         const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
-        if (!s.trainedTasks.includes(taskToCheck)) {
-          return false;
+        if (!staffMember.trainedTasks.includes(taskToCheck)) {
+          console.log(`      ❌ ${staffMember.name}: Not trained on ${taskToCheck}`);
+          continue;
         }
+
+        // Check 2: Is staff available on this date?
+        const availability = staffMember.availability?.find(a => a.date === dateStr);
+        console.log(`      🔍 ${staffMember.name} availability check:`);
+        console.log(`         - Date: ${dateStr}`);
+        console.log(`         - Availability records: ${staffMember.availability?.length || 0}`);
+        console.log(`         - Found record: ${availability ? `YES (${availability.type})` : 'NO'}`);
         
-        // Check if already assigned on this day
+        if (availability && availability.type !== "available") {
+          console.log(`      ❌ ${staffMember.name}: Marked as ${availability.type}`);
+          continue;
+        }
+
+        // Check 3: Already assigned on this day?
         const dayAssignments = assignments.filter(
-          (a) => a.staffId === s.id && a.date === dateStr
+          a => a.staffId === staffMember.id && a.date === dateStr
         );
-        
-        // SPECIAL RULE: Frozen finishes at 10:00, so staff can do Frozen + Inbound on same day
-        const hasFrozen = dayAssignments.some(a => a.task === "Frozen");
-        const hasInbound = dayAssignments.some(a => a.task === "Inbound" || a.task === "Inbound Late");
-        
+
         if (dayAssignments.length > 0) {
-          // Allow Frozen + Inbound combination
+          const hasFrozen = dayAssignments.some(a => a.task === "Frozen");
+          const hasInbound = dayAssignments.some(a => a.task === "Inbound" || a.task === "Inbound Late");
+          
+          // Special rule: Frozen + Inbound allowed
           if ((task === "Inbound" || task === "Inbound Late") && hasFrozen && !hasInbound) {
-            // This is OK - they have Frozen, now assigning Inbound
+            console.log(`      ✅ ${staffMember.name}: Has Frozen, can add ${task}`);
           } else if (task === "Frozen" && hasInbound && !hasFrozen) {
-            // This is OK - they have Inbound, now assigning Frozen
+            console.log(`      ✅ ${staffMember.name}: Has Inbound, can add Frozen`);
           } else {
-            // Any other combination = already assigned, skip
-            return false;
+            console.log(`      ❌ ${staffMember.name}: Already assigned ${dayAssignments.map(a => a.task).join(", ")}`);
+            continue;
           }
         }
 
-        // CRITICAL AVAILABILITY CHECK
-        // Block ONLY if explicitly marked as unavailable (rest day, holiday, sick)
-        const availability = s.availability?.find((a) => a.date === dateStr);
+        console.log(`      ✅ ${staffMember.name}: AVAILABLE`);
+        availableStaff.push(staffMember);
+      }
+
+      console.log(`   📊 ${availableStaff.length} staff available: ${availableStaff.map(s => s.name).join(", ")}`);
+
+      if (availableStaff.length === 0) {
+        console.log(`   ⚠️  WARNING: No staff available for ${task} on ${dayName}`);
+        continue;
+      }
+
+      // Sort by fairness: fewest times doing THIS task, then fewest overall
+      availableStaff.sort((a, b) => {
+        const aTaskCount = (taskCounts[a.id] && taskCounts[a.id][task]) || 0;
+        const bTaskCount = (taskCounts[b.id] && taskCounts[b.id][task]) || 0;
+        if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
         
-        if (availability && availability.type !== "available") {
-          // Explicitly marked as rest day, holiday, or sick leave - BLOCK
-          return false;
-        }
-        
-        // No record OR record says "available" - ALLOW
-        return true;
+        const aTotal = assignmentCounts[a.id] || 0;
+        const bTotal = assignmentCounts[b.id] || 0;
+        return aTotal - bTotal;
       });
 
-      allStaff.push(...available);
-    }
-
-    return allStaff;
-  };
-
-  // Helper: Assign staff to a slot
-  const assignStaff = (staffMember: StaffMember, task: Task, dateStr: string): void => {
-    assignments.push({
-      staffId: staffMember.id,
-      staffName: staffMember.name,
-      task: task,
-      date: dateStr,
-    });
-    
-    staffAssignmentCounts[staffMember.id]++;
-    staffTasksByDate[staffMember.id][dateStr] = task;
-    staffTaskCounts[staffMember.id][task]++;
-  };
-
-  // Simplified sorting: 3 priorities for fair distribution
-  const sortByFairness = (available: StaffMember[], task: Task, dateStr: string): StaffMember[] => {
-    return available.sort((a, b) => {
-      // Priority 1: Fewest times doing THIS task
-      const aTaskCount = staffTaskCounts[a.id][task] || 0;
-      const bTaskCount = staffTaskCounts[b.id][task] || 0;
-      if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
-
-      // Priority 2: Fewest overall assignments
-      const aTotal = staffAssignmentCounts[a.id] || 0;
-      const bTotal = staffAssignmentCounts[b.id] || 0;
-      if (aTotal !== bTotal) return aTotal - bTotal;
-
-      // Priority 3: Earlier shift preferred
-      const aShiftIdx = shiftOrder.indexOf(a.shiftStart || "06:00");
-      const bShiftIdx = shiftOrder.indexOf(b.shiftStart || "06:00");
-      return aShiftIdx - bShiftIdx;
-    });
-  };
-
-  // Task priority for processing order
-  const getTaskPriority = (task: Task): number => {
-    if (task === "Frozen") return 1;
-    if (task === "Inbound") return 1;
-    if (task === "Inbound Late") return 2;
-    if (task === "Milk" || task === "TWI" || task === "Outbound" || task === "Marshaling") return 3;
-    return 4; // Housekeeping
-  };
-
-  const taskOrder = Object.keys(taskConfig).sort((a, b) => {
-    const aPriority = getTaskPriority(a as Task);
-    const bPriority = getTaskPriority(b as Task);
-    if (aPriority !== bPriority) return aPriority - bPriority;
-    return a.localeCompare(b);
-  });
-
-  // Track unfilled slots for diagnostics
-  const unfilledSlots: Array<{ task: Task; date: string; reason: string }> = [];
-
-  // ============================================
-  // PHASE A: CRITICAL + FIRST ASSIGNMENTS
-  // ============================================
-
-  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-    // Create date using local components only - no timezone conversion
-    const currentDate = new Date(baseYear, baseMonth, baseDay + dayIndex);
-    const dateStr = getLocalDateString(currentDate);
-
-    for (const taskName of taskOrder) {
-      const task = taskName as Task;
-      const required = taskConfig[task][dayIndex] || 0;
-      if (required === 0) continue;
-
-      const existingCount = assignments.filter(
-        (a) => a.date === dateStr && a.task === task
-      ).length;
-      const needed = required - existingCount;
-      if (needed <= 0) continue;
-
-      const available = getAvailableStaff(task, dateStr, dayIndex);
-      
-      if (available.length === 0) {
-        unfilledSlots.push({ task, date: dateStr, reason: "No trained staff available" });
-        continue;
-      }
-
-      // Priority 1: Tasks with limited staff pool (1-2 people) - assign immediately
-      if (task !== "Inbound Late" && available.length <= 2) {
-        const sorted = sortByFairness(available, task, dateStr);
-        const toAssign = Math.min(needed, sorted.length);
-        
-        for (let i = 0; i < toAssign; i++) {
-          assignStaff(sorted[i], task, dateStr);
-        }
-        continue;
-      }
-
-      // Priority 2: Staff with zero assignments get preference
-      const zeroAssignmentStaff = available.filter(s => staffAssignmentCounts[s.id] === 0);
-      
-      if (zeroAssignmentStaff.length > 0) {
-        const sorted = sortByFairness(zeroAssignmentStaff, task, dateStr);
-        const toAssign = Math.min(needed, sorted.length);
-        
-        for (let i = 0; i < toAssign; i++) {
-          assignStaff(sorted[i], task, dateStr);
-        }
-      }
-    }
-  }
-
-  // ============================================
-  // PHASE B: FAIR DISTRIBUTION
-  // ============================================
-
-  // Step 1: Frozen-trained staff Inbound quota
-  const frozenTrainedStaff = staff.filter(s => 
-    s.trainedTasks.includes("Frozen") && s.trainedTasks.includes("Inbound")
-  );
-  
-  for (const staffMember of frozenTrainedStaff) {
-    const workingDays = staffWorkingDays[staffMember.id] || 0;
-    
-    let inboundQuota = 0;
-    if (workingDays >= 5) inboundQuota = 2;
-    else if (workingDays >= 3) inboundQuota = 1;
-    
-    if (inboundQuota === 0) continue;
-    
-    const currentInboundCount = assignments.filter(a => 
-      a.staffId === staffMember.id && a.task === "Inbound"
-    ).length;
-    
-    const inboundNeeded = inboundQuota - currentInboundCount;
-    if (inboundNeeded <= 0) continue;
-    
-    let assigned = 0;
-    for (let dayIndex = 0; dayIndex < 7 && assigned < inboundNeeded; dayIndex++) {
-      // Create date using local components only - no timezone conversion
-      const currentDate = new Date(baseYear, baseMonth, baseDay + dayIndex);
-      const dateStr = getLocalDateString(currentDate);
-      
-      const task = "Inbound" as Task;
-      const required = taskConfig[task][dayIndex] || 0;
-      if (required === 0) continue;
-      
-      const existingCount = assignments.filter(
-        (a) => a.date === dateStr && a.task === task
-      ).length;
-      
-      if (existingCount >= required) continue;
-      
-      const available = getAvailableStaff(task, dateStr, dayIndex);
-      const canAssign = available.some(s => s.id === staffMember.id);
-      
-      if (canAssign) {
-        assignStaff(staffMember, task, dateStr);
-        assigned++;
-      }
-    }
-  }
-
-  // Step 2: Fill all remaining slots
-  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-    // Create date using local components only - no timezone conversion
-    const currentDate = new Date(baseYear, baseMonth, baseDay + dayIndex);
-    const dateStr = getLocalDateString(currentDate);
-
-    for (const taskName of taskOrder) {
-      const task = taskName as Task;
-      const required = taskConfig[task][dayIndex] || 0;
-      if (required === 0) continue;
-
-      const existingCount = assignments.filter(
-        (a) => a.date === dateStr && a.task === task
-      ).length;
-      const needed = required - existingCount;
-      if (needed <= 0) continue;
-
-      const available = getAvailableStaff(task, dateStr, dayIndex);
-      
-      if (available.length === 0) {
-        unfilledSlots.push({ task, date: dateStr, reason: "No available staff (all assigned or unavailable)" });
-        continue;
-      }
-
-      const sorted = sortByFairness(available, task, dateStr);
-      const toAssign = Math.min(needed, sorted.length);
+      // Assign staff
+      const toAssign = Math.min(needed, availableStaff.length);
+      console.log(`   ⚡ Assigning ${toAssign} staff:`);
       
       for (let i = 0; i < toAssign; i++) {
-        assignStaff(sorted[i], task, dateStr);
+        const staffMember = availableStaff[i];
+        
+        assignments.push({
+          staffId: staffMember.id,
+          staffName: staffMember.name,
+          task: task,
+          date: dateStr,
+        });
+
+        assignmentCounts[staffMember.id]++;
+        taskCounts[staffMember.id] = taskCounts[staffMember.id] || {};
+        taskCounts[staffMember.id][task] = (taskCounts[staffMember.id][task] || 0) + 1;
+
+        const taskCount = taskCounts[staffMember.id][task];
+        const totalCount = assignmentCounts[staffMember.id];
+        console.log(`      ✅ ${staffMember.name} → ${task} (${taskCount}x this task, ${totalCount} total)`);
       }
 
-      // Log if we couldn't fill all slots
       if (toAssign < needed) {
-        unfilledSlots.push({ 
-          task, 
-          date: dateStr, 
-          reason: `Only ${toAssign}/${needed} slots filled (${available.length} available, ${needed - toAssign} blocked by constraints)` 
-        });
+        console.log(`   ⚠️  WARNING: Only assigned ${toAssign}/${needed} for ${task}`);
       }
     }
   }
 
-  // ============================================
-  // DIAGNOSTICS
-  // ============================================
+  console.log("\n" + "=".repeat(60));
+  console.log("📊 FINAL ASSIGNMENT SUMMARY");
+  console.log("=".repeat(60));
+  staff.forEach(s => {
+    const count = assignmentCounts[s.id] || 0;
+    const tasks = Object.entries(taskCounts[s.id] || {})
+      .filter(([_, count]) => count > 0)
+      .map(([task, count]) => `${task}:${count}`)
+      .join(", ");
+    console.log(`   ${s.name}: ${count} assignments ${tasks ? `(${tasks})` : ''}`);
+  });
+
+  const unassigned = staff.filter(s => (assignmentCounts[s.id] || 0) === 0);
+  if (unassigned.length > 0) {
+    console.log(`\n⚠️  Staff with ZERO assignments: ${unassigned.map(s => s.name).join(", ")}`);
+  }
+
+  console.log(`\n✅ Total assignments: ${assignments.length}`);
+  console.log("=".repeat(60) + "\n");
 
   return assignments;
 }
