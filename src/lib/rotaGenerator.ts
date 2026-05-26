@@ -380,9 +380,9 @@ export function generateWeeklyRota({
     
     if (inboundQuota === 0) continue;
     
-    // Count current Inbound assignments for this staff member
+    // Count current Inbound assignments for this staff member (only regular Inbound, not Late)
     const currentInboundCount = assignments.filter(a => 
-      a.staffId === staffMember.id && (a.task === "Inbound" || a.task === "Inbound Late")
+      a.staffId === staffMember.id && a.task === "Inbound"
     ).length;
     
     const inboundNeeded = inboundQuota - currentInboundCount;
@@ -394,49 +394,42 @@ export function generateWeeklyRota({
     
     console.log(`  🎯 ${staffMember.name} needs ${inboundNeeded} more Inbound shifts (${currentInboundCount}/${inboundQuota} current)`);
     
-    // Find days where we can assign this staff member to Inbound
+    // Find days where we can assign this staff member to Inbound (not Inbound Late)
     let assigned = 0;
     for (let dayIndex = 0; dayIndex < 7 && assigned < inboundNeeded; dayIndex++) {
       const currentDate = new Date(weekStart);
       currentDate.setDate(currentDate.getDate() + dayIndex);
       const dateStr = currentDate.toISOString().split("T")[0];
       
-      // Try Inbound first, then Inbound Late
-      for (const task of ["Inbound", "Inbound Late"] as Task[]) {
-        if (assigned >= inboundNeeded) break;
+      const task = "Inbound" as Task;
+      const required = taskConfig[task][dayIndex] || 0;
+      if (required === 0) continue;
+      
+      const existingCount = assignments.filter(
+        (a) => a.date === dateStr && a.task === task
+      ).length;
+      
+      if (existingCount >= required) continue; // This task is full
+      
+      // Check if this staff member can be assigned
+      const available = getAvailableStaff(task, dateStr, dayIndex);
+      const canAssign = available.some(s => s.id === staffMember.id);
+      
+      if (canAssign && !wouldViolateConsecutive(staffMember.id, task, dateStr)) {
+        assignments.push({
+          staffId: staffMember.id,
+          staffName: staffMember.name,
+          task: task,
+          date: dateStr,
+        });
         
-        const required = taskConfig[task][dayIndex] || 0;
-        if (required === 0) continue;
+        staffAssignmentCounts[staffMember.id]++;
+        staffTasksByDate[staffMember.id][dateStr] = task;
+        staffTaskCounts[staffMember.id][task]++;
+        staffTaskVariety[staffMember.id].add(task);
         
-        const existingCount = assignments.filter(
-          (a) => a.date === dateStr && a.task === task
-        ).length;
-        
-        if (existingCount >= required) continue; // This task is full
-        
-        // Check if this staff member can be assigned
-        const available = getAvailableStaff(task, dateStr, dayIndex);
-        const canAssign = available.some(s => s.id === staffMember.id);
-        
-        if (canAssign && !wouldViolateConsecutive(staffMember.id, task, dateStr)) {
-          assignments.push({
-            staffId: staffMember.id,
-            staffName: staffMember.name,
-            task: task,
-            date: dateStr,
-          });
-          
-          staffAssignmentCounts[staffMember.id]++;
-          staffTasksByDate[staffMember.id][dateStr] = task;
-          staffTaskCounts[staffMember.id][task]++;
-          if (task !== "Frozen") {
-            staffTaskVariety[staffMember.id].add(task);
-          }
-          
-          assigned++;
-          console.log(`    ✓ Assigned ${staffMember.name} to ${task} on ${dateStr} (quota: ${assigned}/${inboundQuota})`);
-          break; // Move to next day
-        }
+        assigned++;
+        console.log(`    ✓ Assigned ${staffMember.name} to ${task} on ${dateStr} (quota: ${assigned}/${inboundQuota})`);
       }
     }
     
