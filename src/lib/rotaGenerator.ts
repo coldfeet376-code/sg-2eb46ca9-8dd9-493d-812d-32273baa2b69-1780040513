@@ -360,6 +360,92 @@ export function generateWeeklyRota({
   }
 
   // ============================================
+  // PHASE 1.5: INBOUND QUOTA FOR FROZEN-TRAINED STAFF
+  // ============================================
+  console.log("📍 PHASE 1.5: Ensuring Frozen-trained staff get Inbound quota...");
+
+  // Identify Frozen-trained staff and their Inbound quota
+  const frozenTrainedStaff = staff.filter(s => s.trainedTasks.includes("Frozen") && s.trainedTasks.includes("Inbound"));
+  
+  for (const staffMember of frozenTrainedStaff) {
+    const workingDays = staffWorkingDays[staffMember.id] || 0;
+    
+    // Determine Inbound quota based on working days
+    let inboundQuota = 0;
+    if (workingDays >= 5) {
+      inboundQuota = 2; // 5-day workers get 2 Inbound shifts
+    } else if (workingDays >= 3) {
+      inboundQuota = 1; // 3-day workers get 1 Inbound shift
+    }
+    
+    if (inboundQuota === 0) continue;
+    
+    // Count current Inbound assignments for this staff member
+    const currentInboundCount = assignments.filter(a => 
+      a.staffId === staffMember.id && (a.task === "Inbound" || a.task === "Inbound Late")
+    ).length;
+    
+    const inboundNeeded = inboundQuota - currentInboundCount;
+    
+    if (inboundNeeded <= 0) {
+      console.log(`  ✓ ${staffMember.name} already has ${currentInboundCount}/${inboundQuota} Inbound shifts`);
+      continue;
+    }
+    
+    console.log(`  🎯 ${staffMember.name} needs ${inboundNeeded} more Inbound shifts (${currentInboundCount}/${inboundQuota} current)`);
+    
+    // Find days where we can assign this staff member to Inbound
+    let assigned = 0;
+    for (let dayIndex = 0; dayIndex < 7 && assigned < inboundNeeded; dayIndex++) {
+      const currentDate = new Date(weekStart);
+      currentDate.setDate(currentDate.getDate() + dayIndex);
+      const dateStr = currentDate.toISOString().split("T")[0];
+      
+      // Try Inbound first, then Inbound Late
+      for (const task of ["Inbound", "Inbound Late"] as Task[]) {
+        if (assigned >= inboundNeeded) break;
+        
+        const required = taskConfig[task][dayIndex] || 0;
+        if (required === 0) continue;
+        
+        const existingCount = assignments.filter(
+          (a) => a.date === dateStr && a.task === task
+        ).length;
+        
+        if (existingCount >= required) continue; // This task is full
+        
+        // Check if this staff member can be assigned
+        const available = getAvailableStaff(task, dateStr, dayIndex);
+        const canAssign = available.some(s => s.id === staffMember.id);
+        
+        if (canAssign && !wouldViolateConsecutive(staffMember.id, task, dateStr)) {
+          assignments.push({
+            staffId: staffMember.id,
+            staffName: staffMember.name,
+            task: task,
+            date: dateStr,
+          });
+          
+          staffAssignmentCounts[staffMember.id]++;
+          staffTasksByDate[staffMember.id][dateStr] = task;
+          staffTaskCounts[staffMember.id][task]++;
+          if (task !== "Frozen") {
+            staffTaskVariety[staffMember.id].add(task);
+          }
+          
+          assigned++;
+          console.log(`    ✓ Assigned ${staffMember.name} to ${task} on ${dateStr} (quota: ${assigned}/${inboundQuota})`);
+          break; // Move to next day
+        }
+      }
+    }
+    
+    if (assigned < inboundNeeded) {
+      console.log(`  ⚠️ Could only assign ${assigned}/${inboundQuota} Inbound shifts for ${staffMember.name} (insufficient slots/availability)`);
+    }
+  }
+
+  // ============================================
   // PHASE 2: FILL REMAINING SLOTS WITH FAIRNESS
   // ============================================
   console.log("📍 PHASE 2: Filling remaining slots with fairness algorithm...");
