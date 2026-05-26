@@ -16,6 +16,7 @@ import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
 import { generateStaffRotaPDF } from "@/lib/pdfGenerator";
 import { rotaService } from "@/services/rotaService";
+import { staffService } from "@/services/staffService";
 import { rotaRealtimeService, type StoredRota } from "@/services/rotaRealtimeService";
 import { useNotifications } from "@/contexts/NotificationContext";
 import type { RealtimeChannel } from "@supabase/supabase-js";
@@ -756,6 +757,50 @@ export default function Home() {
     window.print();
   };
 
+  const autoPopulateAvailability = async () => {
+    try {
+      let updatedCount = 0;
+      
+      for (const staffMember of staff) {
+        for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+          const date = new Date(weekStart);
+          date.setDate(weekStart.getDate() + dayOffset);
+          const dateStr = date.toISOString().split("T")[0];
+          
+          // Check if availability already exists for this date
+          const existingAvailability = staffMember.availability?.find(a => a.date === dateStr);
+          
+          if (!existingAvailability) {
+            // Auto-mark as available
+            await staffService.addAvailability(staffMember.id, [{
+              date: dateStr,
+              type: "available",
+              notes: "Auto-populated",
+            }]);
+            updatedCount++;
+          }
+        }
+      }
+      
+      toast({
+        title: "✅ Availability Set",
+        description: `Auto-populated ${updatedCount} availability entries for the week`,
+      });
+      
+      // Refresh staff data
+      await new Promise(resolve => setTimeout(resolve, 500));
+      window.location.reload();
+      
+    } catch (error) {
+      console.error("Error auto-populating availability:", error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to set availability",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSwapApply = async (fromStaffId: string, toStaffId: string, task: string, date: string) => {
     // Find the assignment to swap from
     const assignmentIndex = assignments.findIndex(
@@ -941,6 +986,17 @@ export default function Home() {
           </CardHeader>
           <CardContent className="pt-6">
             <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={autoPopulateAvailability}
+                disabled={!staff.length || staffLoading}
+                variant="outline"
+                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
+                size="lg"
+              >
+                <Calendar className="h-5 w-5" />
+                Quick Setup Week
+              </Button>
+
               <Button
                 onClick={generateRota}
                 disabled={!staff.length || !taskConfig || staffLoading || configLoading}
