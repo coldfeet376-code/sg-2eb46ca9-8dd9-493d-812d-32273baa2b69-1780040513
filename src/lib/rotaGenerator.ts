@@ -47,16 +47,27 @@ export function generateWeeklyRota({
   const assignmentCounts: Record<string, number> = {};
   const taskCounts: Record<string, Record<Task, number>> = {};
   
+  const initTaskRecord = (): Record<Task, number> => ({
+    "Frozen": 0,
+    "Milk": 0,
+    "TWI": 0,
+    "Inbound": 0,
+    "Inbound Late": 0,
+    "Outbound": 0,
+    "Marshaling": 0,
+    "Housekeeping": 0
+  });
+
   staff.forEach(s => {
     assignmentCounts[s.id] = 0;
-    taskCounts[s.id] = {};
+    taskCounts[s.id] = initTaskRecord();
   });
 
   // Count locked assignments
   lockedAssignments.forEach(a => {
     if (a.staffId) {
       assignmentCounts[a.staffId] = (assignmentCounts[a.staffId] || 0) + 1;
-      taskCounts[a.staffId] = taskCounts[a.staffId] || {};
+      taskCounts[a.staffId] = taskCounts[a.staffId] || initTaskRecord();
       taskCounts[a.staffId][a.task as Task] = (taskCounts[a.staffId][a.task as Task] || 0) + 1;
     }
   });
@@ -182,7 +193,7 @@ export function generateWeeklyRota({
         });
 
         assignmentCounts[staffMember.id]++;
-        taskCounts[staffMember.id] = taskCounts[staffMember.id] || {};
+        taskCounts[staffMember.id] = taskCounts[staffMember.id] || initTaskRecord();
         taskCounts[staffMember.id][task] = (taskCounts[staffMember.id][task] || 0) + 1;
 
         const taskCount = taskCounts[staffMember.id][task];
