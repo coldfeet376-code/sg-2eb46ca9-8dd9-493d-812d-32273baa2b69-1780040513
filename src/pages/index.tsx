@@ -74,10 +74,15 @@ interface TaskConfig {
 
 export default function Home() {
   
-  // Safe date initialization with fallback
+  // Safe date initialization with fallback - always start on Sunday
   const [weekStart, setWeekStart] = useState<Date>(() => {
     try {
-      return getWeekStart(new Date());
+      const today = new Date();
+      const day = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const sunday = new Date(today);
+      sunday.setDate(today.getDate() - day); // Go back to Sunday
+      sunday.setHours(0, 0, 0, 0);
+      return sunday;
     } catch (e) {
       console.error("Error initializing week start:", e);
       return new Date();
@@ -853,12 +858,11 @@ export default function Home() {
             }}
             onTodayClick={() => {
               const today = new Date();
-              const day = today.getDay();
-              const diff = day === 0 ? 0 : 7 - day;
-              const saturday = new Date(today);
-              saturday.setDate(today.getDate() + diff);
-              saturday.setHours(0, 0, 0, 0);
-              setWeekStart(saturday);
+              const day = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+              const sunday = new Date(today);
+              sunday.setDate(today.getDate() - day); // Go back to Sunday
+              sunday.setHours(0, 0, 0, 0);
+              setWeekStart(sunday);
             }}
             data-tour="week-navigator"
           />
