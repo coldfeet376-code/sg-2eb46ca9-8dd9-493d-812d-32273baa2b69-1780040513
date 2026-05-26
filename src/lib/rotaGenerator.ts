@@ -106,28 +106,16 @@ export function generateWeeklyRota({
           }
         }
 
-        // CRITICAL AVAILABILITY CHECK - strict matching
-        // Check if staff has ANY availability records first
-        const hasAvailabilityRecords = s.availability && s.availability.length > 0;
+        // CRITICAL AVAILABILITY CHECK
+        // Block ONLY if explicitly marked as unavailable (rest day, holiday, sick)
+        const availability = s.availability?.find((a) => a.date === dateStr);
         
-        if (hasAvailabilityRecords) {
-          // Find exact date match
-          const availability = s.availability?.find((a) => a.date === dateStr);
-          
-          if (!availability) {
-            // They have availability records but NOT for this date
-            // This means the date is not in their working schedule
-            return false;
-          }
-          
-          // They have a record for this date - check the type
-          if (availability.type !== "available") {
-            // Explicitly marked as rest day, holiday, or sick
-            return false;
-          }
+        if (availability && availability.type !== "available") {
+          // Explicitly marked as rest day, holiday, or sick leave - BLOCK
+          return false;
         }
-        // If they have NO availability records at all, assume available (legacy behavior)
-
+        
+        // No record OR record says "available" - ALLOW
         return true;
       });
 
@@ -209,19 +197,14 @@ export function generateWeeklyRota({
       date.setDate(date.getDate() + d);
       const dateStr = date.toISOString().split("T")[0];
       
-      // Use same strict checking logic as getAvailableStaff
-      const hasAvailabilityRecords = s.availability && s.availability.length > 0;
+      // Count as working day UNLESS explicitly marked unavailable
+      const availability = s.availability?.find(a => a.date === dateStr);
       
-      if (hasAvailabilityRecords) {
-        const availability = s.availability?.find(a => a.date === dateStr);
-        // Only count as working day if explicitly marked available or no record exists
-        if (availability && availability.type === "available") {
-          workingDays++;
-        }
-      } else {
-        // No availability records = assume all days are working days
+      if (!availability || availability.type === "available") {
+        // No record OR explicitly available = working day
         workingDays++;
       }
+      // Only exclude if explicitly marked rest/holiday/sick
     }
     staffWorkingDays[s.id] = workingDays;
   });
