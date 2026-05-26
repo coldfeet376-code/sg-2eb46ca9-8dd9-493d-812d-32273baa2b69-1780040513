@@ -46,7 +46,18 @@ export function SmartAssignmentDialog({
 
   const handleAssign = (staffId: string) => {
     onAssign(staffId);
-    onClose();
+    // Keep dialog open to allow multiple assignments
+  };
+
+  const formatDate = (dateStr: string) => {
+    // Parse date string as local date to prevent timezone shifts
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const localDate = new Date(year, month - 1, day);
+    return localDate.toLocaleDateString("en-GB", { 
+      weekday: "long", 
+      day: "2-digit", 
+      month: "short" 
+    });
   };
 
   const getStatusIcon = (status: string) => {
@@ -84,11 +95,7 @@ export function SmartAssignmentDialog({
             Smart Assignment Suggestions
           </DialogTitle>
           <DialogDescription className="font-sans">
-            {task} on {new Date(date).toLocaleDateString("en-GB", { 
-              weekday: "long", 
-              day: "2-digit", 
-              month: "short" 
-            })}
+            {task} on {formatDate(date)}
           </DialogDescription>
         </DialogHeader>
 
@@ -157,6 +164,12 @@ export function SmartAssignmentDialog({
             ))}
           </div>
         </ScrollArea>
+
+        <div className="flex justify-end pt-4 border-t">
+          <Button onClick={onClose} variant="outline">
+            Close
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );
