@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronDown, ChevronUp, TrendingUp, AlertCircle } from "lucide-react";
 import type { StaffMember, Assignment } from "@/types";
+import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
 
 interface FairnessMeterProps {
   staff: StaffMember[];
@@ -14,51 +15,47 @@ interface FairnessMeterProps {
 export function FairnessMeter({ staff, assignments, weekStart }: FairnessMeterProps) {
   const [expanded, setExpanded] = useState(false);
 
-  // Calculate fairness score
-  const calculateFairness = () => {
-    if (staff.length === 0 || assignments.length === 0) {
-      return { score: 0, balanced: 0, underAssigned: 0, overAssigned: 0, balancedStaff: [], underStaff: [], overStaff: [] };
+  // Calculate fairness metrics using the corrected algorithm
+  const metrics = calculateFairnessMetrics(assignments, staff);
+  
+  // Categorize staff based on assignment rates (not raw counts)
+  const categorizeStaff = () => {
+    if (metrics.staffWorkload.length === 0) {
+      return { balanced: 0, underAssigned: 0, overAssigned: 0, balancedStaff: [], underStaff: [], overStaff: [] };
     }
 
-    // Count assignments per staff member
-    const assignmentCounts = new Map<string, number>();
-    staff.forEach(s => assignmentCounts.set(s.id, 0));
-    
-    assignments.forEach(a => {
-      const staffMember = staff.find(s => s.name === a.staffName);
-      if (staffMember) {
-        assignmentCounts.set(staffMember.id, (assignmentCounts.get(staffMember.id) || 0) + 1);
-      }
-    });
+    // Calculate assignment rates for staff with available days
+    const workloadWithRates = metrics.staffWorkload
+      .filter(w => w.availableDays > 0)
+      .map(w => ({
+        ...w,
+        rate: w.totalAssignments / w.availableDays
+      }));
 
-    const counts = Array.from(assignmentCounts.values());
-    const avg = counts.reduce((sum, c) => sum + c, 0) / counts.length;
-    const variance = counts.reduce((sum, c) => sum + Math.pow(c - avg, 2), 0) / counts.length;
-    const stdDev = Math.sqrt(variance);
+    if (workloadWithRates.length === 0) {
+      return { balanced: 0, underAssigned: 0, overAssigned: 0, balancedStaff: [], underStaff: [], overStaff: [] };
+    }
 
-    // Score: 100 = perfect, 0 = very unfair
-    const score = Math.max(0, Math.min(100, Math.round(100 - (stdDev * 15))));
+    const avgRate = workloadWithRates.reduce((sum, w) => sum + w.rate, 0) / workloadWithRates.length;
 
-    // Categorize staff
     const balancedStaff: Array<{ name: string; count: number }> = [];
     const underStaff: Array<{ name: string; count: number; target: number }> = [];
     const overStaff: Array<{ name: string; count: number; target: number }> = [];
 
-    staff.forEach(s => {
-      const count = assignmentCounts.get(s.id) || 0;
-      const target = Math.round(avg);
+    workloadWithRates.forEach(w => {
+      const targetAssignments = Math.round(avgRate * w.availableDays);
       
-      if (Math.abs(count - avg) <= 1) {
-        balancedStaff.push({ name: s.name, count });
-      } else if (count < avg - 1) {
-        underStaff.push({ name: s.name, count, target });
+      // Within 1 assignment of target = balanced
+      if (Math.abs(w.totalAssignments - targetAssignments) <= 1) {
+        balancedStaff.push({ name: w.staffName, count: w.totalAssignments });
+      } else if (w.totalAssignments < targetAssignments - 1) {
+        underStaff.push({ name: w.staffName, count: w.totalAssignments, target: targetAssignments });
       } else {
-        overStaff.push({ name: s.name, count, target });
+        overStaff.push({ name: w.staffName, count: w.totalAssignments, target: targetAssignments });
       }
     });
 
     return {
-      score,
       balanced: balancedStaff.length,
       underAssigned: underStaff.length,
       overAssigned: overStaff.length,
@@ -68,7 +65,10 @@ export function FairnessMeter({ staff, assignments, weekStart }: FairnessMeterPr
     };
   };
 
-  const fairness = calculateFairness();
+  const fairness = {
+    score: metrics.overallScore,
+    ...categorizeStaff()
+  };
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return "text-green-600";
