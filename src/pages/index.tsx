@@ -756,6 +756,67 @@ export default function Home() {
     window.print();
   };
 
+  const handleSwapApply = async (fromStaffId: string, toStaffId: string, task: string, date: string) => {
+    // Find the assignment to swap from
+    const assignmentIndex = assignments.findIndex(
+      a => a.staffId === fromStaffId && a.task === task && a.date === date
+    );
+
+    if (assignmentIndex === -1) {
+      toast({
+        title: "⚠️ Swap Failed",
+        description: "Assignment not found",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Find the staff member to swap to
+    const toStaff = staff.find(s => s.id === toStaffId);
+    if (!toStaff) {
+      toast({
+        title: "⚠️ Swap Failed",
+        description: "Staff member not found",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Create new assignments array with the swap
+    const newAssignments = [...assignments];
+    newAssignments[assignmentIndex] = {
+      ...newAssignments[assignmentIndex],
+      staffId: toStaffId,
+      staffName: toStaff.name
+    };
+
+    setAssignments(newAssignments);
+
+    // Also update locked assignments if this was locked
+    const wasLocked = isAssignmentLocked(task, weekDates.findIndex(d => d.toISOString().split("T")[0] === date), assignments[assignmentIndex].staffName);
+    if (wasLocked) {
+      const newLocked = lockedAssignments.map(la => {
+        if (la.staffId === fromStaffId && la.task === task && la.date === date) {
+          return { ...la, staffId: toStaffId, staffName: toStaff.name };
+        }
+        return la;
+      });
+      setLockedAssignments(newLocked);
+    }
+
+    await rotaRealtimeService.logAction(
+      "swapped",
+      "assignment",
+      `${date}-${task}`,
+      `Swapped ${assignments[assignmentIndex].staffName} → ${toStaff.name} for ${task}`
+    );
+
+    toast({
+      title: "✅ Swap Applied",
+      description: `${assignments[assignmentIndex].staffName} → ${toStaff.name} for ${task}`,
+    });
+  };
+
   const getTaskColor = (task: string): string => {
     const colorMap: Record<string, string> = {
       "Frozen": "bg-task-frozen text-task-frozen-foreground border-task-frozen",
@@ -1438,6 +1499,7 @@ export default function Home() {
             staff={staff}
             assignments={assignments}
             weekStart={weekStart}
+            onSwapApply={handleSwapApply}
           />
         )}
 
