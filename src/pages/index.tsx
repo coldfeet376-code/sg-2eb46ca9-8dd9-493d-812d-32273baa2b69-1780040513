@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
 import { generateStaffRotaPDF } from "@/lib/pdfGenerator";
@@ -100,6 +101,8 @@ export default function Home() {
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const [fairnessMetrics, setFairnessMetrics] = useState<ReturnType<typeof calculateFairnessMetrics> | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<string[]>([]);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<RealtimeChannel | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -329,13 +332,17 @@ export default function Home() {
   };
 
   const generateRota = async () => {
-    const newAssignments = generateWeeklyRota({
+    const result = generateWeeklyRota({
       staff,
       taskConfig,
       weekStart,
       lockedAssignments
     });
+    const newAssignments = result.assignments;
     setAssignments(newAssignments);
+    setDiagnostics(result.diagnostics);
+    setShowDiagnostics(true);
+    
     const metrics = calculateFairnessMetrics(newAssignments, staff);
     setFairnessMetrics(metrics);
     
@@ -359,13 +366,15 @@ export default function Home() {
   const forceGenerateRota = () => {
     setShowCoverageWarning(false);
     
-    const newAssignments = generateWeeklyRota({
+    const result = generateWeeklyRota({
       staff,
       taskConfig,
       weekStart,
       lockedAssignments,
     });
+    const newAssignments = result.assignments;
     setAssignments(newAssignments);
+    setDiagnostics(result.diagnostics);
     
     // Auto-lock all assignments after forced generation
     setLockedAssignments([...newAssignments]);
@@ -1016,6 +1025,17 @@ export default function Home() {
               </Button>
 
               <Button
+                onClick={() => setShowDiagnostics(true)}
+                disabled={diagnostics.length === 0}
+                variant="outline"
+                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
+                size="lg"
+              >
+                <AlertCircle className="h-5 w-5" />
+                Diagnostics
+              </Button>
+
+              <Button
                 onClick={lockAll}
                 disabled={assignments.length === 0}
                 variant="outline"
@@ -1594,6 +1614,21 @@ export default function Home() {
             }
           }}
         />
+
+        {/* Diagnostics Dialog */}
+        <Dialog open={showDiagnostics} onOpenChange={setShowDiagnostics}>
+          <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="font-condensed text-xl">Generation Diagnostics</DialogTitle>
+              <DialogDescription>
+                Detailed log of how the rota was generated. Use this to understand why staff were or weren't assigned.
+              </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="flex-1 bg-black text-green-400 p-4 rounded-md font-mono text-xs whitespace-pre-wrap min-h-[50vh]">
+              {diagnostics.join("\n")}
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
         
         </TabsContent>
 

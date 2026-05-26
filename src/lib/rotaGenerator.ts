@@ -22,13 +22,19 @@ export function generateWeeklyRota({
   taskConfig: TaskConfig;
   weekStart: Date;
   lockedAssignments?: Assignment[];
-}): Assignment[] {
-  console.log("=".repeat(60));
-  console.log("🚀 ROTA GENERATION STARTED");
-  console.log(`📅 Week: ${weekStart.toDateString()}`);
-  console.log(`👥 Staff: ${staff.length}`);
-  console.log(`🔒 Locked: ${lockedAssignments.length}`);
-  console.log("=".repeat(60));
+}): { assignments: Assignment[]; diagnostics: string[] } {
+  const diagnostics: string[] = [];
+  const log = (msg: string) => {
+    console.log(msg);
+    diagnostics.push(msg);
+  };
+
+  log("=".repeat(60));
+  log("🚀 ROTA GENERATION STARTED");
+  log(`📅 Week: ${weekStart.toDateString()}`);
+  log(`👥 Staff: ${staff.length}`);
+  log(`🔒 Locked: ${lockedAssignments.length}`);
+  log("=".repeat(60));
 
   const assignments: Assignment[] = [...lockedAssignments];
   
@@ -55,9 +61,9 @@ export function generateWeeklyRota({
     }
   });
 
-  console.log("\n📋 Initial assignment counts:");
+  log("\n📋 Initial assignment counts:");
   staff.forEach(s => {
-    console.log(`   ${s.name}: ${assignmentCounts[s.id]} assignments`);
+    log(`   ${s.name}: ${assignmentCounts[s.id]} assignments`);
   });
 
   // Process each day
@@ -66,9 +72,9 @@ export function generateWeeklyRota({
     const dateStr = getLocalDateString(currentDate);
     const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dayIndex];
     
-    console.log(`\n${"=".repeat(60)}`);
-    console.log(`📅 ${dayName} - ${dateStr}`);
-    console.log("=".repeat(60));
+    log(`\n${"=".repeat(60)}`);
+    log(`📅 ${dayName} - ${dateStr}`);
+    log("=".repeat(60));
 
     // Process each task for this day
     for (const taskName of Object.keys(taskConfig)) {
@@ -76,11 +82,11 @@ export function generateWeeklyRota({
       const required = taskConfig[task][dayIndex];
       
       if (required === 0) {
-        console.log(`   ⏭️  ${task}: 0 required, skipping`);
+        log(`   ⏭️  ${task}: 0 required, skipping`);
         continue;
       }
 
-      console.log(`\n   🎯 ${task}: ${required} required`);
+      log(`\n   🎯 ${task}: ${required} required`);
 
       // Check how many are already assigned (locked)
       const alreadyAssigned = assignments.filter(
@@ -90,11 +96,11 @@ export function generateWeeklyRota({
       const needed = required - alreadyAssigned;
       
       if (needed <= 0) {
-        console.log(`   ✅ ${task}: Already filled (${alreadyAssigned}/${required})`);
+        log(`   ✅ ${task}: Already filled (${alreadyAssigned}/${required})`);
         continue;
       }
 
-      console.log(`   🔍 Need to assign ${needed} more staff`);
+      log(`   🔍 Need to assign ${needed} more staff`);
 
       // Find available staff for this task on this day
       const availableStaff: StaffMember[] = [];
@@ -103,19 +109,19 @@ export function generateWeeklyRota({
         // Check 1: Is staff trained for this task?
         const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
         if (!staffMember.trainedTasks.includes(taskToCheck)) {
-          console.log(`      ❌ ${staffMember.name}: Not trained on ${taskToCheck}`);
+          log(`      ❌ ${staffMember.name}: Not trained on ${taskToCheck}`);
           continue;
         }
 
         // Check 2: Is staff available on this date?
         const availability = staffMember.availability?.find(a => a.date === dateStr);
-        console.log(`      🔍 ${staffMember.name} availability check:`);
-        console.log(`         - Date: ${dateStr}`);
-        console.log(`         - Availability records: ${staffMember.availability?.length || 0}`);
-        console.log(`         - Found record: ${availability ? `YES (${availability.type})` : 'NO'}`);
+        log(`      🔍 ${staffMember.name} availability check:`);
+        log(`         - Date: ${dateStr}`);
+        log(`         - Availability records: ${staffMember.availability?.length || 0}`);
+        log(`         - Found record: ${availability ? `YES (${availability.type})` : 'NO'}`);
         
         if (availability && availability.type !== "available") {
-          console.log(`      ❌ ${staffMember.name}: Marked as ${availability.type}`);
+          log(`      ❌ ${staffMember.name}: Marked as ${availability.type}`);
           continue;
         }
 
@@ -130,23 +136,23 @@ export function generateWeeklyRota({
           
           // Special rule: Frozen + Inbound allowed
           if ((task === "Inbound" || task === "Inbound Late") && hasFrozen && !hasInbound) {
-            console.log(`      ✅ ${staffMember.name}: Has Frozen, can add ${task}`);
+            log(`      ✅ ${staffMember.name}: Has Frozen, can add ${task}`);
           } else if (task === "Frozen" && hasInbound && !hasFrozen) {
-            console.log(`      ✅ ${staffMember.name}: Has Inbound, can add Frozen`);
+            log(`      ✅ ${staffMember.name}: Has Inbound, can add Frozen`);
           } else {
-            console.log(`      ❌ ${staffMember.name}: Already assigned ${dayAssignments.map(a => a.task).join(", ")}`);
+            log(`      ❌ ${staffMember.name}: Already assigned ${dayAssignments.map(a => a.task).join(", ")}`);
             continue;
           }
         }
 
-        console.log(`      ✅ ${staffMember.name}: AVAILABLE`);
+        log(`      ✅ ${staffMember.name}: AVAILABLE`);
         availableStaff.push(staffMember);
       }
 
-      console.log(`   📊 ${availableStaff.length} staff available: ${availableStaff.map(s => s.name).join(", ")}`);
+      log(`   📊 ${availableStaff.length} staff available: ${availableStaff.map(s => s.name).join(", ")}`);
 
       if (availableStaff.length === 0) {
-        console.log(`   ⚠️  WARNING: No staff available for ${task} on ${dayName}`);
+        log(`   ⚠️  WARNING: No staff available for ${task} on ${dayName}`);
         continue;
       }
 
@@ -163,7 +169,7 @@ export function generateWeeklyRota({
 
       // Assign staff
       const toAssign = Math.min(needed, availableStaff.length);
-      console.log(`   ⚡ Assigning ${toAssign} staff:`);
+      log(`   ⚡ Assigning ${toAssign} staff:`);
       
       for (let i = 0; i < toAssign; i++) {
         const staffMember = availableStaff[i];
@@ -181,36 +187,36 @@ export function generateWeeklyRota({
 
         const taskCount = taskCounts[staffMember.id][task];
         const totalCount = assignmentCounts[staffMember.id];
-        console.log(`      ✅ ${staffMember.name} → ${task} (${taskCount}x this task, ${totalCount} total)`);
+        log(`      ✅ ${staffMember.name} → ${task} (${taskCount}x this task, ${totalCount} total)`);
       }
 
       if (toAssign < needed) {
-        console.log(`   ⚠️  WARNING: Only assigned ${toAssign}/${needed} for ${task}`);
+        log(`   ⚠️  WARNING: Only assigned ${toAssign}/${needed} for ${task}`);
       }
     }
   }
 
-  console.log("\n" + "=".repeat(60));
-  console.log("📊 FINAL ASSIGNMENT SUMMARY");
-  console.log("=".repeat(60));
+  log("\n" + "=".repeat(60));
+  log("📊 FINAL ASSIGNMENT SUMMARY");
+  log("=".repeat(60));
   staff.forEach(s => {
     const count = assignmentCounts[s.id] || 0;
     const tasks = Object.entries(taskCounts[s.id] || {})
       .filter(([_, count]) => count > 0)
       .map(([task, count]) => `${task}:${count}`)
       .join(", ");
-    console.log(`   ${s.name}: ${count} assignments ${tasks ? `(${tasks})` : ''}`);
+    log(`   ${s.name}: ${count} assignments ${tasks ? `(${tasks})` : ''}`);
   });
 
   const unassigned = staff.filter(s => (assignmentCounts[s.id] || 0) === 0);
   if (unassigned.length > 0) {
-    console.log(`\n⚠️  Staff with ZERO assignments: ${unassigned.map(s => s.name).join(", ")}`);
+    log(`\n⚠️  Staff with ZERO assignments: ${unassigned.map(s => s.name).join(", ")}`);
   }
 
-  console.log(`\n✅ Total assignments: ${assignments.length}`);
-  console.log("=".repeat(60) + "\n");
+  log(`\n✅ Total assignments: ${assignments.length}`);
+  log("=".repeat(60) + "\n");
 
-  return assignments;
+  return { assignments, diagnostics };
 }
 
 export function getWeekStart(date: Date): Date {
