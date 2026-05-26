@@ -62,16 +62,30 @@ export function calculateFairnessMetrics(
   });
 
   // Calculate assignment rates (assignments per available day) instead of raw counts
-  // Only include staff who had at least 1 available day
+  // Exclude single-task staff from fairness calculation (they have no choice in assignments)
+  // But still include them in the workload display
   const rates = staffWorkload
-    .filter(w => w.availableDays > 0)
+    .filter(w => {
+      // Must have at least 1 available day
+      if (w.availableDays === 0) return false;
+      
+      // Find staff member to check training
+      const staffMember = staff.find(s => s.id === w.staffId);
+      if (!staffMember) return false;
+      
+      // Exclude single-task staff from fairness calculation
+      // They chose not to be multi-skilled, so uneven task distribution is expected
+      const isMultiSkilled = staffMember.trainedTasks.length > 1;
+      return isMultiSkilled;
+    })
     .map(w => w.totalAssignments / w.availableDays);
 
   if (rates.length === 0) {
+    // No multi-skilled staff with available days - fairness score doesn't apply
     return { overallScore: 0, standardDeviation: 0, staffWorkload: [] };
   }
 
-  // Calculate standard deviation on rates, not raw counts
+  // Calculate standard deviation on rates for multi-skilled staff only
   const mean = rates.reduce((sum, r) => sum + r, 0) / rates.length;
   const variance =
     rates.reduce((sum, r) => sum + Math.pow(r - mean, 2), 0) / rates.length;
