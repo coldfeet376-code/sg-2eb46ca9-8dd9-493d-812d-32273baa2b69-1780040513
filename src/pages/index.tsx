@@ -761,11 +761,19 @@ export default function Home() {
     try {
       let updatedCount = 0;
       
+      // Use same date calculation as generator - local components only
+      const baseYear = weekStart.getFullYear();
+      const baseMonth = weekStart.getMonth();
+      const baseDay = weekStart.getDate();
+      
       for (const staffMember of staff) {
         for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-          const date = new Date(weekStart);
-          date.setDate(weekStart.getDate() + dayOffset);
-          const dateStr = date.toISOString().split("T")[0];
+          // Create date using local components only - no timezone conversion
+          const currentDate = new Date(baseYear, baseMonth, baseDay + dayOffset);
+          const year = currentDate.getFullYear();
+          const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+          const day = String(currentDate.getDate()).padStart(2, '0');
+          const dateStr = `${year}-${month}-${day}`;
           
           // Check if availability already exists for this date
           const existingAvailability = staffMember.availability?.find(a => a.date === dateStr);
