@@ -124,6 +124,19 @@ export function generateWeeklyRota({
           continue;
         }
 
+        // Check 1.5: Weekly Inbound limit for part-time staff
+        const partTimeInboundLimit = ["POPE R", "FLAHERTY P", "WILSON I"];
+        if (partTimeInboundLimit.includes(staffMember.name) && (task === "Inbound" || task === "Inbound Late")) {
+          const inboundThisWeek = assignments.filter(
+            a => a.staffId === staffMember.id && (a.task === "Inbound" || a.task === "Inbound Late")
+          ).length;
+          
+          if (inboundThisWeek >= 1) {
+            log(`      ❌ ${staffMember.name}: Already has ${inboundThisWeek} Inbound this week (max 1)`);
+            continue;
+          }
+        }
+
         // Check 2: Is staff available on this date?
         const availability = staffMember.availability?.find(a => a.date === dateStr);
         log(`      🔍 ${staffMember.name} availability check:`);
