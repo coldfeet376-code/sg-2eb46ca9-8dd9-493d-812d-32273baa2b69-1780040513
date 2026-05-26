@@ -136,7 +136,17 @@ export function generateWeeklyRota({
           continue;
         }
 
-        // Check 3: Already assigned on this day?
+        // Check 3: Already assigned to THIS EXACT TASK on this day?
+        const alreadyAssignedToThisTask = assignments.some(
+          a => a.staffId === staffMember.id && a.date === dateStr && a.task === task
+        );
+        
+        if (alreadyAssignedToThisTask) {
+          log(`      ❌ ${staffMember.name}: Already assigned to ${task} today`);
+          continue;
+        }
+
+        // Check 4: Already assigned to another task on this day?
         const dayAssignments = assignments.filter(
           a => a.staffId === staffMember.id && a.date === dateStr
         );
