@@ -141,33 +141,6 @@ export function generateWeeklyRota({
     return allStaff;
   };
 
-  // Helper: Check consecutive task violation (soft preference)
-  const wouldViolateConsecutive = (staffId: string, task: Task, dateStr: string): boolean => {
-    const currentDate = new Date(dateStr);
-    
-    // Only check within the current week - don't look at previous week
-    const weekStartDate = new Date(baseYear, baseMonth, baseDay);
-    
-    // Check previous day only if it's within this week
-    const prevDate = new Date(currentDate);
-    prevDate.setDate(prevDate.getDate() - 1);
-    
-    // If previous day is before this week's start, don't check it
-    if (prevDate < weekStartDate) {
-      return false;
-    }
-    
-    const prevDateStr = getLocalDateString(prevDate);
-    const prevTask = staffTasksByDate[staffId]?.[prevDateStr];
-    
-    if (task === "Inbound" || task === "Inbound Late") {
-      if (prevTask === "Inbound" || prevTask === "Inbound Late") return true;
-    }
-    if (prevTask === task) return true;
-    
-    return false;
-  };
-
   // Helper: Assign staff to a slot
   const assignStaff = (staffMember: StaffMember, task: Task, dateStr: string): void => {
     assignments.push({
@@ -182,25 +155,20 @@ export function generateWeeklyRota({
     staffTaskCounts[staffMember.id][task]++;
   };
 
-  // Simplified sorting: 4 priorities only
+  // Simplified sorting: 3 priorities for fair distribution
   const sortByFairness = (available: StaffMember[], task: Task, dateStr: string): StaffMember[] => {
     return available.sort((a, b) => {
-      // Priority 1: Avoid consecutive tasks (soft preference, not blocker)
-      const aViolates = wouldViolateConsecutive(a.id, task, dateStr);
-      const bViolates = wouldViolateConsecutive(b.id, task, dateStr);
-      if (aViolates !== bViolates) return aViolates ? 1 : -1;
-
-      // Priority 2: Fewest times doing THIS task
+      // Priority 1: Fewest times doing THIS task
       const aTaskCount = staffTaskCounts[a.id][task] || 0;
       const bTaskCount = staffTaskCounts[b.id][task] || 0;
       if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
 
-      // Priority 3: Fewest overall assignments
+      // Priority 2: Fewest overall assignments
       const aTotal = staffAssignmentCounts[a.id] || 0;
       const bTotal = staffAssignmentCounts[b.id] || 0;
       if (aTotal !== bTotal) return aTotal - bTotal;
 
-      // Priority 4: Earlier shift preferred
+      // Priority 3: Earlier shift preferred
       const aShiftIdx = shiftOrder.indexOf(a.shiftStart || "06:00");
       const bShiftIdx = shiftOrder.indexOf(b.shiftStart || "06:00");
       return aShiftIdx - bShiftIdx;
@@ -322,7 +290,7 @@ export function generateWeeklyRota({
       const available = getAvailableStaff(task, dateStr, dayIndex);
       const canAssign = available.some(s => s.id === staffMember.id);
       
-      if (canAssign && !wouldViolateConsecutive(staffMember.id, task, dateStr)) {
+      if (canAssign) {
         assignStaff(staffMember, task, dateStr);
         assigned++;
       }
