@@ -66,14 +66,18 @@ export function generateWeeklyRota({
 
   const shiftOrder: ShiftStart[] = ["06:00", "08:30", "09:00", "09:30", "10:00", "11:00"];
 
-  // Calculate working days per staff member
+  // Calculate working days per staff member - use local date arithmetic
   const staffWorkingDays: Record<string, number> = {};
+  const baseYear = weekStart.getFullYear();
+  const baseMonth = weekStart.getMonth();
+  const baseDay = weekStart.getDate();
+  
   staff.forEach(s => {
     let workingDays = 0;
     for (let d = 0; d < 7; d++) {
-      const date = new Date(weekStart);
-      date.setDate(date.getDate() + d);
-      const dateStr = getLocalDateString(date);
+      // Create date using local components only - no timezone conversion
+      const currentDate = new Date(baseYear, baseMonth, baseDay + d);
+      const dateStr = getLocalDateString(currentDate);
       
       const availability = s.availability?.find(a => a.date === dateStr);
       if (!availability || availability.type === "available") {
@@ -219,8 +223,8 @@ export function generateWeeklyRota({
   console.log("🎯 PHASE A: Critical tasks + ensuring everyone gets first assignment...");
 
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-    const currentDate = new Date(weekStart);
-    currentDate.setDate(currentDate.getDate() + dayIndex);
+    // Create date using local components only - no timezone conversion
+    const currentDate = new Date(baseYear, baseMonth, baseDay + dayIndex);
     const dateStr = getLocalDateString(currentDate);
 
     for (const taskName of taskOrder) {
@@ -294,8 +298,8 @@ export function generateWeeklyRota({
     
     let assigned = 0;
     for (let dayIndex = 0; dayIndex < 7 && assigned < inboundNeeded; dayIndex++) {
-      const currentDate = new Date(weekStart);
-      currentDate.setDate(currentDate.getDate() + dayIndex);
+      // Create date using local components only - no timezone conversion
+      const currentDate = new Date(baseYear, baseMonth, baseDay + dayIndex);
       const dateStr = getLocalDateString(currentDate);
       
       const task = "Inbound" as Task;
@@ -320,8 +324,8 @@ export function generateWeeklyRota({
 
   // Step 2: Fill all remaining slots
   for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-    const currentDate = new Date(weekStart);
-    currentDate.setDate(currentDate.getDate() + dayIndex);
+    // Create date using local components only - no timezone conversion
+    const currentDate = new Date(baseYear, baseMonth, baseDay + dayIndex);
     const dateStr = getLocalDateString(currentDate);
 
     for (const taskName of taskOrder) {
