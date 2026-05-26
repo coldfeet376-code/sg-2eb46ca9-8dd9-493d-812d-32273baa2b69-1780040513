@@ -88,6 +88,7 @@ export function generateWeeklyRota({
     log("=".repeat(60));
 
     // Process each task for this day
+    // taskConfig[task][dayIndex] maps correctly: [0]=Sunday, [1]=Monday, ..., [6]=Saturday
     for (const taskName of Object.keys(taskConfig)) {
       const task = taskName as Task;
       const required = taskConfig[task][dayIndex];

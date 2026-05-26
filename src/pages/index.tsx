@@ -350,7 +350,8 @@ export default function Home() {
     const newAssignments = result.assignments;
     setAssignments(newAssignments);
     setDiagnostics(result.diagnostics);
-    setShowDiagnostics(true);
+    // Don't auto-show diagnostics - user can click button if needed
+    // setShowDiagnostics(true);
     
     const metrics = calculateFairnessMetrics(newAssignments, staff);
     setFairnessMetrics(metrics);
