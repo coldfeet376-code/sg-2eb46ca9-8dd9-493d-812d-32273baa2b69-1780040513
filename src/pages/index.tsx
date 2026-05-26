@@ -103,6 +103,7 @@ export default function Home() {
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [showSundayDebug, setShowSundayDebug] = useState(false);
   const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<RealtimeChannel | null>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -1009,6 +1010,7 @@ export default function Home() {
                 variant="outline"
                 className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
                 size="lg"
+                data-quick-setup
               >
                 <Calendar className="h-5 w-5" />
                 Quick Setup Week
@@ -1033,6 +1035,15 @@ export default function Home() {
               >
                 <AlertCircle className="h-5 w-5" />
                 Diagnostics
+              </Button>
+
+              <Button
+                onClick={() => setShowSundayDebug(true)}
+                variant="secondary"
+                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
+                size="lg"
+              >
+                🔍 Debug Sunday
               </Button>
 
               <Button
@@ -1627,6 +1638,214 @@ export default function Home() {
             <ScrollArea className="flex-1 bg-black text-green-400 p-4 rounded-md font-mono text-xs whitespace-pre-wrap min-h-[50vh]">
               {diagnostics.join("\n")}
             </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        {/* Sunday Debug Panel */}
+        <Dialog open={showSundayDebug} onOpenChange={setShowSundayDebug}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-condensed text-xl">🔍 Sunday Debug Report</DialogTitle>
+              <DialogDescription>
+                Plain English analysis of why Sunday isn't populating
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {/* Staff Check */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">👥 Staff Check</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    {staff.length > 0 ? (
+                      <span className="text-green-600 font-bold">✅</span>
+                    ) : (
+                      <span className="text-red-600 font-bold">❌</span>
+                    )}
+                    <span className="font-medium">{staff.length} staff members in system</span>
+                  </div>
+                  {staff.length === 0 && (
+                    <p className="text-sm text-muted-foreground ml-6">
+                      ⚠️ No staff found. Add staff on the Staff page.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Sunday Config Check */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">⚙️ Sunday Configuration</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {taskConfig && Object.entries(taskConfig).map(([task, days]) => {
+                    const sundayRequired = days[0];
+                    return (
+                      <div key={task} className="flex items-center gap-2">
+                        {sundayRequired > 0 ? (
+                          <span className="text-green-600 font-bold">✅</span>
+                        ) : (
+                          <span className="text-yellow-600 font-bold">⚠️</span>
+                        )}
+                        <span className="font-medium">{task}: {sundayRequired} required</span>
+                      </div>
+                    );
+                  })}
+                  {taskConfig && Object.values(taskConfig).every((days: number[]) => days[0] === 0) && (
+                    <p className="text-sm text-muted-foreground ml-6">
+                      ⚠️ All tasks set to 0 on Sunday. Update config to require staff.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Sunday Availability Check */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">📅 Sunday Availability</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {(() => {
+                    const sundayDate = new Date(weekStart);
+                    const year = sundayDate.getFullYear();
+                    const month = String(sundayDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(sundayDate.getDate()).padStart(2, '0');
+                    const sundayDateStr = `${year}-${month}-${day}`;
+                    
+                    const staffWithAvailability = staff.filter(s => 
+                      s.availability?.some(a => a.date === sundayDateStr)
+                    );
+                    
+                    const availableStaff = staff.filter(s => {
+                      const record = s.availability?.find(a => a.date === sundayDateStr);
+                      return !record || record.type === "available";
+                    });
+                    
+                    const unavailableStaff = staff.filter(s => {
+                      const record = s.availability?.find(a => a.date === sundayDateStr);
+                      return record && record.type !== "available";
+                    });
+                    
+                    return (
+                      <>
+                        <div className="flex items-center gap-2">
+                          {availableStaff.length > 0 ? (
+                            <span className="text-green-600 font-bold">✅</span>
+                          ) : (
+                            <span className="text-red-600 font-bold">❌</span>
+                          )}
+                          <span className="font-medium">{availableStaff.length} staff available on Sunday ({sundayDateStr})</span>
+                        </div>
+                        
+                        {staffWithAvailability.length > 0 && (
+                          <div className="text-sm text-muted-foreground ml-6">
+                            {staffWithAvailability.length} staff have availability records for Sunday
+                          </div>
+                        )}
+                        
+                        {unavailableStaff.length > 0 && (
+                          <div className="text-sm text-amber-600 ml-6">
+                            ⚠️ {unavailableStaff.length} staff marked unavailable: {unavailableStaff.map(s => s.name).join(", ")}
+                          </div>
+                        )}
+                        
+                        {availableStaff.length === 0 && (
+                          <p className="text-sm text-red-600 ml-6">
+                            ❌ No staff available on Sunday. Click "Quick Setup Week" to mark all staff as available.
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
+              {/* Training Check */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">🎓 Training Check</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {taskConfig && Object.entries(taskConfig).map(([task, days]) => {
+                    if (days[0] === 0) return null;
+                    
+                    const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
+                    const trainedStaff = staff.filter(s => 
+                      s.trainedTasks.includes(taskToCheck)
+                    );
+                    
+                    return (
+                      <div key={task}>
+                        <div className="flex items-center gap-2">
+                          {trainedStaff.length > 0 ? (
+                            <span className="text-green-600 font-bold">✅</span>
+                          ) : (
+                            <span className="text-red-600 font-bold">❌</span>
+                          )}
+                          <span className="font-medium">{task}: {trainedStaff.length} trained staff</span>
+                        </div>
+                        {trainedStaff.length === 0 && (
+                          <p className="text-sm text-red-600 ml-6">
+                            ❌ No staff trained on {task}. Add training on Staff page.
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+
+              {/* Summary */}
+              <Card className="border-2 border-primary">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">🎯 Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const sundayDate = new Date(weekStart);
+                    const year = sundayDate.getFullYear();
+                    const month = String(sundayDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(sundayDate.getDate()).padStart(2, '0');
+                    const sundayDateStr = `${year}-${month}-${day}`;
+                    
+                    const availableStaff = staff.filter(s => {
+                      const record = s.availability?.find(a => a.date === sundayDateStr);
+                      return !record || record.type === "available";
+                    });
+                    
+                    const hasConfig = taskConfig && Object.values(taskConfig).some((days: number[]) => days[0] > 0);
+                    
+                    if (staff.length === 0) {
+                      return <p className="text-red-600 font-medium">❌ Add staff first</p>;
+                    }
+                    
+                    if (!hasConfig) {
+                      return <p className="text-yellow-600 font-medium">⚠️ Sunday config set to 0 for all tasks</p>;
+                    }
+                    
+                    if (availableStaff.length === 0) {
+                      return (
+                        <>
+                          <p className="text-red-600 font-medium mb-2">❌ No staff available on Sunday</p>
+                          <Button onClick={() => {
+                            setShowSundayDebug(false);
+                            // Trigger autoPopulateAvailability
+                            const event = new MouseEvent('click', { bubbles: true });
+                            document.querySelector('[data-quick-setup]')?.dispatchEvent(event);
+                          }} size="sm" variant="default">
+                            Fix: Click Quick Setup Week
+                          </Button>
+                        </>
+                      );
+                    }
+                    
+                    return <p className="text-green-600 font-medium">✅ Sunday should populate. If not, check Diagnostics log.</p>;
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
           </DialogContent>
         </Dialog>
         
