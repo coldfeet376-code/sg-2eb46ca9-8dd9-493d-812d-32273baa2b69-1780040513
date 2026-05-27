@@ -1196,6 +1196,105 @@ export default function StaffPage() {
 
                           <CollapsibleContent>
                             <CardContent className="space-y-3 pb-6">
+                              {/* Weekly Availability Calendar */}
+                              <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs font-medium text-muted-foreground font-mono">
+                                    WEEKLY AVAILABILITY
+                                  </div>
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    Click any day to set status
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-7 gap-2">
+                                  {weekDates.map((date, idx) => {
+                                    const dateStr = getLocalDateString(date);
+                                    const availabilityType = getAvailabilityForDate(member, date);
+                                    const dayName = DAYS[date.getDay()];
+                                    const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
+                                    
+                                    return (
+                                      <div key={dateStr} className="flex flex-col gap-1">
+                                        <div className="text-center text-xs font-mono font-semibold text-muted-foreground">
+                                          {dayName}
+                                        </div>
+                                        <Popover 
+                                          open={openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr}
+                                          onOpenChange={(open) => {
+                                            if (open) {
+                                              setOpenDayDropdown({ staffId: member.id, date: dateStr });
+                                            } else if (openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr) {
+                                              setOpenDayDropdown(null);
+                                            }
+                                          }}
+                                        >
+                                          <PopoverTrigger asChild>
+                                            <button
+                                              className={cn(
+                                                "h-14 rounded-lg border-2 flex items-center justify-center font-mono font-bold text-lg transition-all",
+                                                getDayColor(availabilityType),
+                                                isLoading && "opacity-50 cursor-wait",
+                                                !isLoading && "hover:scale-105 cursor-pointer shadow-sm hover:shadow-md"
+                                              )}
+                                              disabled={isLoading}
+                                            >
+                                              {isLoading ? "..." : getDayLabel(availabilityType)}
+                                            </button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-48 p-2" align="center">
+                                            <div className="space-y-1">
+                                              <div className="px-2 py-1.5 text-xs font-mono font-semibold text-muted-foreground border-b">
+                                                {date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                                              </div>
+                                              <button
+                                                onClick={() => setDayAvailability(member.id, dateStr, "rest")}
+                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-500/10 transition-colors"
+                                              >
+                                                <span className="w-6 h-6 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center">R</span>
+                                                <span className="text-xs font-mono">Rest Day</span>
+                                              </button>
+                                              <button
+                                                onClick={() => setDayAvailability(member.id, dateStr, "holiday")}
+                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-purple-500/10 transition-colors"
+                                              >
+                                                <span className="w-6 h-6 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center">H</span>
+                                                <span className="text-xs font-mono">Holiday</span>
+                                              </button>
+                                              <button
+                                                onClick={() => setDayAvailability(member.id, dateStr, "sick")}
+                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-red-500/10 transition-colors"
+                                              >
+                                                <span className="w-6 h-6 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center">S</span>
+                                                <span className="text-xs font-mono">Sick Leave</span>
+                                              </button>
+                                              <button
+                                                onClick={() => setDayAvailability(member.id, dateStr, "available")}
+                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-green-500/10 transition-colors"
+                                              >
+                                                <span className="w-6 h-6 rounded bg-green-500 text-white text-xs font-bold flex items-center justify-center">A</span>
+                                                <span className="text-xs font-mono">Available</span>
+                                              </button>
+                                              <div className="border-t pt-1">
+                                                <button
+                                                  onClick={() => setDayAvailability(member.id, dateStr, "clear")}
+                                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted transition-colors"
+                                                >
+                                                  <span className="w-6 h-6 rounded bg-muted text-muted-foreground text-xs font-bold flex items-center justify-center">—</span>
+                                                  <span className="text-xs font-mono">Clear (Working)</span>
+                                                </button>
+                                              </div>
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+                                        <div className="text-center text-xs font-mono text-muted-foreground">
+                                          {date.getDate()}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
                               <div>
                                 <div className="text-xs font-medium text-muted-foreground mb-2 font-mono">
                                   TRAINED TASKS
