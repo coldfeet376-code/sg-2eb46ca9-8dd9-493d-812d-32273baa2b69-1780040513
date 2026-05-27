@@ -36,6 +36,14 @@ export function generateWeeklyRota({
   console.log(`🗓️  GENERATING ROTA FOR WEEK:`);
   console.log(`   Start (Sunday):  ${weekStart.toDateString()} (${baseYear}-${String(baseMonth+1).padStart(2,'0')}-${String(baseDay).padStart(2,'0')})`);
   console.log(`   End (Saturday):  ${weekEndDate.toDateString()} (${weekEndDate.getFullYear()}-${String(weekEndDate.getMonth()+1).padStart(2,'0')}-${String(weekEndDate.getDate()).padStart(2,'0')})`);
+  console.log('');
+  console.log('   Full Week Dates:');
+  for (let i = 0; i < 7; i++) {
+    const dayDate = new Date(baseYear, baseMonth, baseDay + i);
+    const dayStr = getLocalDateString(dayDate);
+    const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i];
+    console.log(`   ${dayName.padEnd(10)}: ${dayDate.toDateString()} (${dayStr})`);
+  }
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   
   log(`📅 Week: ${weekStart.toDateString()}`);
