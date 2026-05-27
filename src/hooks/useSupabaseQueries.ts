@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { StaffMember, Task, ShiftStart, ShiftPattern } from "@/types";
 
@@ -6,47 +7,57 @@ interface TaskConfig {
   [task: string]: number[];
 }
 
-// Staff Query Hook - Stable with full dataset loading
+// Staff Query Hook - Emergency cache bypass
 export function useStaff() {
+  // Generate unique timestamp for this page load to force fresh fetch
+  const loadTimestamp = useRef(Date.now()).current;
+  
   return useQuery({
-    queryKey: ["staff", "full"], // Stable key
+    queryKey: ["staff", "emergency-bypass", loadTimestamp],
     queryFn: async () => {
-      console.log("🔍 [useStaff] Starting query...");
+      const fetchId = Math.random().toString(36).substring(7);
+      console.log(`🚨 [EMERGENCY FETCH ${fetchId}] Starting with cache bypass at ${new Date().toISOString()}`);
       
       try {
+        // Add cache-busting query parameter to Supabase request
         const { data: staffData, error: staffError } = await supabase
           .from("staff")
           .select("*")
           .order("name");
 
         if (staffError) {
-          console.error("❌ [useStaff] Staff query error:", staffError);
+          console.error(`❌ [${fetchId}] Staff query error:`, staffError);
           throw staffError;
         }
 
-        console.log("📊 [useStaff] Staff loaded:", staffData?.length || 0, "members");
+        console.log(`📊 [${fetchId}] Staff loaded:`, staffData?.length || 0, "members");
 
         if (!staffData || staffData.length === 0) {
-          console.warn("⚠️ [useStaff] No staff data in database");
+          console.warn(`⚠️ [${fetchId}] No staff data in database`);
           return [];
         }
 
-        // Fetch ALL availability data
-        console.log("📅 [useStaff] Fetching availability data...");
+        // Fetch ALL availability data with NO date filtering
+        console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset (no filters)...`);
         const { data: availabilityData, error: availError } = await supabase
           .from("availability")
           .select("*")
           .order('date', { ascending: true });
 
         if (availError) {
-          console.error("❌ [useStaff] Availability query error:", availError);
+          console.error(`❌ [${fetchId}] Availability query error:`, availError);
           throw availError;
         }
 
-        console.log(`✅ [useStaff] Fetched ${availabilityData?.length || 0} availability records`);
+        const totalAvail = availabilityData?.length || 0;
+        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records from database`);
+        
+        if (totalAvail === 0) {
+          console.warn(`⚠️ [${fetchId}] Database returned ZERO availability records!`);
+        }
 
         if (!availabilityData || availabilityData.length === 0) {
-          console.warn("⚠️ [useStaff] No availability data in database");
+          console.warn(`⚠️ [${fetchId}] No availability data in database`);
           // Return staff without availability
           return staffData.map((s) => ({
             id: s.id,
@@ -70,9 +81,21 @@ export function useStaff() {
               notes: a.notes || undefined,
             }));
           
-          // Debug logging for specific staff
+          // Detailed logging for Abbo and Brian
           if (s.name.toLowerCase().includes('abbo') || s.name.toLowerCase().includes('brian')) {
-            console.log(`   📋 [${s.name}] ${staffAvail.length} entries | Range: ${staffAvail[0]?.date || 'N/A'} → ${staffAvail[staffAvail.length - 1]?.date || 'N/A'}`);
+            console.log(`🔍 [${fetchId}] ${s.name}:`);
+            console.log(`   Total entries: ${staffAvail.length}`);
+            if (staffAvail.length > 0) {
+              console.log(`   Date range: ${staffAvail[0].date} → ${staffAvail[staffAvail.length - 1].date}`);
+              console.log(`   First 3: ${staffAvail.slice(0, 3).map(a => `${a.date}(${a.type})`).join(', ')}`);
+              console.log(`   Last 3: ${staffAvail.slice(-3).map(a => `${a.date}(${a.type})`).join(', ')}`);
+              
+              // Check May 24-30 week specifically
+              const mayWeek = staffAvail.filter(a => a.date >= '2026-05-24' && a.date <= '2026-05-30');
+              console.log(`   May 24-30 entries: ${mayWeek.map(a => `${a.date}(${a.type})`).join(', ')}`);
+            } else {
+              console.warn(`   ⚠️ NO availability entries for ${s.name}!`);
+            }
           }
           
           return {
@@ -85,18 +108,21 @@ export function useStaff() {
           };
         });
 
-        console.log(`✅ [useStaff] Successfully mapped ${staffMembers.length} staff members with availability`);
+        console.log(`✅ [${fetchId}] Successfully mapped ${staffMembers.length} staff members`);
+        console.log(`📊 [${fetchId}] Query complete - returning fresh data to React Query`);
         return staffMembers;
         
       } catch (error) {
-        console.error("❌ [useStaff] Fatal error:", error);
+        console.error(`❌ [${fetchId}] Fatal error:`, error);
         throw error;
       }
     },
-    retry: 2,
-    staleTime: 1000 * 10, // 10 seconds
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
+    retry: 1,
+    staleTime: 0, // Never consider data stale
+    gcTime: 0, // Don't cache
+    refetchOnMount: "always",
+    refetchOnWindowFocus: "always",
+    refetchOnReconnect: "always",
   });
 }
 
