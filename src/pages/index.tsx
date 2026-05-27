@@ -897,6 +897,7 @@ export default function IndexPage() {
 
   const implementAllSwaps = async (swaps: SwapSuggestion[]) => {
     const updatedAssignments = [...assignments];
+    const updatedLocked = [...lockedAssignments];
     let successCount = 0;
 
     swaps.forEach(swap => {
@@ -905,16 +906,30 @@ export default function IndexPage() {
       );
       
       if (fromIndex !== -1) {
+        const lockedIndex = updatedLocked.findIndex(
+          la => la.staffId === swap.fromStaffId && la.task === swap.task && la.date === swap.date
+        );
+
         updatedAssignments[fromIndex] = {
           ...updatedAssignments[fromIndex],
           staffId: swap.toStaffId,
           staffName: swap.toStaffName
         };
+
+        if (lockedIndex !== -1) {
+          updatedLocked[lockedIndex] = {
+            ...updatedLocked[lockedIndex],
+            staffId: swap.toStaffId,
+            staffName: swap.toStaffName
+          };
+        }
+
         successCount++;
       }
     });
 
     setAssignments(updatedAssignments);
+    setLockedAssignments(updatedLocked);
     setShowSwapSuggestions(false);
 
     toast({
