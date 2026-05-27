@@ -28,6 +28,7 @@ import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { FairnessMeter } from "@/components/rota/FairnessMeter";
 import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
 import { SwapSuggestionsDialog } from "@/components/rota/SwapSuggestionsDialog";
+import { RotaTableRow } from "@/components/rota/RotaTableRow";
 import { suggestSwaps, type SwapSuggestion } from "@/lib/swapSuggester";
 import { useToast } from "@/hooks/use-toast";
 import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
