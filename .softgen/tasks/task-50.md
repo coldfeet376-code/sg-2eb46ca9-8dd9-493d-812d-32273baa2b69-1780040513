@@ -29,8 +29,8 @@ Root causes identified:
 - [x] Review and fix database schema (availability table, constraints, indexes)
 - [x] Rebuild availability service layer - clean save/load/delete operations
 - [x] Rebuild rota generator - simple, bulletproof availability checking
-- [ ] Rebuild staff availability UI - clean date picker for individual dates
-- [ ] Add visual availability calendar to staff cards
+- [x] Rebuild staff availability UI - clean date picker for individual dates
+- [x] Add visual availability calendar to staff cards
 - [ ] Test full flow: set rest day → save → generate rota → verify excluded
 - [ ] Add data validation and error handling throughout
 

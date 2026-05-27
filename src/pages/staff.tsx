@@ -1173,19 +1173,20 @@ export default function StaffPage() {
 
       {/* Edit Availability Dialog */}
       <Dialog open={editAvailabilityStaff !== null} onOpenChange={(open) => !open && closeEditAvailabilityDialog()}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle className="font-condensed text-xl">
-              Edit Availability - {editAvailabilityStaff?.name}
+              Set Availability - {editAvailabilityStaff?.name}
             </DialogTitle>
             <DialogDescription className="font-mono text-xs">
-              Set availability for a specific date
+              Choose a specific date and set availability status
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-date" className="font-mono text-xs">
+          <div className="space-y-6 py-4">
+            <div className="space-y-3">
+              <Label htmlFor="edit-date" className="font-mono text-sm font-semibold flex items-center gap-2">
+                <CalendarIcon className="h-4 w-4" />
                 Select Date
               </Label>
               <Input
@@ -1193,82 +1194,99 @@ export default function StaffPage() {
                 type="date"
                 value={editAvailabilityDate}
                 onChange={(e) => setEditAvailabilityDate(e.target.value)}
-                className="rounded-lg font-mono"
+                className="rounded-lg font-mono text-base h-11"
               />
+              {editAvailabilityDate && (
+                <div className="text-xs text-muted-foreground font-mono bg-muted/50 p-2 rounded">
+                  Setting availability for:{" "}
+                  <span className="font-semibold text-foreground">
+                    {new Date(editAvailabilityDate + 'T00:00:00').toLocaleDateString("en-GB", { 
+                      weekday: "long", 
+                      day: "numeric", 
+                      month: "long",
+                      year: "numeric"
+                    })}
+                  </span>
+                </div>
+              )}
             </div>
 
-            <div className="space-y-2">
-              <Label className="font-mono text-xs">Availability Status</Label>
-              <div className="space-y-2">
+            <div className="space-y-3">
+              <Label className="font-mono text-sm font-semibold">Status</Label>
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setEditAvailabilityType("rest")}
                   className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all",
+                    "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105",
                     editAvailabilityType === "rest"
-                      ? "border-blue-500 bg-blue-500/10"
-                      : "border-border hover:border-blue-500/50"
+                      ? "border-blue-500 bg-blue-500/20 shadow-md"
+                      : "border-border hover:border-blue-500/50 hover:bg-blue-500/5"
                   )}
                 >
-                  <span className="w-8 h-8 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                  <span className="w-12 h-12 rounded-lg bg-blue-500 text-white text-lg font-bold flex items-center justify-center">
                     R
                   </span>
-                  <span className="font-mono font-semibold">Rest Day</span>
+                  <span className="font-mono font-semibold text-sm">Rest Day</span>
                 </button>
 
                 <button
                   onClick={() => setEditAvailabilityType("holiday")}
                   className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all",
+                    "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105",
                     editAvailabilityType === "holiday"
-                      ? "border-purple-500 bg-purple-500/10"
-                      : "border-border hover:border-purple-500/50"
+                      ? "border-purple-500 bg-purple-500/20 shadow-md"
+                      : "border-border hover:border-purple-500/50 hover:bg-purple-500/5"
                   )}
                 >
-                  <span className="w-8 h-8 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                  <span className="w-12 h-12 rounded-lg bg-purple-500 text-white text-lg font-bold flex items-center justify-center">
                     H
                   </span>
-                  <span className="font-mono font-semibold">Holiday</span>
+                  <span className="font-mono font-semibold text-sm">Holiday</span>
                 </button>
 
                 <button
                   onClick={() => setEditAvailabilityType("sick")}
                   className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all",
+                    "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105",
                     editAvailabilityType === "sick"
-                      ? "border-red-500 bg-red-500/10"
-                      : "border-border hover:border-red-500/50"
+                      ? "border-red-500 bg-red-500/20 shadow-md"
+                      : "border-border hover:border-red-500/50 hover:bg-red-500/5"
                   )}
                 >
-                  <span className="w-8 h-8 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                  <span className="w-12 h-12 rounded-lg bg-red-500 text-white text-lg font-bold flex items-center justify-center">
                     S
                   </span>
-                  <span className="font-mono font-semibold">Sick Leave</span>
+                  <span className="font-mono font-semibold text-sm">Sick Leave</span>
                 </button>
 
                 <button
                   onClick={() => setEditAvailabilityType("available")}
                   className={cn(
-                    "w-full flex items-center gap-3 px-4 py-3 rounded-lg border-2 transition-all",
+                    "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105",
                     editAvailabilityType === "available"
-                      ? "border-green-500 bg-green-500/10"
-                      : "border-border hover:border-green-500/50"
+                      ? "border-green-500 bg-green-500/20 shadow-md"
+                      : "border-border hover:border-green-500/50 hover:bg-green-500/5"
                   )}
                 >
-                  <span className="w-8 h-8 rounded bg-green-500 text-white text-xs font-bold flex items-center justify-center shrink-0">
+                  <span className="w-12 h-12 rounded-lg bg-green-500 text-white text-lg font-bold flex items-center justify-center">
                     A
                   </span>
-                  <span className="font-mono font-semibold">Available (Clear)</span>
+                  <span className="font-mono font-semibold text-sm">Available</span>
                 </button>
               </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={closeEditAvailabilityDialog}>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={closeEditAvailabilityDialog} className="font-mono">
               Cancel
             </Button>
-            <Button onClick={handleSaveEditAvailability}>
-              Save Availability
+            <Button 
+              onClick={handleSaveEditAvailability} 
+              disabled={!editAvailabilityDate}
+              className="font-mono"
+            >
+              {!editAvailabilityDate ? "Select a date" : "Save Availability"}
             </Button>
           </DialogFooter>
         </DialogContent>
