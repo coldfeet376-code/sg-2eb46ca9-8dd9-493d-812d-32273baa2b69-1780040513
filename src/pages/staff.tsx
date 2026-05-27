@@ -96,22 +96,14 @@ export default function StaffPage() {
   
   // Force re-render key - increments after successful cache updates
   const [renderKey, setRenderKey] = useState(0);
-  
-  // Bulk operations - multi-select state
-  const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
 
-  // Batch availability state
-  const [batchDate, setBatchDate] = useState<string>("");
-  const [batchAvailability, setBatchAvailability] = useState<AvailabilityType>("rest");
-
-  // Bulk operations state
-  const [bulkData, setBulkData] = useState<string>("");
-  const [bulkAvailability, setBulkAvailability] = useState<AvailabilityType>("available");
-
-  // Edit availability dialog state
-  const [editAvailabilityStaff, setEditAvailabilityStaff] = useState<{ id: string; name: string } | null>(null);
-  const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
-  const [editAvailabilityType, setEditAvailabilityType] = useState<AvailabilityType>("rest");
+  // Consistent date string formatting
+  const getLocalDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   // React Query hooks
   const { data: staff = [], isLoading: staffLoading } = useStaff();
@@ -1114,77 +1106,97 @@ export default function StaffPage() {
 
                                 {/* Calendar grid */}
                                 <div className="grid grid-cols-7 gap-2" key={`${member.id}-${renderKey}`}>
-                                  {weekDates.map((date, idx) => {
-                                    const availType = getAvailabilityForDate(member, date);
-                                    // Use LOCAL date formatting to avoid timezone shifts
-                                    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-                                    const isOpen = openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr;
-                                    const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
-                                    const dayLabel = DAYS[date.getDay()];
+                                  {weekDates.map((date, dayIndex) => {
+                                    const availability = getAvailabilityForDate(member, date);
+                                    const isLoadingThisCell = loadingCell?.staffId === member.id && loadingCell?.date === getLocalDateString(date);
                                     
+                                    // Get visual badge based on availability type
+                                    const getBadge = () => {
+                                      if (isLoadingThisCell) {
+                                        return <span className="text-xs">⏳</span>;
+                                      }
+                                  
+                                      if (!availability) {
+                                        return <span className="text-xs text-muted-foreground">-</span>;
+                                      }
+                                  
+                                      switch (availability) {
+                                        case 'rest':
+                                          return <Badge variant="outline" className="px-1.5 py-0 h-5 text-xs font-mono font-bold bg-blue-500/20 text-blue-700 border-blue-500">R</Badge>;
+                                        case 'holiday':
+                                          return <Badge variant="outline" className="px-1.5 py-0 h-5 text-xs font-mono font-bold bg-purple-500/20 text-purple-700 border-purple-500">H</Badge>;
+                                        case 'sick':
+                                          return <Badge variant="outline" className="px-1.5 py-0 h-5 text-xs font-mono font-bold bg-red-500/20 text-red-700 border-red-500">S</Badge>;
+                                        case 'available':
+                                          return <Badge variant="outline" className="px-1.5 py-0 h-5 text-xs font-mono font-bold bg-green-500/20 text-green-700 border-green-500">A</Badge>;
+                                        default:
+                                          return <span className="text-xs text-muted-foreground">-</span>;
+                                      }
+                                    };
+
                                     return (
-                                      <Popover key={`${idx}-${renderKey}`} open={isOpen} onOpenChange={(open) => {
-                                        if (open) {
-                                          setOpenDayDropdown({ staffId: member.id, date: dateStr });
-                                        } else if (openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr) {
-                                          setOpenDayDropdown(null);
-                                        }
-                                      }}>
-                                        <PopoverTrigger asChild>
-                                          <button
-                                            disabled={isLoading}
-                                            className={cn(
-                                              "aspect-square rounded-lg border-2 transition-all font-mono text-xs font-bold flex flex-col items-center justify-center min-h-[56px] hover:scale-105 gap-0.5",
-                                              getDayColor(availType),
-                                              isLoading && "opacity-50 cursor-wait animate-pulse"
-                                            )}
-                                          >
-                                            <span className="text-[10px] opacity-80 font-semibold">
-                                              {dayLabel}
-                                            </span>
-                                            <span className="text-lg leading-none">
-                                              {isLoading ? "..." : getDayLabel(availType)}
-                                            </span>
-                                          </button>
-                                        </PopoverTrigger>
-                                        <PopoverContent align="center" className="w-56 p-2">
-                                          <div className="space-y-1">
-                                            <button
-                                              onClick={() => setDayAvailability(member.id, dateStr, "rest")}
-                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-blue-500/10 transition-colors font-mono text-sm"
+                                      <TableCell key={dayIndex} className="p-1 text-center relative">
+                                        <DropdownMenu 
+                                          open={openDayDropdown?.staffId === member.id && openDayDropdown?.date === getLocalDateString(date)}
+                                          onOpenChange={(open) => {
+                                            if (open) {
+                                              setOpenDayDropdown({ staffId: member.id, date: getLocalDateString(date) });
+                                            } else {
+                                              setOpenDayDropdown(null);
+                                            }
+                                          }}
+                                        >
+                                          <DropdownMenuTrigger asChild>
+                                            <button 
+                                              className="w-full h-8 flex items-center justify-center hover:bg-accent/50 rounded transition-colors"
+                                              disabled={isLoadingThisCell}
                                             >
-                                              <span className="w-8 h-8 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center shrink-0">R</span>
-                                              <span className="font-semibold">Rest Day</span>
+                                              {getBadge()}
                                             </button>
-                                            <button
-                                              onClick={() => setDayAvailability(member.id, dateStr, "holiday")}
-                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-purple-500/10 transition-colors font-mono text-sm"
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="center" className="w-36">
+                                            <DropdownMenuLabel className="font-mono text-xs">
+                                              {date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
+                                            </DropdownMenuLabel>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem 
+                                              onClick={() => setDayAvailability(member.id, getLocalDateString(date), "rest")}
+                                              className="font-mono text-xs gap-2"
                                             >
-                                              <span className="w-8 h-8 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center shrink-0">H</span>
-                                              <span className="font-semibold">Holiday</span>
-                                            </button>
-                                            <button
-                                              onClick={() => setDayAvailability(member.id, dateStr, "sick")}
-                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-red-500/10 transition-colors font-mono text-sm"
+                                              <span className="w-4 h-4 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center">R</span>
+                                              Rest Day
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem 
+                                              onClick={() => setDayAvailability(member.id, getLocalDateString(date), "holiday")}
+                                              className="font-mono text-xs gap-2"
                                             >
-                                              <span className="w-8 h-8 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center shrink-0">S</span>
-                                              <span className="font-semibold">Sick Leave</span>
-                                            </button>
-                                            {availType !== null && (
-                                              <>
-                                                <div className="border-t my-2"></div>
-                                                <button
-                                                  onClick={() => setDayAvailability(member.id, dateStr, "clear")}
-                                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors font-mono text-sm text-muted-foreground"
-                                                >
-                                                  <X className="h-5 w-5 shrink-0" />
-                                                  <span className="font-semibold">Clear (Working)</span>
-                                                </button>
-                                              </>
-                                            )}
-                                          </div>
-                                        </PopoverContent>
-                                      </Popover>
+                                              <span className="w-4 h-4 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center">H</span>
+                                              Holiday
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem 
+                                              onClick={() => setDayAvailability(member.id, getLocalDateString(date), "sick")}
+                                              className="font-mono text-xs gap-2"
+                                            >
+                                              <span className="w-4 h-4 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center">S</span>
+                                              Sick Leave
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem 
+                                              onClick={() => setDayAvailability(member.id, getLocalDateString(date), "available")}
+                                              className="font-mono text-xs gap-2"
+                                            >
+                                              <span className="w-4 h-4 rounded bg-green-500 text-white text-xs font-bold flex items-center justify-center">A</span>
+                                              Available
+                                            </DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem 
+                                              onClick={() => setDayAvailability(member.id, getLocalDateString(date), "clear")}
+                                              className="font-mono text-xs text-muted-foreground"
+                                            >
+                                              Clear (Working)
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
+                                      </TableCell>
                                     );
                                   })}
                                 </div>
