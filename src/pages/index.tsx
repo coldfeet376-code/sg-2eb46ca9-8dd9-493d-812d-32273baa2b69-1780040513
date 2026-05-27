@@ -297,10 +297,6 @@ export default function Home() {
             if (entry && entry.type !== "available") return false;
           }
 
-          // Check regular rest days
-          const dayOfWeek = currentDate.getDay();
-          if (s.restDays?.some(d => Number(d) === dayOfWeek)) return false;
-
           return true;
         }).length;
 
