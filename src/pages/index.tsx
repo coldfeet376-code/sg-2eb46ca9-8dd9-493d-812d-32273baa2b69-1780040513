@@ -902,24 +902,6 @@ export default function IndexPage() {
     return colorMap[task] || "bg-primary text-primary-foreground border-primary";
   };
 
-  const handleSmartSuggestion = async () => {
-    const suggestions = suggestSwaps(
-      assignments,
-      staff,
-      weekDates.map(date => getLocalDateString(date))
-    );
-
-    if (suggestions.length === 0) {
-      toast({
-        title: "No Improvements Found",
-        description: "The current rota is already well-balanced",
-      });
-      return;
-    }
-
-    setShowSmartAssignment(true);
-  };
-
   const implementAllSwaps = async (swaps: SwapSuggestion[]) => {
     const updatedAssignments = [...assignments];
     let successCount = 0;
