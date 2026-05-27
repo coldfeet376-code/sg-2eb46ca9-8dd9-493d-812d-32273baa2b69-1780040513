@@ -41,7 +41,7 @@ export function useStaff() {
         console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset via RPC...`);
         
         // Use JSON RPC function to bypass Supabase PostgREST max-rows completely
-        const { data: rawData, error: availError } = await supabase
+        const { data: rawData, error: availError } = await (supabase as any)
           .rpc('get_all_availability_json');
 
         if (availError) {
