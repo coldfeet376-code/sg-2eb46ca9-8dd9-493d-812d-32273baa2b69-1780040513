@@ -114,10 +114,10 @@ export default function StaffPage() {
   const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
   const [editAvailabilityType, setEditAvailabilityType] = useState<AvailabilityType>("rest");
 
-  // React Query hooks - Load 52 weeks (1 year) of data centered on current viewed week
+  // React Query hooks - Load ALL historical data for staff page (no pagination limits)
   const { data: staff = [], isLoading: staffLoading } = useStaff({ 
     centerDate: currentWeekStart, 
-    weeksWindow: 52 
+    weeksWindow: 999 // Large number = effectively loads all data
   });
   const addStaffMutation = useAddStaff();
   const updateStaffMutation = useUpdateStaff();
@@ -408,26 +408,6 @@ export default function StaffPage() {
     
     // Find matching availability entry
     const entry = staffMember.availability?.find(a => a.date === dateStr);
-    
-    // COMPREHENSIVE DEBUG - Log all lookups for Wilson I to diagnose mismatch
-    if (staffMember.name.toLowerCase().includes('wilson')) {
-      console.log(`🔍 LOOKUP for ${staffMember.name} on ${dateStr}:`);
-      console.log(`   Total availability entries: ${staffMember.availability?.length || 0}`);
-      if (staffMember.availability && staffMember.availability.length > 0) {
-        console.log(`   First 3 dates in availability array:`, staffMember.availability.slice(0, 3).map(a => a.date));
-        console.log(`   Last 3 dates in availability array:`, staffMember.availability.slice(-3).map(a => a.date));
-      }
-      console.log(`   Looking for date: "${dateStr}"`);
-      console.log(`   Match found: ${entry ? 'YES (' + entry.type + ')' : 'NO'}`);
-      
-      // Check if ANY availability date contains similar numbers
-      const similarDates = staffMember.availability?.filter(a => 
-        a.date.includes(String(date.getDate()).padStart(2, '0'))
-      );
-      if (similarDates && similarDates.length > 0) {
-        console.log(`   Similar day numbers found:`, similarDates.map(a => a.date));
-      }
-    }
     
     return entry ? entry.type : null;
   };

@@ -10,26 +10,12 @@ interface TaskConfig {
 export function useStaff(options?: { centerDate?: Date; weeksWindow?: number }) {
   const centerDate = options?.centerDate || new Date();
   const weeksWindow = options?.weeksWindow || 12; // Default 12 weeks for rota page
+  const loadAllData = weeksWindow >= 999; // If 999+, load everything
   
   return useQuery({
-    queryKey: ["staff", "v4", centerDate.toISOString().split('T')[0], weeksWindow],
+    queryKey: ["staff", "v4", loadAllData ? "all" : centerDate.toISOString().split('T')[0], weeksWindow],
     queryFn: async () => {
       console.log("🔍 Starting staff query with v4 and date-range pagination...");
-      
-      // Calculate date range centered on the provided date
-      const today = centerDate;
-      const weeksBack = Math.floor(weeksWindow / 2);
-      const weeksForward = Math.ceil(weeksWindow / 2);
-      
-      const startDate = new Date(today);
-      startDate.setDate(today.getDate() - (weeksBack * 7));
-      const endDate = new Date(today);
-      endDate.setDate(today.getDate() + (weeksForward * 7));
-      
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
-      
-      console.log(`📅 Loading availability from ${startDateStr} to ${endDateStr} (${weeksWindow} weeks window, centered on ${centerDate.toISOString().split('T')[0]})`);
       
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -51,21 +37,44 @@ export function useStaff(options?: { centerDate?: Date; weeksWindow?: number }) 
         return [];
       }
 
-      // Fetch availability with date range filter
-      console.log("📅 Fetching availability data with date range...");
-      const { data: availabilityData, error: availError } = await supabase
+      // Fetch availability - either ALL data or date-range filtered
+      console.log("📅 Fetching availability data...");
+      let availabilityQuery = supabase
         .from("availability")
         .select("*")
-        .gte('date', startDateStr)
-        .lte('date', endDateStr)
         .order('date', { ascending: true });
+
+      if (!loadAllData) {
+        // Calculate date range centered on the provided date
+        const today = centerDate;
+        const weeksBack = Math.floor(weeksWindow / 2);
+        const weeksForward = Math.ceil(weeksWindow / 2);
+        
+        const startDate = new Date(today);
+        startDate.setDate(today.getDate() - (weeksBack * 7));
+        const endDate = new Date(today);
+        endDate.setDate(today.getDate() + (weeksForward * 7));
+        
+        const startDateStr = startDate.toISOString().split('T')[0];
+        const endDateStr = endDate.toISOString().split('T')[0];
+        
+        console.log(`📅 Loading availability from ${startDateStr} to ${endDateStr} (${weeksWindow} weeks window, centered on ${centerDate.toISOString().split('T')[0]})`);
+        
+        availabilityQuery = availabilityQuery
+          .gte('date', startDateStr)
+          .lte('date', endDateStr);
+      } else {
+        console.log(`📅 Loading ALL availability data (no date restrictions)`);
+      }
+
+      const { data: availabilityData, error: availError } = await availabilityQuery;
 
       if (availError) {
         console.error("❌ Availability query error:", availError);
         throw availError;
       }
 
-      console.log(`✅ Fetched ${availabilityData?.length || 0} availability records (${weeksWindow}-week window)`);
+      console.log(`✅ Fetched ${availabilityData?.length || 0} availability records${loadAllData ? ' (all data)' : ` (${weeksWindow}-week window)`}`);
 
       if (!availabilityData || availabilityData.length === 0) {
         console.warn("⚠️ No availability data in date range");
