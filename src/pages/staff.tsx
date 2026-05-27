@@ -395,25 +395,6 @@ export default function StaffPage() {
     const dateStr = `${year}-${month}-${day}`;
     
     const entry = staffMember.availability?.find(a => a.date === dateStr);
-    
-    // EMERGENCY DEBUG for Abbo specifically
-    if (staffMember.name.toLowerCase().includes('abbo') && staffMember.availability && staffMember.availability.length > 0) {
-      console.log(`🔍 ABBO LOOKUP DEBUG:`);
-      console.log(`   Looking for: "${dateStr}" (${date.toDateString()})`);
-      console.log(`   Total availability entries: ${staffMember.availability.length}`);
-      console.log(`   First 3 dates in array:`, staffMember.availability.slice(0, 3).map(a => `"${a.date}" (${a.type})`));
-      console.log(`   Match found: ${entry ? `YES - ${entry.type}` : 'NO'}`);
-      
-      // Check if ANY dates match
-      const exactMatches = staffMember.availability.filter(a => a.date === dateStr);
-      const similarDates = staffMember.availability.filter(a => a.date.includes(dateStr.substring(5))); // Match month-day
-      console.log(`   Exact matches: ${exactMatches.length}`);
-      console.log(`   Partial month-day matches: ${similarDates.length}`);
-      if (similarDates.length > 0) {
-        console.log(`   Similar dates found:`, similarDates.map(a => a.date));
-      }
-    }
-    
     return entry ? entry.type : null;
   };
 
@@ -424,18 +405,6 @@ export default function StaffPage() {
       holiday: availability.filter((a) => a.type === "holiday").length,
       sick: availability.filter((a) => a.type === "sick").length,
     };
-    
-    // DEBUG LOGGING - Log stats for specific staff
-    if (staffMember.name.toLowerCase().includes('wilson') || staffMember.name.toLowerCase().includes('allison')) {
-      console.log(`📊 AVAILABILITY STATS for ${staffMember.name}:`);
-      console.log(`   Raw availability array length: ${availability.length}`);
-      console.log(`   Rest: ${stats.rest}, Holiday: ${stats.holiday}, Sick: ${stats.sick}`);
-      if (availability.length > 0) {
-        console.log(`   First 5 entries:`, availability.slice(0, 5));
-      } else {
-        console.log(`   ⚠️ availability array is EMPTY!`);
-      }
-    }
     
     return stats;
   };
@@ -634,41 +603,6 @@ export default function StaffPage() {
       <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
 
       <div className="space-y-6">
-        {/* MOBILE CACHE ISSUE DETECTION - Hidden in production */}
-        {/* <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle className="font-condensed font-semibold">🔴 MOBILE CACHE ISSUE DETECTED</AlertTitle>
-          <AlertDescription className="font-sans">
-            Your browser is showing old code. Tap the button below to force download the latest version:
-            <Button 
-              variant="destructive" 
-              className="w-full mt-2 font-sans font-semibold"
-              onClick={() => {
-                if ('caches' in window) {
-                  caches.keys().then(names => {
-                    names.forEach(name => caches.delete(name));
-                  });
-                }
-                window.location.reload();
-              }}
-            >
-              TAP HERE TO FORCE RELOAD WITH NEW CODE
-            </Button>
-            <p className="text-xs mt-2">
-              This will clear all caches and force your browser to download the latest JavaScript with the .range(0, 50000) fix.
-            </p>
-          </AlertDescription>
-        </Alert> */}
-
-        {/* CRITICAL DEBUG BANNER - Shows what Supabase actually returned */}
-        {/* SUPABASE QUERY DEBUG (RAW DATA) - Hidden in production */}
-        {/* <Alert variant="destructive" className="mb-4">
-          <AlertCircle className="h-4 w-4" />
-          <AlertTitle className="font-condensed font-semibold">🔴 SUPABASE QUERY DEBUG (RAW DATA)</AlertTitle>
-        </Alert> */}
-
-        {/* Bulk Operations Panel */}
-
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-4xl font-condensed font-bold tracking-tight text-foreground mb-2">
@@ -892,45 +826,6 @@ export default function StaffPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
-            {/* DEBUG PANEL - Hidden in production */}
-            {/* {staff.length > 0 && (
-              <Alert className="mb-4 bg-amber-50 border-amber-200">
-                <AlertCircle className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="text-xs font-mono space-y-1">
-                  <div className="font-bold text-amber-900 mb-2">🔍 DATABASE DEBUG INFO:</div>
-                  {(() => {
-                    const wilsonStaff = staff.find(s => s.name.toLowerCase().includes('wilson'));
-                    const allisonStaff = staff.find(s => s.name.toLowerCase().includes('allison'));
-                    
-                    return (
-                      <>
-                        <div>Total Staff Loaded: {staff.length}</div>
-                        {wilsonStaff && (
-                          <>
-                            <div className="text-blue-700 font-bold mt-2">WILSON I:</div>
-                            <div className="pl-2">Staff ID: {wilsonStaff.id}</div>
-                            <div className="pl-2">Availability Array Length: {wilsonStaff.availability?.length || 0}</div>
-                            <div className="pl-2">Rest: {wilsonStaff.availability?.filter(a => a.type === 'rest').length || 0}</div>
-                          </>
-                        )}
-                        {allisonStaff && (
-                          <>
-                            <div className="text-purple-700 font-bold mt-2">ALLISON G:</div>
-                            <div className="pl-2">Staff ID: {allisonStaff.id}</div>
-                            <div className="pl-2">Availability Array Length: {allisonStaff.availability?.length || 0}</div>
-                            <div className="pl-2">Rest: {allisonStaff.availability?.filter(a => a.type === 'rest').length || 0}</div>
-                          </>
-                        )}
-                        <div className="mt-2 pt-2 border-t border-amber-300 text-amber-900">
-                          If Wilson I shows 0 but Allison G shows data, this confirms a filtering bug in the query hook.
-                          The database HAS the data (238 entries confirmed by SQL), but JavaScript filter is failing.
-                        </div>
-                      </>
-                    );
-                  })()}
-                </AlertDescription>
-              </Alert>
-            )} */}
             
             {staffLoading && (
               <div className="space-y-3">
@@ -983,19 +878,10 @@ export default function StaffPage() {
                                       <div className="flex-1 text-left">
                                         <div className="flex items-center gap-3 mb-2">
                                           <h3 className="font-condensed font-semibold text-lg">{member.name}</h3>
-                                          {/* DEBUG INDICATOR - Shows raw availability count */}
-                                          <Badge variant="outline" className="font-mono text-xs bg-amber-500/10 text-amber-700 border-amber-500/30">
-                                            📊 Loaded: {member.availability?.length || 0} entries
-                                          </Badge>
                                           {member.shiftStart && (
                                             <Badge variant="secondary" className="font-mono text-xs">
                                               <Clock className="h-3 w-3 mr-1" />
                                               {member.shiftStart}
-                                            </Badge>
-                                          )}
-                                          {(member as any).dayShiftPattern && (
-                                            <Badge variant="outline" className="font-mono text-xs bg-accent/10 text-accent-foreground border-accent/30">
-                                              {(member as any).dayShiftPattern}
                                             </Badge>
                                           )}
                                         </div>
