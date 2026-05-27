@@ -42,6 +42,7 @@ export function useStaff() {
         const { data: availabilityData, error: availError } = await supabase
           .from("availability")
           .select("*")
+          .limit(50000) // Override default 1000-row limit to fetch full dataset
           .order('date', { ascending: true });
 
         if (availError) {
