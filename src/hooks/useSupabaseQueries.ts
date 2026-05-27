@@ -39,10 +39,12 @@ export function useStaff() {
 
         // Fetch ALL availability data with NO date filtering
         console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset (no filters)...`);
+        
+        // Use range(0, 99999) instead of limit() to bypass Supabase's default 1000-row limit
         const { data: availabilityData, error: availError } = await supabase
           .from("availability")
-          .select("*")
-          .limit(50000) // Override default 1000-row limit to fetch full dataset
+          .select("*", { count: 'exact' })
+          .range(0, 99999)
           .order('date', { ascending: true });
 
         if (availError) {
