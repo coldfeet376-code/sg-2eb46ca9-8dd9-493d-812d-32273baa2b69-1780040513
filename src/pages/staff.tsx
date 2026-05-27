@@ -29,7 +29,7 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff, useAddAvailability, useDeleteAvailability } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Task, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Trash2, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
+import { Users, Plus, Trash2, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon, Info, RefreshCw, Target, Settings, HelpCircle, Sparkles, Wand2, Eye } from "lucide-react";
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -40,16 +40,13 @@ const SHIFT_STARTS: ShiftStart[] = ["06:00", "07:00", "08:00", "09:00", "10:00"]
 
 const DAY_SHIFT_PATTERNS: DayShiftPattern[] = [
   "06:00-14:30",
-  "06:00-14:00",
-  "08:30-17:00",
-  "09:00-17:00",
-  "09:30-18:00",
-  "10:00-14:00",
-  "10:00-16:30",
-  "11:00-17:30",
+  "07:00-15:30",
+  "08:00-16:30",
+  "09:00-17:30",
+  "10:00-18:30"
 ];
 
-export default function StaffPage() {
+export default function StaffManagement() {
   const [name, setName] = useState("");
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
   const [shiftStart, setShiftStart] = useState<ShiftStart>("06:00");
