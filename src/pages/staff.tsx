@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -15,14 +13,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -34,14 +24,12 @@ import {
 import { SEO } from "@/components/SEO";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { StaffBulkOperations } from "@/components/staff/StaffBulkOperations";
-import { StaffAvailabilityPanel } from "@/components/staff/StaffAvailabilityPanel";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { useAudit } from "@/contexts/AuditContext";
-import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
-import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
+import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff, useAddAvailability, useDeleteAvailability } from "@/hooks/useSupabaseQueries";
+import type { StaffMember, Task, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon, MoreVertical } from "lucide-react";
+import { Users, Plus, Trash2, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -49,7 +37,6 @@ import { cn } from "@/lib/utils";
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"];
 const SHIFT_STARTS: ShiftStart[] = ["06:00", "07:00", "08:00", "09:00", "10:00"];
-const SHIFT_PATTERNS = ["4on4off", "5on3off"];
 
 const DAY_SHIFT_PATTERNS: DayShiftPattern[] = [
   "06:00-14:30",
@@ -380,43 +367,6 @@ export default function StaffPage() {
     });
   };
 
-  const clearAllAvailability = async (staffId: string, staffName: string) => {
-    try {
-      const staffMember = staff.find(s => s.id === staffId);
-      if (!staffMember?.availability || staffMember.availability.length === 0) {
-        toast({
-          title: "No data to clear",
-          description: `${staffName} has no availability data`,
-        });
-        return;
-      }
-
-      // Delete all availability entries
-      for (const entry of staffMember.availability) {
-        await staffService.deleteAvailability(staffId, entry.date);
-      }
-
-      // Refresh data
-      await queryClient.refetchQueries({ queryKey: ["staff", "full"] });
-      
-      // Force re-render
-      setRenderKey(prev => prev + 1);
-      
-      toast({
-        title: "✓ All Cleared",
-        description: `Removed ${staffMember.availability.length} availability entries for ${staffName}`,
-      });
-      
-    } catch (error) {
-      console.error("Error clearing availability:", error);
-      toast({
-        title: "❌ Error",
-        description: "Failed to clear availability data",
-        variant: "destructive",
-      });
-    }
-  };
-
   const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
     setLoadingCell({ staffId, date: dateStr });
     setOpenDayDropdown(null);
@@ -544,14 +494,6 @@ export default function StaffPage() {
       return;
     }
     handleBulkSetAvailability(Array.from(selectedStaffIds), [batchDate], batchAvailability);
-  };
-
-  const handleBulkImport = () => {
-    toast({ title: "Import functionality coming soon" });
-  };
-
-  const downloadTemplate = () => {
-    toast({ title: "Template download coming soon" });
   };
 
   const handleCopyWeek = async (fromWeek: Date, toWeek: Date, staffIds: string[]) => {
