@@ -11,19 +11,7 @@ export function useStaff() {
   return useQuery({
     queryKey: ["staff", "v4"],
     queryFn: async () => {
-      console.log("🔍 Starting staff query with v4 and date-range pagination...");
-      
-      // Calculate date range: 4 weeks back, 8 weeks forward (12 weeks total)
-      const today = new Date();
-      const startDate = new Date(today);
-      startDate.setDate(today.getDate() - (4 * 7)); // 4 weeks back
-      const endDate = new Date(today);
-      endDate.setDate(today.getDate() + (8 * 7)); // 8 weeks forward
-      
-      const startDateStr = startDate.toISOString().split('T')[0];
-      const endDateStr = endDate.toISOString().split('T')[0];
-      
-      console.log(`📅 Loading availability from ${startDateStr} to ${endDateStr} (12 weeks window)`);
+      console.log("🔍 Starting staff query with v4...");
       
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -45,13 +33,11 @@ export function useStaff() {
         return [];
       }
 
-      // Fetch availability with date range filter
-      console.log("📅 Fetching availability data with date range...");
+      // Fetch ALL availability data (no date filter - load complete imported data)
+      console.log("📅 Fetching ALL availability data...");
       const { data: availabilityData, error: availError } = await supabase
         .from("availability")
         .select("*")
-        .gte('date', startDateStr)
-        .lte('date', endDateStr)
         .order('date', { ascending: true });
 
       if (availError) {
@@ -59,10 +45,10 @@ export function useStaff() {
         throw availError;
       }
 
-      console.log(`✅ Fetched ${availabilityData?.length || 0} availability records (12-week window)`);
+      console.log(`✅ Fetched ${availabilityData?.length || 0} availability records (full dataset)`);
 
       if (!availabilityData || availabilityData.length === 0) {
-        console.warn("⚠️ No availability data in date range");
+        console.warn("⚠️ No availability data found");
         const staffMembers: StaffMember[] = (staffData || []).map((s) => ({
           id: s.id,
           name: s.name,
@@ -96,6 +82,9 @@ export function useStaff() {
       });
 
       console.log("✅ Staff members mapped:", staffMembers.length);
+      staffMembers.forEach(sm => {
+        console.log(`   ${sm.name}: ${sm.availability?.length || 0} availability entries`);
+      });
       return staffMembers;
     },
     retry: 1,
