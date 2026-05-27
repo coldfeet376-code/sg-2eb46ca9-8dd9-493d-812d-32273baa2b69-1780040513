@@ -130,17 +130,6 @@ export default function StaffPage() {
       date.setDate(weekStart.getDate() + i);
       dates.push(date);
     }
-    
-    // DEBUG: Show the exact week being displayed
-    console.log('📅 CALENDAR WEEK DATES:');
-    dates.forEach((d, i) => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-      console.log(`   ${DAYS[i]}: ${d.toDateString()} → DB lookup: "${dateStr}"`);
-    });
-    
     return dates;
   };
 
@@ -406,28 +395,6 @@ export default function StaffPage() {
     const dateStr = `${year}-${month}-${day}`;
     
     const entry = staffMember.availability?.find(a => a.date === dateStr);
-    
-    // EMERGENCY DEBUG - Show exact dates being looked up
-    if (staffMember.name.toLowerCase().includes('brian') && staffMember.name.toLowerCase().includes('murray')) {
-      console.log(`🔍 BRIAN MURRAY - ${date.toDateString()} (${DAYS[date.getDay()]})`);
-      console.log(`   Looking for: "${dateStr}"`);
-      console.log(`   Total entries: ${staffMember.availability?.length || 0}`);
-      if (staffMember.availability && staffMember.availability.length > 0) {
-        console.log(`   First 5 dates in DB:`, staffMember.availability.slice(0, 5).map(a => `${a.date} (${a.type})`));
-        console.log(`   Last 5 dates in DB:`, staffMember.availability.slice(-5).map(a => `${a.date} (${a.type})`));
-        
-        // Check for dates near this one
-        const nearDates = staffMember.availability.filter(a => {
-          const dbDate = new Date(a.date + 'T00:00:00');
-          const diff = Math.abs(dbDate.getTime() - date.getTime());
-          const daysDiff = diff / (1000 * 60 * 60 * 24);
-          return daysDiff < 7;
-        });
-        console.log(`   Dates within 7 days:`, nearDates.map(a => `${a.date} (${a.type})`));
-      }
-      console.log(`   Match: ${entry ? `YES - ${entry.type}` : 'NO'}`);
-    }
-    
     return entry ? entry.type : null;
   };
 
@@ -1060,57 +1027,6 @@ export default function StaffPage() {
                           <CollapsibleContent>
                             <CardContent className="pt-2 px-6 pb-6">
                               <div className="space-y-3">
-                                {/* EMERGENCY DEBUG PANEL - Shows date matching info */}
-                                {member === staff[0] && (
-                                  <Alert className="bg-amber-50 border-amber-200 mb-4">
-                                    <AlertCircle className="h-4 w-4 text-amber-600" />
-                                    <AlertTitle className="text-amber-900 font-mono text-xs font-bold">
-                                      DEBUG: Date Matching Info (First Staff Only)
-                                    </AlertTitle>
-                                    <AlertDescription className="text-amber-800 font-mono text-[10px] space-y-1 mt-2">
-                                      <div className="font-bold">Week being displayed:</div>
-                                      <div className="pl-2">
-                                        {weekDates.map((d, i) => {
-                                          const year = d.getFullYear();
-                                          const month = String(d.getMonth() + 1).padStart(2, '0');
-                                          const day = String(d.getDate()).padStart(2, '0');
-                                          const dateStr = `${year}-${month}-${day}`;
-                                          return (
-                                            <div key={i}>
-                                              {DAYS[i]}: {d.toDateString()} → Lookup: "{dateStr}"
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                      <div className="font-bold mt-2">Database entries for {member.name}:</div>
-                                      <div className="pl-2">
-                                        Total: {member.availability?.length || 0} entries
-                                        {member.availability && member.availability.length > 0 && (
-                                          <>
-                                            <div>First 5: {member.availability.slice(0, 5).map(a => `${a.date}(${a.type[0].toUpperCase()})`).join(', ')}</div>
-                                            <div>Last 5: {member.availability.slice(-5).map(a => `${a.date}(${a.type[0].toUpperCase()})`).join(', ')}</div>
-                                          </>
-                                        )}
-                                      </div>
-                                      <div className="font-bold mt-2">Matches found this week:</div>
-                                      <div className="pl-2">
-                                        {weekDates.map((d, i) => {
-                                          const year = d.getFullYear();
-                                          const month = String(d.getMonth() + 1).padStart(2, '0');
-                                          const day = String(d.getDate()).padStart(2, '0');
-                                          const dateStr = `${year}-${month}-${day}`;
-                                          const entry = member.availability?.find(a => a.date === dateStr);
-                                          return (
-                                            <div key={i} className={entry ? "text-green-700 font-bold" : "text-red-700"}>
-                                              {DAYS[i]} ({dateStr}): {entry ? `FOUND - ${entry.type.toUpperCase()}` : "NOT FOUND"}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </AlertDescription>
-                                  </Alert>
-                                )}
-
                                 <div className="flex items-center justify-between mb-4">
                                   <div className="text-xs font-mono text-muted-foreground">
                                     Click any day to set availability
