@@ -34,11 +34,30 @@ export const rotaService = {
     }
   },
 
-  async getWeeklyAssignments(weekStart: string): Promise<Assignment[]> {
-    const { data, error } = await supabase
+  async getWeeklyAssignments(weekStart: string, includeAdjacentWeeks: boolean = false): Promise<Assignment[]> {
+    let query = supabase
       .from("assignments")
-      .select("*")
-      .eq("week_start", weekStart);
+      .select("*");
+
+    if (includeAdjacentWeeks) {
+      // Load 3 weeks: current week + 1 week before + 1 week after
+      const weekStartDate = new Date(weekStart);
+      const prevWeekDate = new Date(weekStartDate);
+      prevWeekDate.setDate(weekStartDate.getDate() - 7);
+      const nextWeekDate = new Date(weekStartDate);
+      nextWeekDate.setDate(weekStartDate.getDate() + 7);
+      
+      const prevWeekStr = prevWeekDate.toISOString().split('T')[0];
+      const nextWeekStr = nextWeekDate.toISOString().split('T')[0];
+      
+      query = query
+        .gte('week_start', prevWeekStr)
+        .lte('week_start', nextWeekStr);
+    } else {
+      query = query.eq("week_start", weekStart);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error("Error fetching assignments:", error);

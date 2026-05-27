@@ -9,10 +9,21 @@ interface TaskConfig {
 // Staff Query Hook
 export function useStaff() {
   return useQuery({
-    queryKey: ["staff", "v4"], // CHANGED: v4 forces complete cache refresh
+    queryKey: ["staff", "v4"],
     queryFn: async () => {
-      console.log("🔍 Starting staff query with v4...");
-      console.log("⚠️ CRITICAL: Fetching ALL availability records using .order().limit(100000)");
+      console.log("🔍 Starting staff query with v4 and date-range pagination...");
+      
+      // Calculate date range: 4 weeks back, 8 weeks forward (12 weeks total)
+      const today = new Date();
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - (4 * 7)); // 4 weeks back
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() + (8 * 7)); // 8 weeks forward
+      
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      console.log(`📅 Loading availability from ${startDateStr} to ${endDateStr} (12 weeks window)`);
       
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -22,7 +33,6 @@ export function useStaff() {
       console.log("📊 Staff query result:", { 
         staffCount: staffData?.length || 0, 
         error: staffError?.message,
-        staffData: staffData?.slice(0, 2) // Log first 2 for debugging
       });
 
       if (staffError) {
@@ -35,72 +45,36 @@ export function useStaff() {
         return [];
       }
 
-      // CRITICAL FIX: Fetch ALL availability records using pagination
-      // Supabase has a server-side limit of 1000 rows per query
-      console.log("📅 Fetching availability data with pagination...");
-      let allAvailability: any[] = [];
-      let currentPage = 0;
-      const pageSize = 1000;
-      let hasMore = true;
+      // Fetch availability with date range filter
+      console.log("📅 Fetching availability data with date range...");
+      const { data: availabilityData, error: availError } = await supabase
+        .from("availability")
+        .select("*")
+        .gte('date', startDateStr)
+        .lte('date', endDateStr)
+        .order('date', { ascending: true });
 
-      while (hasMore) {
-        const { data: pageData, error: pageError } = await supabase
-          .from("availability")
-          .select("*")
-          .order('date', { ascending: true })
-          .range(currentPage * pageSize, (currentPage + 1) * pageSize - 1);
-
-        if (pageError) {
-          console.error(`❌ Availability query error on page ${currentPage}:`, pageError);
-          throw pageError;
-        }
-
-        if (pageData && pageData.length > 0) {
-          allAvailability = allAvailability.concat(pageData);
-          console.log(`  ✓ Fetched page ${currentPage + 1}: ${pageData.length} records (total so far: ${allAvailability.length})`);
-          
-          // If we got less than pageSize, we've reached the end
-          if (pageData.length < pageSize) {
-            hasMore = false;
-          } else {
-            currentPage++;
-          }
-        } else {
-          hasMore = false;
-        }
+      if (availError) {
+        console.error("❌ Availability query error:", availError);
+        throw availError;
       }
 
-      const availabilityData = allAvailability;
-      console.log(`✅ PAGINATION COMPLETE: Fetched ${availabilityData.length} total availability records`);
+      console.log(`✅ Fetched ${availabilityData?.length || 0} availability records (12-week window)`);
 
-      console.log("📅 Availability query result:", {
-        availCount: availabilityData?.length || 0,
-        sampleStaffIds: availabilityData?.slice(0, 3).map(a => ({ staff_id: a.staff_id, date: a.date }))
-      });
-
-      // CRITICAL: Check if Supabase returned ZERO availability records
       if (!availabilityData || availabilityData.length === 0) {
-        console.error("🚨 CRITICAL: Supabase returned ZERO availability records!");
-        console.error("This means RLS is blocking reads or the table is actually empty.");
-        console.error("Database SQL confirmed 12,177 records exist, so this is an RLS/auth issue.");
-        
-        // Return staff with empty availability arrays
+        console.warn("⚠️ No availability data in date range");
         const staffMembers: StaffMember[] = (staffData || []).map((s) => ({
           id: s.id,
           name: s.name,
           trainedTasks: (s.trained_tasks || []) as Task[],
           shiftStart: (s.shift_start || "06:00") as ShiftStart,
           shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
-          availability: [], // Empty because Supabase returned nothing
+          availability: [],
         }));
-        
         return staffMembers;
       }
 
-      console.log(`✅ Supabase returned ${availabilityData.length} availability records - now filtering...`);
       const staffMembers: StaffMember[] = (staffData || []).map((s) => {
-        // CRITICAL FIX: Convert both IDs to strings for comparison
-        // Supabase might return UUIDs in different formats (UUID object vs string)
         const staffIdStr = String(s.id);
         
         const staffAvail = (availabilityData || [])
@@ -110,40 +84,6 @@ export function useStaff() {
             type: a.type as "rest" | "holiday" | "sick" | "available",
             notes: a.notes || undefined,
           }));
-        
-        // ULTRA-DETAILED DEBUG LOGGING for Wilson I and Allison G
-        if (s.name.toLowerCase().includes('wilson') || s.name.toLowerCase().includes('allison')) {
-          console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-          console.log(`🔍 DETAILED FILTER DEBUG for: ${s.name}`);
-          console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-          console.log(`Staff ID (original): ${s.id} (type: ${typeof s.id})`);
-          console.log(`Staff ID (string): ${staffIdStr}`);
-          console.log(`Total availability records in database: ${availabilityData?.length || 0}`);
-          
-          // Check how many records have matching staff_id using string comparison
-          const matchingRecords = (availabilityData || []).filter(a => String(a.staff_id) === staffIdStr);
-          console.log(`Records matching this staff_id (STRING comparison): ${matchingRecords.length}`);
-          
-          // Show sample of availability staff_ids to check format
-          const sampleAvailIds = (availabilityData || []).slice(0, 5).map(a => ({
-            staff_id_original: a.staff_id,
-            staff_id_string: String(a.staff_id),
-            type_original: typeof a.staff_id,
-            matches_our_staff: String(a.staff_id) === staffIdStr,
-          }));
-          console.log(`Sample availability staff_ids:`, sampleAvailIds);
-          
-          console.log(`Final filtered availability count: ${staffAvail.length}`);
-          if (staffAvail.length > 0) {
-            console.log(`First 3 filtered entries:`, staffAvail.slice(0, 3));
-          } else {
-            console.log(`❌ NO ENTRIES MATCHED - FILTER FAILED!`);
-          }
-          console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-        } else if (staffAvail.length > 0) {
-          // For other staff, just log the count
-          console.log(`  ${s.name}: ${staffAvail.length} availability entries`);
-        }
         
         return {
           id: s.id,
@@ -159,9 +99,9 @@ export function useStaff() {
       return staffMembers;
     },
     retry: 1,
-    staleTime: 1000 * 30, // Cache for only 30 seconds (was 5 minutes)
-    refetchOnMount: "always", // Always fetch fresh data when component mounts
-    refetchOnWindowFocus: true, // Refetch when user returns to browser tab
+    staleTime: 1000 * 30,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 }
 

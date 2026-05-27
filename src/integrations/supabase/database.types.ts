@@ -24,6 +24,7 @@ export type Database = {
           staff_id: string | null
           staff_name: string
           task: string
+          version: number | null
           week_start: string
         }
         Insert: {
@@ -34,6 +35,7 @@ export type Database = {
           staff_id?: string | null
           staff_name: string
           task: string
+          version?: number | null
           week_start: string
         }
         Update: {
@@ -44,6 +46,7 @@ export type Database = {
           staff_id?: string | null
           staff_name?: string
           task?: string
+          version?: number | null
           week_start?: string
         }
         Relationships: [
@@ -100,6 +103,7 @@ export type Database = {
           notes: string | null
           staff_id: string
           type: string
+          version: number | null
         }
         Insert: {
           created_at?: string | null
@@ -108,6 +112,7 @@ export type Database = {
           notes?: string | null
           staff_id: string
           type: string
+          version?: number | null
         }
         Update: {
           created_at?: string | null
@@ -116,6 +121,7 @@ export type Database = {
           notes?: string | null
           staff_id?: string
           type?: string
+          version?: number | null
         }
         Relationships: [
           {
@@ -210,6 +216,7 @@ export type Database = {
           preferred_shift: string | null
           recurring_rest_days: number[] | null
           updated_at: string | null
+          version: number | null
         }
         Insert: {
           can_admin?: boolean
@@ -222,6 +229,7 @@ export type Database = {
           preferred_shift?: string | null
           recurring_rest_days?: number[] | null
           updated_at?: string | null
+          version?: number | null
         }
         Update: {
           can_admin?: boolean
@@ -234,6 +242,7 @@ export type Database = {
           preferred_shift?: string | null
           recurring_rest_days?: number[] | null
           updated_at?: string | null
+          version?: number | null
         }
         Relationships: []
       }
@@ -300,6 +309,7 @@ export type Database = {
           id: string
           locked_count: number | null
           updated_at: string | null
+          version: number | null
           week_start: string
         }
         Insert: {
@@ -310,6 +320,7 @@ export type Database = {
           id?: string
           locked_count?: number | null
           updated_at?: string | null
+          version?: number | null
           week_start: string
         }
         Update: {
@@ -320,6 +331,7 @@ export type Database = {
           id?: string
           locked_count?: number | null
           updated_at?: string | null
+          version?: number | null
           week_start?: string
         }
         Relationships: []
@@ -333,6 +345,7 @@ export type Database = {
           shift_start: string
           trained_tasks: string[]
           updated_at: string | null
+          version: number | null
         }
         Insert: {
           created_at?: string | null
@@ -342,6 +355,7 @@ export type Database = {
           shift_start?: string
           trained_tasks?: string[]
           updated_at?: string | null
+          version?: number | null
         }
         Update: {
           created_at?: string | null
@@ -351,6 +365,7 @@ export type Database = {
           shift_start?: string
           trained_tasks?: string[]
           updated_at?: string | null
+          version?: number | null
         }
         Relationships: []
       }

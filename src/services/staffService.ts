@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { StaffMember, AvailabilityEntry, Task, ShiftStart, ShiftPattern } from "@/types";
 
 export const staffService = {
-  // Fetch all staff members with their availability
+  // Fetch all staff members with their availability (12-week window)
   async getAllStaff(): Promise<StaffMember[]> {
     const { data: staffData, error: staffError } = await supabase
       .from("staff")
@@ -14,9 +14,21 @@ export const staffService = {
       throw staffError;
     }
 
+    // Calculate date range: 4 weeks back, 8 weeks forward
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - (4 * 7));
+    const endDate = new Date(today);
+    endDate.setDate(today.getDate() + (8 * 7));
+    
+    const startDateStr = startDate.toISOString().split('T')[0];
+    const endDateStr = endDate.toISOString().split('T')[0];
+
     const { data: availabilityData, error: availError } = await supabase
       .from("availability")
-      .select("*");
+      .select("*")
+      .gte('date', startDateStr)
+      .lte('date', endDateStr);
 
     if (availError) {
       console.error("Error fetching availability:", availError);

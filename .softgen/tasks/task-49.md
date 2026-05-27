@@ -1,4 +1,4 @@
-<![CDATA[---
+---
 title: Production Readiness - Critical Fixes
 status: in_progress
 priority: urgent
@@ -26,11 +26,11 @@ User confirmed:
 
 ## Checklist
 
-- [ ] Create migration to add version columns (assignments, rotas, staff, managers, manager_duties)
-- [ ] Create migration to fix RLS policies (require auth.uid() IS NOT NULL)
-- [ ] Add pagination indexes for date-range queries
-- [ ] Update useSupabaseQueries to load only 12 weeks of availability
-- [ ] Update useSupabaseQueries to load only selected week + adjacent weeks for assignments
+- [x] Create migration to add version columns (assignments, rotas, staff, managers, manager_duties)
+- [x] Create migration to fix RLS policies (require auth.uid() IS NOT NULL)
+- [x] Add pagination indexes for date-range queries
+- [x] Update useSupabaseQueries to load only 12 weeks of availability
+- [x] Update useSupabaseQueries to load only selected week + adjacent weeks for assignments
 - [ ] Add optimistic locking logic in rotaService (check version before save)
 - [ ] Add transaction wrapper for bulk staff operations
 - [ ] Add transaction wrapper for rota generation
@@ -45,4 +45,3 @@ User confirmed:
 - Page loads in <500ms even with 12 months of data
 - Bulk operations rollback cleanly on failure
 - Touch targets meet 48px accessibility standard
-</file_path>
