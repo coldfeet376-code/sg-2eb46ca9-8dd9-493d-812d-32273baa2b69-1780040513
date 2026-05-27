@@ -2003,3 +2003,24 @@ export default function IndexPage() {
     </Layout>
   );
 }
+
+const getWeekStart = (date: Date): Date => {
+  const d = new Date(date);
+  const day = d.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  const diff = day; // Number of days to subtract to get to Sunday
+  d.setDate(d.getDate() - diff);
+  d.setHours(0, 0, 0, 0);
+  
+  const weekStartStr = getLocalDateString(d);
+  if (weekStartStr === "2026-05-24") {
+    console.log(`🔍 getWeekStart for problematic week:`, {
+      inputDate: date.toISOString(),
+      inputDay: date.getDay(),
+      calculatedDiff: diff,
+      weekStart: d.toISOString(),
+      weekStartString: weekStartStr
+    });
+  }
+  
+  return d;
+};

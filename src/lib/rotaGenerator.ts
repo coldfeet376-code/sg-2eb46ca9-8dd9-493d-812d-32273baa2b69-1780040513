@@ -33,6 +33,23 @@ export function generateWeeklyRota({
   log(`🔒 Locked: ${lockedAssignments.length}`);
   log("=".repeat(60));
 
+  const weekDates: Date[] = [];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(weekStart);
+    date.setDate(date.getDate() + i);
+    weekDates.push(date);
+  }
+
+  // Special diagnostic for problematic week
+  const weekStartStr = getLocalDateString(weekStart);
+  if (weekStartStr === "2026-05-24") {
+    log("🔍 DIAGNOSTIC: Processing problematic week 2026-05-24");
+    log(`   Week start: ${weekStart.toISOString()}`);
+    log(`   Week dates: ${weekDates.map(d => getLocalDateString(d)).join(", ")}`);
+    log(`   Staff count: ${staff.length}`);
+    log(`   Task config: ${JSON.stringify(taskConfig)}`);
+  }
+
   const assignments: Assignment[] = [...lockedAssignments];
   
   // Track how many times each person has been assigned

@@ -41,7 +41,7 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon } from "lucide-react";
+import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon, MoreVertical } from "lucide-react";
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -1154,11 +1154,11 @@ export default function StaffPage() {
                                       if (isLoadingThisCell) {
                                         return <span className="text-xs">⏳</span>;
                                       }
-                                  
+  
                                       if (!availability) {
                                         return <span className="text-xs text-muted-foreground">-</span>;
                                       }
-                                  
+  
                                       switch (availability) {
                                         case 'rest':
                                           return <Badge variant="outline" className="px-1.5 py-0 h-5 text-xs font-mono font-bold bg-blue-500/20 text-blue-700 border-blue-500">R</Badge>;
