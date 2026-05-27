@@ -58,6 +58,7 @@ export const rotaService = {
         .from("rotas")
         .upsert({
           week_start: weekStart,
+          assignments: assignments as any,
           version: (expectedVersion !== undefined ? expectedVersion + 1 : 1),
           updated_at: new Date().toISOString()
         }, { onConflict: "week_start" });
