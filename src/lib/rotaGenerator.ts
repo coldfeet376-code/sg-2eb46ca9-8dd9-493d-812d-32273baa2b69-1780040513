@@ -140,26 +140,36 @@ export function generateWeeklyRota({
 
         // Check 2: Is staff available on this date?
         // Match EXACT date string format (YYYY-MM-DD)
-        const availability = staffMember.availability?.find(a => a.date === dateStr);
+        // Find ALL entries for this date (in case of duplicates) and use the most restrictive
+        const availabilityEntries = staffMember.availability?.filter(a => a.date === dateStr) || [];
         
         console.log(`    🔍 Checking ${staffMember.name} for ${dateStr}:`, {
           totalAvailabilityEntries: staffMember.availability?.length || 0,
-          foundEntry: availability ? { date: availability.date, type: availability.type } : null
+          entriesForThisDate: availabilityEntries.length,
+          entries: availabilityEntries.map(e => ({ date: e.date, type: e.type }))
         });
         
-        // Normalize availability type to handle case variations (e.g., "Rest Day" → "rest")
+        // Normalize all availability types and pick the most restrictive
         let normalizedType: string | null = null;
-        if (availability) {
+        
+        for (const availability of availabilityEntries) {
           const rawType = availability.type.toString().toLowerCase().trim();
-          console.log(`      Raw type: "${availability.type}" → normalized: "${rawType}"`);
+          console.log(`      Raw type: "${availability.type}" → normalized check: "${rawType}"`);
           
-          if (rawType.includes('rest')) normalizedType = 'rest';
-          else if (rawType.includes('holiday') || rawType.includes('hol')) normalizedType = 'holiday';
-          else if (rawType.includes('sick')) normalizedType = 'sick';
-          else if (rawType.includes('available') || rawType.includes('avail')) normalizedType = 'available';
-          
-          console.log(`      Normalized type: "${normalizedType}"`);
+          // Most restrictive statuses win (rest/sick/holiday override available)
+          if (rawType.includes('rest')) {
+            normalizedType = 'rest';
+            break; // Rest day is most restrictive, stop checking
+          } else if (rawType.includes('sick') && normalizedType !== 'rest') {
+            normalizedType = 'sick';
+          } else if ((rawType.includes('holiday') || rawType.includes('hol')) && !['rest', 'sick'].includes(normalizedType || '')) {
+            normalizedType = 'holiday';
+          } else if ((rawType.includes('available') || rawType.includes('avail')) && !normalizedType) {
+            normalizedType = 'available';
+          }
         }
+        
+        console.log(`      Final normalized type: "${normalizedType}"`);
         
         // Skip if staff has a rest day, holiday, or sick leave entry
         if (normalizedType && ['rest', 'holiday', 'sick'].includes(normalizedType)) {
