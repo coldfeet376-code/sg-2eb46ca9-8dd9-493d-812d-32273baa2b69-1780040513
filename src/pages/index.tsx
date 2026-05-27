@@ -134,9 +134,13 @@ export default function Home() {
   const weekDates = useMemo(() => {
     try {
       if (!weekStart) return [];
+      // Use local components only - match rota generator pattern
+      const baseYear = weekStart.getFullYear();
+      const baseMonth = weekStart.getMonth();
+      const baseDay = weekStart.getDate();
+      
       return DAYS.map((_, i) => {
-        const date = new Date(weekStart);
-        date.setDate(weekStart.getDate() + i);
+        const date = new Date(baseYear, baseMonth, baseDay + i);
         return date;
       });
     } catch (e) {
