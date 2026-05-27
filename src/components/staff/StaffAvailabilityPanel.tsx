@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/select";
 import { Calendar, Check, X } from "lucide-react";
 import type { AvailabilityType, StaffMember as Staff } from "@/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface StaffAvailabilityPanelProps {
   selectedStaff: Staff[];
@@ -32,6 +34,36 @@ export function StaffAvailabilityPanel({
   onApply,
   onClearSelection,
 }: StaffAvailabilityPanelProps) {
+  const [open, setOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedType, setSelectedType] = useState<AvailabilityType>("rest");
+  const [notes, setNotes] = useState("");
+
+  const handleSubmit = async () => {
+    if (!selectedDate) return;
+
+    const dateStr = selectedDate.toISOString().split("T")[0];
+    
+    const newAvailability: AvailabilityEntry = {
+      id: crypto.randomUUID(),
+      date: dateStr,
+      type: selectedType,
+      notes: notes || undefined,
+    };
+
+    const updatedAvailability = [
+      ...(staffMember.availability || []).filter(a => a.date !== dateStr),
+      newAvailability,
+    ];
+
+    await onUpdate(staffMember.id, updatedAvailability);
+    
+    setOpen(false);
+    setSelectedDate(undefined);
+    setSelectedType("rest");
+    setNotes("");
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -51,8 +83,12 @@ export function StaffAvailabilityPanel({
           <Input
             id="batch-date"
             type="date"
-            value={selectedDate}
-            onChange={(e) => onDateChange(e.target.value)}
+            value={selectedDate ? selectedDate.toISOString().split("T")[0] : ""}
+            onChange={(e) => {
+              if (e.target.value) {
+                setSelectedDate(new Date(e.target.value + "T00:00:00"));
+              }
+            }}
             className="font-mono mt-1.5"
           />
         </div>
@@ -62,22 +98,33 @@ export function StaffAvailabilityPanel({
             Status
           </Label>
           <Select
-            value={selectedAvailability}
-            onValueChange={(value) => onAvailabilityChange(value as AvailabilityType)}
+            value={selectedType}
+            onValueChange={(value) => setSelectedType(value as AvailabilityType)}
           >
             <SelectTrigger className="font-mono mt-1.5">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="available">Available</SelectItem>
               <SelectItem value="rest">Rest Day</SelectItem>
               <SelectItem value="holiday">Holiday</SelectItem>
+              <SelectItem value="sick">Sick Leave</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="notes">Notes (Optional)</Label>
+          <Textarea
+            id="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Additional notes..."
+            className="font-mono text-sm"
+          />
+        </div>
+
         <div className="flex gap-2">
-          <Button onClick={onApply} className="rounded-lg gap-2 flex-1">
+          <Button onClick={handleSubmit} disabled={!selectedDate} className="rounded-lg gap-2 flex-1">
             <Check className="h-4 w-4" />
             Apply to Selected
           </Button>
