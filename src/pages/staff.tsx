@@ -16,6 +16,14 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -62,6 +70,14 @@ export default function StaffPage() {
   const [shiftPattern, setShiftPattern] = useState<"Early" | "Late" | "All">("All");
   const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
+  const [batchDate, setBatchDate] = useState<string>("");
+  const [batchAvailability, setBatchAvailability] = useState<AvailabilityType>("rest");
+  
+  const [editAvailabilityStaff, setEditAvailabilityStaff] = useState<{ id: string; name: string } | null>(null);
+  const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
+  const [editAvailabilityType, setEditAvailabilityType] = useState<AvailabilityType | "clear">("rest");
   
   // Week navigation - Start on SUNDAY of the current week
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
@@ -1135,7 +1151,10 @@ export default function StaffPage() {
                                     };
 
                                     return (
-                                      <TableCell key={dayIndex} className="p-1 text-center relative">
+                                      <div key={dayIndex} className="p-1 text-center relative border border-border/50 rounded flex flex-col justify-between min-h-[4rem]">
+                                        <div className="text-[10px] font-mono mb-1 text-muted-foreground">
+                                          {date.toLocaleDateString("en-GB", { weekday: "short" })}
+                                        </div>
                                         <DropdownMenu 
                                           open={openDayDropdown?.staffId === member.id && openDayDropdown?.date === getLocalDateString(date)}
                                           onOpenChange={(open) => {
@@ -1161,28 +1180,28 @@ export default function StaffPage() {
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem 
                                               onClick={() => setDayAvailability(member.id, getLocalDateString(date), "rest")}
-                                              className="font-mono text-xs gap-2"
+                                              className="font-mono text-xs gap-2 cursor-pointer"
                                             >
                                               <span className="w-4 h-4 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center">R</span>
                                               Rest Day
                                             </DropdownMenuItem>
                                             <DropdownMenuItem 
                                               onClick={() => setDayAvailability(member.id, getLocalDateString(date), "holiday")}
-                                              className="font-mono text-xs gap-2"
+                                              className="font-mono text-xs gap-2 cursor-pointer"
                                             >
                                               <span className="w-4 h-4 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center">H</span>
                                               Holiday
                                             </DropdownMenuItem>
                                             <DropdownMenuItem 
                                               onClick={() => setDayAvailability(member.id, getLocalDateString(date), "sick")}
-                                              className="font-mono text-xs gap-2"
+                                              className="font-mono text-xs gap-2 cursor-pointer"
                                             >
                                               <span className="w-4 h-4 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center">S</span>
                                               Sick Leave
                                             </DropdownMenuItem>
                                             <DropdownMenuItem 
                                               onClick={() => setDayAvailability(member.id, getLocalDateString(date), "available")}
-                                              className="font-mono text-xs gap-2"
+                                              className="font-mono text-xs gap-2 cursor-pointer"
                                             >
                                               <span className="w-4 h-4 rounded bg-green-500 text-white text-xs font-bold flex items-center justify-center">A</span>
                                               Available
@@ -1190,13 +1209,13 @@ export default function StaffPage() {
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem 
                                               onClick={() => setDayAvailability(member.id, getLocalDateString(date), "clear")}
-                                              className="font-mono text-xs text-muted-foreground"
+                                              className="font-mono text-xs text-muted-foreground cursor-pointer"
                                             >
                                               Clear (Working)
                                             </DropdownMenuItem>
                                           </DropdownMenuContent>
                                         </DropdownMenu>
-                                      </TableCell>
+                                      </div>
                                     );
                                   })}
                                 </div>
