@@ -40,17 +40,20 @@ export function useStaff() {
         // Fetch ALL availability data using RPC function (bypasses JS client limits)
         console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset via RPC...`);
         
-        // Use RPC function to bypass Supabase JS client's row limits
-        const { data: availabilityData, error: availError } = await supabase
-          .rpc('get_all_availability');
+        // Use JSON RPC function to bypass Supabase PostgREST max-rows completely
+        const { data: rawData, error: availError } = await supabase
+          .rpc('get_all_availability_json');
 
         if (availError) {
           console.error(`❌ [${fetchId}] Availability RPC error:`, availError);
           throw availError;
         }
+        
+        // Parse the JSON array
+        const availabilityData: any[] = Array.isArray(rawData) ? rawData : (typeof rawData === 'string' ? JSON.parse(rawData) : []);
 
-        const totalAvail = availabilityData?.length || 0;
-        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records via RPC (NO CLIENT LIMITS)`);
+        const totalAvail = availabilityData.length;
+        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records via JSON RPC (NO CLIENT LIMITS)`);
         
         if (totalAvail === 0) {
           console.warn(`⚠️ [${fetchId}] Database returned ZERO availability records!`);
