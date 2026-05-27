@@ -728,20 +728,27 @@ export default function Home() {
     
     const availability = staffMember.availability?.find(a => a.date === dateStr);
     
-    if (!availability) return { type: 'available', color: 'bg-green-50 text-green-700 border-green-200', label: 'Available' };
+    // If no availability record, assume working/available (no special status)
+    if (!availability) return null;
     
-    switch (availability.type) {
-      case 'rest':
-        return { type: 'rest', color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Rest Day' };
-      case 'sick':
-        return { type: 'sick', color: 'bg-red-50 text-red-700 border-red-200', label: 'Sick' };
-      case 'holiday':
-        return { type: 'holiday', color: 'bg-purple-50 text-purple-700 border-purple-200', label: 'Holiday' };
-      case 'available':
-        return { type: 'available', color: 'bg-green-50 text-green-700 border-green-200', label: 'Available' };
-      default:
-        return null;
+    // Normalize the type value to handle case variations, whitespace, and full phrases
+    const normalizedType = availability.type.toString().toLowerCase().trim();
+    
+    if (normalizedType.includes('rest')) {
+      return { type: 'rest', color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Rest Day' };
     }
+    if (normalizedType.includes('sick')) {
+      return { type: 'sick', color: 'bg-red-50 text-red-700 border-red-200', label: 'Sick' };
+    }
+    if (normalizedType.includes('holiday') || normalizedType.includes('hol')) {
+      return { type: 'holiday', color: 'bg-purple-50 text-purple-700 border-purple-200', label: 'Holiday' };
+    }
+    if (normalizedType.includes('available') || normalizedType.includes('avail')) {
+      return { type: 'available', color: 'bg-green-50 text-green-700 border-green-200', label: 'Available' };
+    }
+    
+    // Fallback for unknown types
+    return null;
   };
 
   const getAllUnavailableStaff = (task: string, dateIndex: number): { name: string; reason: string; color: string }[] => {

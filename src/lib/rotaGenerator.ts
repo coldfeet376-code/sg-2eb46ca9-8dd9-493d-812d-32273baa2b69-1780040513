@@ -142,7 +142,7 @@ export function generateWeeklyRota({
         // Match EXACT date string format (YYYY-MM-DD)
         const availability = staffMember.availability?.find(a => a.date === dateStr);
         
-        // Normalize availability type to handle case variations
+        // Normalize availability type to handle case variations (e.g., "Rest Day" → "rest")
         let normalizedType: string | null = null;
         if (availability) {
           const rawType = availability.type.toString().toLowerCase().trim();
