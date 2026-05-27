@@ -628,6 +628,37 @@ export default function StaffPage() {
     }
   };
 
+  // Auto-jump to first week with availability data on page load
+  useEffect(() => {
+    if (staff.length === 0 || staffLoading) return;
+    
+    // Find the earliest availability date across all staff
+    let earliestDate: Date | null = null;
+    
+    for (const member of staff) {
+      if (!member.availability || member.availability.length === 0) continue;
+      
+      for (const entry of member.availability) {
+        const entryDate = new Date(entry.date + 'T00:00:00'); // Parse as local date
+        if (!earliestDate || entryDate < earliestDate) {
+          earliestDate = entryDate;
+        }
+      }
+    }
+    
+    if (earliestDate) {
+      // Calculate the Saturday that starts the week containing earliestDate
+      const day = earliestDate.getDay();
+      const diff = day === 0 ? 0 : 7 - day; // Days until next Saturday
+      const saturday = new Date(earliestDate);
+      saturday.setDate(earliestDate.getDate() + diff);
+      saturday.setHours(0, 0, 0, 0);
+      
+      console.log(`📅 Auto-jumping to first week with data: ${saturday.toISOString().split('T')[0]}`);
+      setCurrentWeekStart(saturday);
+    }
+  }, [staff, staffLoading]);
+
   return (
     <Layout>
       <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
