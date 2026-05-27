@@ -1110,6 +1110,18 @@ export default function IndexPage() {
                 Generate Rota
               </Button>
 
+              {getLocalDateString(weekStart) === "2026-05-24" && (
+                <Button
+                  onClick={handleDebugWeek}
+                  size="lg"
+                  variant="outline"
+                  className="gap-2 border-warning text-warning hover:bg-warning/10"
+                >
+                  <Bug className="h-5 w-5" />
+                  Debug This Week
+                </Button>
+              )}
+
               <Button
                 onClick={() => {
                   const suggestions = suggestSwaps(assignments, staff, 10);
