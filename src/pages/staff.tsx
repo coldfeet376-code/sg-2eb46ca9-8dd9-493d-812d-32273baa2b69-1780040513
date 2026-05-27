@@ -306,7 +306,7 @@ export default function StaffPage() {
       }
 
       // Refresh data
-      await queryClient.refetchQueries({ queryKey: ["staff", "v5-full-dataset"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "full"] });
       
       // Force re-render
       setRenderKey(prev => prev + 1);
@@ -354,8 +354,8 @@ export default function StaffPage() {
       }
       
       // IMMEDIATE cache refresh - force complete reload
-      queryClient.removeQueries({ queryKey: ["staff", "v5-full-dataset"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "v5-full-dataset"] });
+      queryClient.removeQueries({ queryKey: ["staff", "full"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "full"] });
       
       // Force re-render
       setRenderKey(prev => prev + 1);
@@ -462,8 +462,8 @@ export default function StaffPage() {
         }
       }
       
-      await queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "v5-full-dataset"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "full"], type: "active" });
       await new Promise(resolve => setTimeout(resolve, 800));
       setRenderKey(prev => prev + 1);
       
@@ -522,8 +522,8 @@ export default function StaffPage() {
         }
       }
       
-      await queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "v5-full-dataset"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "full"], type: "active" });
       await new Promise(resolve => setTimeout(resolve, 800));
       setRenderKey(prev => prev + 1);
       
@@ -553,8 +553,8 @@ export default function StaffPage() {
 
       await staffService.updateStaff(staffId, { trainedTasks: newTasks });
       
-      await queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "v5-full-dataset"], type: "active" });
+      await queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "full"], type: "active" });
       
       toast({
         title: currentTasks.includes(task) ? "✓ Training Removed" : "✓ Training Added",
@@ -617,8 +617,8 @@ export default function StaffPage() {
               variant="outline"
               onClick={async () => {
                 toast({ title: "🔄 Refreshing data...", description: "Loading latest from database" });
-                await queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
-                await queryClient.refetchQueries({ queryKey: ["staff", "v5-full-dataset"], type: "active" });
+                await queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
+                await queryClient.refetchQueries({ queryKey: ["staff", "full"], type: "active" });
                 await new Promise(resolve => setTimeout(resolve, 1000));
                 setRenderKey(prev => prev + 1);
                 toast({ title: "✅ Data Refreshed", description: "Loaded latest availability data" });
