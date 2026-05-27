@@ -70,13 +70,16 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
         startTour,
         completeTour: endTour,
         setCurrentStep: setStepIndex,
-        resetAllTours: resetTour,
+        resetTour,
       }}
     >
       {children}
     </TourContext.Provider>
   );
 }
+
+// Export resetTour for external use
+export { resetTour as resetTourExternal };
 
 export function useTour() {
   const context = useContext(TourContext);

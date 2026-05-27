@@ -39,12 +39,14 @@ export function generateWeeklyRota({
   const assignmentCounts: Record<string, number> = {};
   const taskCounts: Record<string, Record<Task, number>> = {};
   const lastTaskAssigned: Record<string, Task | null> = {};
+  const inboundCounts: Record<string, number> = {}; // NEW: Track inbound assignments per person
 
   // Initialize tracking
   staff.forEach((s) => {
     assignmentCounts[s.id] = 0;
     taskCounts[s.id] = {} as Record<Task, number>;
     lastTaskAssigned[s.id] = null;
+    inboundCounts[s.id] = 0; // NEW: Initialize inbound counter
   });
 
   // Generate assignments for each day (Sun-Sat)
@@ -116,6 +118,18 @@ export function generateWeeklyRota({
           return false;
         }
 
+        // NEW: Inbound constraint for part-time staff
+        if (task === "Inbound") {
+          const totalShiftsThisWeek = assignmentCounts[s.id];
+          const inboundShiftsThisWeek = inboundCounts[s.id];
+          
+          // If staff member is working ≤3 shifts and already has 1 inbound, skip them
+          if (totalShiftsThisWeek <= 3 && inboundShiftsThisWeek >= 1) {
+            log(`   ⚠️ ${s.name} - inbound constraint (part-time with ${inboundShiftsThisWeek} inbound already)`);
+            return false;
+          }
+        }
+
         return true;
       });
 
@@ -156,6 +170,12 @@ export function generateWeeklyRota({
         assignmentCounts[staffMember.id]++;
         taskCounts[staffMember.id] = taskCounts[staffMember.id] || ({} as Record<Task, number>);
         taskCounts[staffMember.id][task] = (taskCounts[staffMember.id][task] || 0) + 1;
+        
+        // NEW: Track inbound assignments
+        if (task === "Inbound") {
+          inboundCounts[staffMember.id]++;
+          log(`      📊 Inbound count for ${staffMember.name}: ${inboundCounts[staffMember.id]}`);
+        }
 
         const taskCount = taskCounts[staffMember.id][task];
         const totalCount = assignmentCounts[staffMember.id];

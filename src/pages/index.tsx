@@ -23,13 +23,14 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useStaff, useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
-import { Lock, Unlock, Save, Download, Copy, Calendar, History, RotateCcw, Zap, LayoutGrid, Printer, AlertCircle, TrendingUp } from "lucide-react";
+import { Info, Calendar, Download, Eye, RefreshCw, Lock, Unlock, Shuffle, TrendingUp, Users, Target, Settings, HelpCircle } from "lucide-react";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { FairnessMeter } from "@/components/rota/FairnessMeter";
 import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
 import { useToast } from "@/hooks/use-toast";
 import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
 import { RecentChangesPanel } from "@/components/RecentChangesPanel";
+import { useTour } from "@/hooks/useTour";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -82,25 +83,16 @@ interface TaskConfig {
   [task: string]: number[];
 }
 
-export default function Home() {
+export default function IndexPage() {
   
   // Safe date initialization with fallback - always start on Sunday
-  const [weekStart, setWeekStart] = useState<Date>(() => {
-    try {
-      const today = new Date();
-      const day = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-      const sunday = new Date(today);
-      sunday.setDate(today.getDate() - day); // Go back to Sunday
-      sunday.setHours(0, 0, 0, 0);
-      return sunday;
-    } catch (e) {
-      console.error("Error initializing week start:", e);
-      return new Date();
-    }
-  });
-  
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [lockedAssignments, setLockedAssignments] = useState<Assignment[]>([]);
+  const [showSmartAssignment, setShowSmartAssignment] = useState(false);
+  const { resetTour } = useTour();
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [history, setHistory] = useState<RotaSnapshot[]>([]);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [coverageGaps, setCoverageGaps] = useState<CoverageGap[]>([]);
@@ -108,8 +100,6 @@ export default function Home() {
   const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const [fairnessMetrics, setFairnessMetrics] = useState<ReturnType<typeof calculateFairnessMetrics> | null>(null);
-  const [showPrintPreview, setShowPrintPreview] = useState(false);
-  const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [showSundayDebug, setShowSundayDebug] = useState(false);
   const { addNotification } = useNotifications();
