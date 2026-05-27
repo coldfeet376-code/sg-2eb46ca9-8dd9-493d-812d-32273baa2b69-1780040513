@@ -412,6 +412,20 @@ export default function StaffPage() {
     // Find matching availability entry
     const entry = staffMember.availability?.find(a => a.date === dateStr);
     
+    // DEBUG: Log every lookup for Wilson I to diagnose
+    if (staffMember.name.toLowerCase().includes('wilson') && staffMember.availability && staffMember.availability.length > 0) {
+      console.log(`🔍 Calendar lookup for ${staffMember.name}:`);
+      console.log(`   Looking for: "${dateStr}"`);
+      console.log(`   Total availability entries: ${staffMember.availability.length}`);
+      console.log(`   Sample dates in array:`, staffMember.availability.slice(0, 5).map(a => a.date));
+      console.log(`   Match found: ${entry ? entry.type : 'NO'}`);
+      
+      // Check if the date exists with different formatting
+      const exactMatches = staffMember.availability.filter(a => a.date === dateStr);
+      const partialMatches = staffMember.availability.filter(a => a.date.includes(dateStr.slice(-5))); // Match day-month
+      console.log(`   Exact matches: ${exactMatches.length}, Partial matches: ${partialMatches.length}`);
+    }
+    
     return entry ? entry.type : null;
   };
 
