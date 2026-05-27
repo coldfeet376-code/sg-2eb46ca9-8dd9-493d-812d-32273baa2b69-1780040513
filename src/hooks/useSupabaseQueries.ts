@@ -37,23 +37,48 @@ export function useStaff() {
           return [];
         }
 
-        // Fetch ALL availability data directly - remove default 1000 row limit
-        console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset (full year)...`);
+        // Fetch ALL availability data directly - use pagination to bypass limits
+        console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset with pagination...`);
         
-        const { data: rawData, error: availError } = await supabase
-          .from("availability")
-          .select("*")
-          .limit(20000); // Set high limit to get all 52 weeks for all staff
-
-        if (availError) {
-          console.error(`❌ [${fetchId}] Availability fetch error:`, availError);
-          throw availError;
+        let allAvailability: any[] = [];
+        let offset = 0;
+        const chunkSize = 1000;
+        let hasMore = true;
+        
+        while (hasMore) {
+          console.log(`   📦 Fetching chunk at offset ${offset}...`);
+          
+          const { data: chunk, error: chunkError } = await supabase
+            .from("availability")
+            .select("*")
+            .range(offset, offset + chunkSize - 1)
+            .order("date");
+          
+          if (chunkError) {
+            console.error(`❌ [${fetchId}] Availability fetch error at offset ${offset}:`, chunkError);
+            throw chunkError;
+          }
+          
+          if (!chunk || chunk.length === 0) {
+            hasMore = false;
+            console.log(`   ✅ No more records - pagination complete`);
+          } else {
+            allAvailability = [...allAvailability, ...chunk];
+            console.log(`   ✅ Fetched ${chunk.length} records (total so far: ${allAvailability.length})`);
+            
+            if (chunk.length < chunkSize) {
+              hasMore = false;
+              console.log(`   ✅ Last chunk - pagination complete`);
+            } else {
+              offset += chunkSize;
+            }
+          }
         }
         
-        const availabilityData: any[] = rawData || [];
+        const availabilityData: any[] = allAvailability;
 
         const totalAvail = availabilityData.length;
-        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records (full year)`);
+        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records (full year via pagination)`);
         
         if (totalAvail === 0) {
           console.warn(`⚠️ [${fetchId}] Database returned ZERO availability records!`);
