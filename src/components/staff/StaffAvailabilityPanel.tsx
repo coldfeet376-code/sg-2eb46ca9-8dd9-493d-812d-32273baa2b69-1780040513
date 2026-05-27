@@ -34,7 +34,6 @@ export function StaffAvailabilityPanel({
     const dateStr = selectedDate.toISOString().split("T")[0];
     
     const newAvailability: AvailabilityEntry = {
-      id: crypto.randomUUID(),
       date: dateStr,
       type: selectedType,
       notes: notes || undefined,
