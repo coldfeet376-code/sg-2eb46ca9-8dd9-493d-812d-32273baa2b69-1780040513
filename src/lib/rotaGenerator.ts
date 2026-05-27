@@ -35,60 +35,34 @@ export function generateWeeklyRota({
 
   const assignments: Assignment[] = [...lockedAssignments];
   
-  // Extract local date components once
-  const baseYear = weekStart.getFullYear();
-  const baseMonth = weekStart.getMonth();
-  const baseDay = weekStart.getDate();
-
   // Track how many times each person has been assigned
   const assignmentCounts: Record<string, number> = {};
   const taskCounts: Record<string, Record<Task, number>> = {};
-  
-  const initTaskRecord = (): Record<Task, number> => ({
-    "Frozen": 0,
-    "Milk": 0,
-    "TWI": 0,
-    "Inbound": 0,
-    "Inbound Late": 0,
-    "Outbound": 0,
-    "Marshaling": 0,
-    "Housekeeping": 0
-  });
+  const lastTaskAssigned: Record<string, Task | null> = {};
 
-  staff.forEach(s => {
+  // Initialize tracking
+  staff.forEach((s) => {
     assignmentCounts[s.id] = 0;
-    taskCounts[s.id] = initTaskRecord();
+    taskCounts[s.id] = {} as Record<Task, number>;
+    lastTaskAssigned[s.id] = null;
   });
 
-  // Count locked assignments
-  lockedAssignments.forEach(a => {
-    if (a.staffId) {
-      assignmentCounts[a.staffId] = (assignmentCounts[a.staffId] || 0) + 1;
-      taskCounts[a.staffId] = taskCounts[a.staffId] || initTaskRecord();
-      taskCounts[a.staffId][a.task as Task] = (taskCounts[a.staffId][a.task as Task] || 0) + 1;
-    }
-  });
-
-  log("\n📋 Initial assignment counts:");
-  staff.forEach(s => {
-    log(`   ${s.name}: ${assignmentCounts[s.id]} assignments`);
-  });
-
-  // Process each day
-  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-    const currentDate = new Date(baseYear, baseMonth, baseDay + dayIndex);
+  // Generate assignments for each day (Sun-Sat)
+  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    // Create date using local time - NO timezone conversion
+    const currentDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
     const dateStr = getLocalDateString(currentDate);
-    const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][dayIndex];
+    const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][currentDate.getDay()];
     
     log(`\n${"=".repeat(60)}`);
-    log(`📅 ${dayName} - ${dateStr}`);
-    log("=".repeat(60));
+    log(`📅 ${dayName} ${dateStr}`);
+    log(`${"=".repeat(60)}`);
 
     // Process each task for this day
     // taskConfig[task][dayIndex] maps correctly: [0]=Sunday, [1]=Monday, ..., [6]=Saturday
     for (const taskName of Object.keys(taskConfig)) {
       const task = taskName as Task;
-      const required = taskConfig[task][dayIndex];
+      const required = taskConfig[task][dayOffset];
       
       if (required === 0) {
         log(`   ⏭️  ${task}: 0 required, skipping`);
@@ -177,12 +151,16 @@ export function generateWeeklyRota({
       for (let i = 0; i < toAssign; i++) {
         const staffMember = availableStaff[i];
         
-        assignments.push({
+        // Create assignment
+        const assignment: Assignment = {
+          id: crypto.randomUUID(),
+          date: dateStr, // Already in YYYY-MM-DD format from getLocalDateString
+          task,
           staffId: staffMember.id,
           staffName: staffMember.name,
-          task: task,
-          date: dateStr,
-        });
+          notes: `Auto-assigned - Availability: yes, Previous task: ${lastTaskAssigned[staffMember.id] || "none"}`,
+        };
+        assignments.push(assignment);
 
         assignmentCounts[staffMember.id]++;
         taskCounts[staffMember.id] = taskCounts[staffMember.id] || initTaskRecord();
