@@ -341,6 +341,7 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
+          rest_days: Json | null
           shift_pattern: string | null
           shift_start: string
           trained_tasks: string[]
@@ -351,6 +352,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           name: string
+          rest_days?: Json | null
           shift_pattern?: string | null
           shift_start?: string
           trained_tasks?: string[]
@@ -361,6 +363,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           name?: string
+          rest_days?: Json | null
           shift_pattern?: string | null
           shift_start?: string
           trained_tasks?: string[]
