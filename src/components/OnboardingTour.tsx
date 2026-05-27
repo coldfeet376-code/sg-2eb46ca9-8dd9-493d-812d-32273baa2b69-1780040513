@@ -107,15 +107,40 @@ const tourSteps: TourStep[] = [
 
 export function OnboardingTour() {
   const router = useRouter();
-  const { isTourActive, currentStep, setCurrentStep, completeTour } = useTour();
+  const { run, stepIndex, steps, tourActive } = useTour();
+  const [hasStarted, setHasStarted] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
   const [highlightPosition, setHighlightPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
 
-  const currentTourStep = tourSteps[currentStep];
-  const isLastStep = currentStep === tourSteps.length - 1;
-  const isFirstStep = currentStep === 0;
+  useEffect(() => {
+    console.log("🎯 OnboardingTour mounted");
+    console.log("   Tour active:", tourActive);
+    console.log("   Should run:", run);
+    console.log("   Step index:", stepIndex);
+    console.log("   Total steps:", steps.length);
+    
+    if (!hasStarted && run && tourActive) {
+      console.log("✅ Starting tour...");
+      setHasStarted(true);
+    }
+    
+    return () => {
+      console.log("🎯 OnboardingTour unmounted");
+    };
+  }, [run, tourActive, hasStarted, stepIndex, steps.length]);
+
+  if (!run || !tourActive) {
+    console.log("⏸️ Tour not running - run:", run, "active:", tourActive);
+    return null;
+  }
+
+  console.log(`📍 Rendering tour step ${stepIndex + 1}/${steps.length}`);
+
+  const currentTourStep = steps[stepIndex];
+  const isLastStep = stepIndex === steps.length - 1;
+  const isFirstStep = stepIndex === 0;
 
   useEffect(() => {
     setMounted(true);
@@ -123,16 +148,16 @@ export function OnboardingTour() {
 
   // Navigate to correct route for current step
   useEffect(() => {
-    if (!isTourActive || !currentTourStep?.route) return;
+    if (!tourActive || !currentTourStep?.route) return;
     
     if (router.pathname !== currentTourStep.route) {
       router.push(currentTourStep.route);
     }
-  }, [currentStep, isTourActive, currentTourStep?.route, router]);
+  }, [stepIndex, tourActive, currentTourStep?.route, router]);
 
   // Calculate positions
   useEffect(() => {
-    if (!isTourActive || !mounted) return;
+    if (!tourActive || !mounted) return;
 
     const updatePositions = () => {
       const target = document.querySelector(currentTourStep.target);
@@ -198,27 +223,27 @@ export function OnboardingTour() {
       window.removeEventListener("scroll", updatePositions);
       window.removeEventListener("resize", updatePositions);
     };
-  }, [isTourActive, currentStep, mounted, currentTourStep]);
+  }, [tourActive, stepIndex, mounted, currentTourStep]);
 
   const handleNext = () => {
     if (isLastStep) {
-      completeTour();
+      steps[0].action?.onClick();
     } else {
-      setCurrentStep(currentStep + 1);
+      steps[stepIndex + 1].action?.onClick();
     }
   };
 
   const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+    if (stepIndex > 0) {
+      steps[stepIndex - 1].action?.onClick();
     }
   };
 
   const handleSkip = () => {
-    completeTour();
+    steps[0].action?.onClick();
   };
 
-  if (!isTourActive || !mounted) return null;
+  if (!tourActive || !mounted) return null;
 
   return (
     <>
@@ -262,7 +287,7 @@ export function OnboardingTour() {
                 {currentTourStep.title}
               </CardTitle>
               <CardDescription className="text-xs font-mono mt-2">
-                Step {currentStep + 1} of {tourSteps.length}
+                Step {stepIndex + 1} of {steps.length}
               </CardDescription>
             </div>
             <Button
@@ -285,12 +310,12 @@ export function OnboardingTour() {
             <div className="h-1.5 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-primary transition-all duration-300"
-                style={{ width: `${((currentStep + 1) / tourSteps.length) * 100}%` }}
+                style={{ width: `${((stepIndex + 1) / steps.length) * 100}%` }}
               />
             </div>
             <div className="flex justify-between text-xs font-mono text-muted-foreground">
               <span>Progress</span>
-              <span>{Math.round(((currentStep + 1) / tourSteps.length) * 100)}%</span>
+              <span>{Math.round(((stepIndex + 1) / steps.length) * 100)}%</span>
             </div>
           </div>
 

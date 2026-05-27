@@ -14,53 +14,63 @@ const TourContext = createContext<TourContextType | undefined>(undefined);
 const TOUR_STORAGE_KEY = "gist-rota-tour-completed";
 
 export function TourProvider({ children }: { children: React.ReactNode }) {
-  const [isTourActive, setIsTourActive] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [mounted, setMounted] = useState(false);
+  const [tourActive, setTourActive] = useState(false);
+  const [run, setRun] = useState(false);
+  const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
-    setMounted(true);
+    console.log("🎓 TourContext initialized");
     
-    // Check if tour has been completed before
-    const tourCompleted = localStorage.getItem(TOUR_STORAGE_KEY);
+    // Check if tour has been completed
+    const tourCompleted = localStorage.getItem("tourCompleted");
+    console.log("   Tour completed status:", tourCompleted);
     
-    // Auto-start tour for new users
     if (!tourCompleted) {
-      // Delay to ensure page is fully loaded
-      setTimeout(() => {
-        setIsTourActive(true);
+      console.log("   ✅ Tour not completed - will show tour");
+      // Small delay to ensure DOM elements are ready
+      const timer = setTimeout(() => {
+        console.log("   🚀 Starting tour after delay");
+        setTourActive(true);
+        setRun(true);
       }, 1000);
+      
+      return () => clearTimeout(timer);
+    } else {
+      console.log("   ⏭️ Tour already completed - skipping");
     }
   }, []);
 
   const startTour = () => {
-    setCurrentStep(0);
-    setIsTourActive(true);
+    console.log("🎬 Manual tour start requested");
+    setStepIndex(0);
+    setTourActive(true);
+    setRun(true);
   };
 
-  const completeTour = () => {
-    setIsTourActive(false);
-    setCurrentStep(0);
-    if (mounted) {
-      localStorage.setItem(TOUR_STORAGE_KEY, "true");
-    }
+  const endTour = () => {
+    console.log("🏁 Tour ended");
+    setRun(false);
+    setTourActive(false);
+    localStorage.setItem("tourCompleted", "true");
   };
 
-  const resetAllTours = () => {
-    localStorage.removeItem(TOUR_STORAGE_KEY);
-    setCurrentStep(0);
-    setIsTourActive(true);
+  const resetTour = () => {
+    console.log("🔄 Tour reset");
+    localStorage.removeItem("tourCompleted");
+    setStepIndex(0);
+    setTourActive(true);
+    setRun(true);
   };
 
   return (
     <TourContext.Provider
       value={{
-        isTourActive,
-        currentStep,
+        isTourActive: tourActive,
+        currentStep: stepIndex,
         startTour,
-        completeTour,
-        setCurrentStep,
-        resetAllTours,
+        completeTour: endTour,
+        setCurrentStep: setStepIndex,
+        resetAllTours: resetTour,
       }}
     >
       {children}
