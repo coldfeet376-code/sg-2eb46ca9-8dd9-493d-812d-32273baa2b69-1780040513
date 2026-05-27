@@ -331,10 +331,21 @@ export default function StaffPage() {
     setOpenDayDropdown(null);
     setLoadingCell({ staffId, date: dateStr });
     
+    console.log('🔧 setDayAvailability called:', {
+      staffId,
+      dateStr,
+      type,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       // Find staff name for better feedback
       const staffMember = staff.find(s => s.id === staffId);
       const staffName = staffMember?.name || "Staff";
+      
+      console.log(`   Staff: ${staffName} (${staffId})`);
+      console.log(`   Date: ${dateStr}`);
+      console.log(`   Action: ${type === 'clear' ? 'DELETE' : 'UPSERT'} ${type}`);
       
       // Format date for display - parse as UK local date
       const [year, month, day] = dateStr.split('-').map(Number);
@@ -343,22 +354,32 @@ export default function StaffPage() {
       
       if (type === "clear") {
         // Remove availability
+        console.log(`   🗑️  Calling staffService.deleteAvailability(${staffId}, ${dateStr})`);
         await staffService.deleteAvailability(staffId, dateStr);
+        console.log('   ✅ Delete successful');
       } else {
         // Add or update (UPSERT)
+        console.log(`   💾 Calling staffService.addAvailability with:`, {
+          staffId,
+          entry: { date: dateStr, type: type, notes: `Marked as ${type}` }
+        });
         await staffService.addAvailability(staffId, [{
           date: dateStr,
           type: type,
           notes: `Marked as ${type}`,
         }]);
+        console.log('   ✅ Upsert successful');
       }
       
       // IMMEDIATE cache refresh - force complete reload
+      console.log('   🔄 Invalidating React Query cache...');
       queryClient.removeQueries({ queryKey: ["staff", "full"] });
       await queryClient.refetchQueries({ queryKey: ["staff", "full"] });
+      console.log('   ✅ Cache refreshed');
       
       // Force re-render
       setRenderKey(prev => prev + 1);
+      console.log('   🎨 Re-render triggered');
       
       // Show success toast
       if (type === "clear") {
@@ -372,10 +393,15 @@ export default function StaffPage() {
           title: `✓ Saved ${typeLabel}`,
           description: `${staffName} - ${dateDisplay} = ${typeLabel}`,
         });
+        console.log(`   ✅ SUCCESS: ${staffName} marked as ${typeLabel} on ${dateStr}`);
       }
       
     } catch (error) {
-      console.error("Error updating availability:", error);
+      console.error("❌ Error updating availability:", error);
+      console.error('   Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       toast({
         title: "❌ Error",
         description: `Failed to save. ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -384,6 +410,7 @@ export default function StaffPage() {
     } finally {
       // Clear loading state
       setLoadingCell(null);
+      console.log('   🏁 setDayAvailability complete\n');
     }
   };
 
