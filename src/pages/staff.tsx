@@ -68,10 +68,10 @@ export default function StaffPage() {
     const today = new Date();
     const day = today.getDay();
     const diff = day === 0 ? 0 : 7 - day;
-    const saturday = new Date(today);
-    saturday.setDate(today.getDate() + diff);
-    saturday.setHours(0, 0, 0, 0);
-    return saturday;
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() + diff);
+    sunday.setHours(0, 0, 0, 0);
+    return sunday;
   });
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
   const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
@@ -152,10 +152,10 @@ export default function StaffPage() {
     const today = new Date();
     const day = today.getDay();
     const diff = day === 0 ? 0 : 7 - day;
-    const saturday = new Date(today);
-    saturday.setDate(today.getDate() + diff);
-    saturday.setHours(0, 0, 0, 0);
-    setCurrentWeekStart(saturday);
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() + diff);
+    sunday.setHours(0, 0, 0, 0);
+    setCurrentWeekStart(sunday);
   };
 
   const handleAddStaff = async () => {
@@ -671,16 +671,16 @@ export default function StaffPage() {
       // If date is Monday (1) -> go back 2 days to Saturday
       // If date is Friday (5) -> go back 6 days to Saturday
       const dayOfWeek = earliestDate.getDay();
-      const daysBack = (dayOfWeek + 1) % 7;
-      const saturday = new Date(earliestDate);
-      saturday.setDate(earliestDate.getDate() - daysBack);
-      saturday.setHours(0, 0, 0, 0);
+      const daysBack = dayOfWeek; // Sunday is 0
+      const sunday = new Date(earliestDate);
+      sunday.setDate(earliestDate.getDate() - daysBack);
+      sunday.setHours(0, 0, 0, 0);
       
       console.log(`📅 AUTO-JUMP TO FIRST WEEK WITH DATA:`);
       console.log(`   Earliest date: ${earliestDate.toISOString().split('T')[0]}`);
-      console.log(`   Week start: ${saturday.toISOString().split('T')[0]}`);
+      console.log(`   Week start: ${sunday.toISOString().split('T')[0]}`);
       
-      setCurrentWeekStart(saturday);
+      setCurrentWeekStart(sunday);
       hasJumpedToData.current = true;
     }
   }, [staff, staffLoading]);
