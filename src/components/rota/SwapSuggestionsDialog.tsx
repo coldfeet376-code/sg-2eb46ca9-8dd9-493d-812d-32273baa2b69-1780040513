@@ -24,13 +24,27 @@ export function SwapSuggestionsDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="font-condensed text-2xl flex items-center gap-2">
-            <Shuffle className="h-6 w-6 text-primary" />
-            Smart Swap Suggestions
-          </DialogTitle>
-          <DialogDescription className="font-mono text-sm">
-            {suggestions.length} optimization opportunities found
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="font-condensed text-2xl flex items-center gap-2">
+                <Shuffle className="h-6 w-6 text-primary" />
+                Smart Swap Suggestions
+              </DialogTitle>
+              <DialogDescription className="font-mono text-sm">
+                {suggestions.length} optimization opportunities found
+              </DialogDescription>
+            </div>
+            {suggestions.length > 0 && (
+              <Button
+                onClick={() => onImplementAll(suggestions)}
+                className="gap-2"
+                size="lg"
+              >
+                <Zap className="h-4 w-4" />
+                Implement All ({suggestions.length})
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <ScrollArea className="flex-1 pr-4">
@@ -91,21 +105,6 @@ export function SwapSuggestionsDialog({
             </div>
           )}
         </ScrollArea>
-
-        {suggestions.length > 0 && (
-          <DialogFooter className="gap-2 sm:gap-2 pt-4 border-t">
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
-            <Button
-              onClick={() => onImplementAll(suggestions)}
-              className="gap-2"
-            >
-              <Zap className="h-4 w-4" />
-              Implement All ({suggestions.length})
-            </Button>
-          </DialogFooter>
-        )}
       </DialogContent>
     </Dialog>
   );
