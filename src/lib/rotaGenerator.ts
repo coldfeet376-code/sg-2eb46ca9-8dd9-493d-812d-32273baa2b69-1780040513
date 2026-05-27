@@ -139,48 +139,16 @@ export function generateWeeklyRota({
         }
 
         // Check 2: Is staff available on this date?
+        // Match EXACT date string format (YYYY-MM-DD)
         const availability = staffMember.availability?.find(a => a.date === dateStr);
-        log(`      🔍 ${staffMember.name} availability check:`);
-        log(`         - Date: ${dateStr}`);
-        log(`         - Availability records: ${staffMember.availability?.length || 0}`);
-        log(`         - Found record: ${availability ? `YES (${availability.type})` : 'NO'}`);
         
         if (availability && availability.type !== "available") {
-          log(`      ❌ ${staffMember.name}: Marked as ${availability.type}`);
+          log(`      ⛔ ${staffMember.name}: ${availability.type.toUpperCase()} on ${dateStr}`);
           continue;
         }
-
-        // Check 3: Already assigned to THIS EXACT TASK on this day?
-        const alreadyAssignedToThisTask = assignments.some(
-          a => a.staffId === staffMember.id && a.date === dateStr && a.task === task
-        );
         
-        if (alreadyAssignedToThisTask) {
-          log(`      ❌ ${staffMember.name}: Already assigned to ${task} today`);
-          continue;
-        }
-
-        // Check 4: Already assigned to another task on this day?
-        const dayAssignments = assignments.filter(
-          a => a.staffId === staffMember.id && a.date === dateStr
-        );
-
-        if (dayAssignments.length > 0) {
-          const hasFrozen = dayAssignments.some(a => a.task === "Frozen");
-          const hasInbound = dayAssignments.some(a => a.task === "Inbound" || a.task === "Inbound Late");
-          
-          // Special rule: Frozen + Inbound allowed
-          if ((task === "Inbound" || task === "Inbound Late") && hasFrozen && !hasInbound) {
-            log(`      ✅ ${staffMember.name}: Has Frozen, can add ${task}`);
-          } else if (task === "Frozen" && hasInbound && !hasFrozen) {
-            log(`      ✅ ${staffMember.name}: Has Inbound, can add Frozen`);
-          } else {
-            log(`      ❌ ${staffMember.name}: Already assigned ${dayAssignments.map(a => a.task).join(", ")}`);
-            continue;
-          }
-        }
-
-        log(`      ✅ ${staffMember.name}: AVAILABLE`);
+        // If no availability record exists, assume AVAILABLE (default working)
+        log(`      ✓ ${staffMember.name}: Available`);
         availableStaff.push(staffMember);
       }
 
