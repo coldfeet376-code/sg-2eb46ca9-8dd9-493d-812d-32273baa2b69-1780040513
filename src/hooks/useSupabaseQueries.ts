@@ -6,24 +6,30 @@ interface TaskConfig {
   [task: string]: number[];
 }
 
-// Staff Query Hook
-export function useStaff() {
+// Staff Query Hook with optional date range centered on a specific date
+export function useStaff(options?: { centerDate?: Date; weeksWindow?: number }) {
+  const centerDate = options?.centerDate || new Date();
+  const weeksWindow = options?.weeksWindow || 12; // Default 12 weeks for rota page
+  
   return useQuery({
-    queryKey: ["staff", "v4"],
+    queryKey: ["staff", "v4", centerDate.toISOString().split('T')[0], weeksWindow],
     queryFn: async () => {
       console.log("🔍 Starting staff query with v4 and date-range pagination...");
       
-      // Calculate date range: 4 weeks back, 8 weeks forward (12 weeks total)
-      const today = new Date();
+      // Calculate date range centered on the provided date
+      const today = centerDate;
+      const weeksBack = Math.floor(weeksWindow / 2);
+      const weeksForward = Math.ceil(weeksWindow / 2);
+      
       const startDate = new Date(today);
-      startDate.setDate(today.getDate() - (4 * 7)); // 4 weeks back
+      startDate.setDate(today.getDate() - (weeksBack * 7));
       const endDate = new Date(today);
-      endDate.setDate(today.getDate() + (8 * 7)); // 8 weeks forward
+      endDate.setDate(today.getDate() + (weeksForward * 7));
       
       const startDateStr = startDate.toISOString().split('T')[0];
       const endDateStr = endDate.toISOString().split('T')[0];
       
-      console.log(`📅 Loading availability from ${startDateStr} to ${endDateStr} (12 weeks window)`);
+      console.log(`📅 Loading availability from ${startDateStr} to ${endDateStr} (${weeksWindow} weeks window, centered on ${centerDate.toISOString().split('T')[0]})`);
       
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -59,7 +65,7 @@ export function useStaff() {
         throw availError;
       }
 
-      console.log(`✅ Fetched ${availabilityData?.length || 0} availability records (12-week window)`);
+      console.log(`✅ Fetched ${availabilityData?.length || 0} availability records (${weeksWindow}-week window)`);
 
       if (!availabilityData || availabilityData.length === 0) {
         console.warn("⚠️ No availability data in date range");

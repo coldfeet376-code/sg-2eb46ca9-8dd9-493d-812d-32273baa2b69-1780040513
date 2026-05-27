@@ -114,8 +114,11 @@ export default function StaffPage() {
   const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
   const [editAvailabilityType, setEditAvailabilityType] = useState<AvailabilityType>("rest");
 
-  // React Query hooks
-  const { data: staff = [], isLoading: staffLoading } = useStaff();
+  // React Query hooks - Load 52 weeks (1 year) of data centered on current viewed week
+  const { data: staff = [], isLoading: staffLoading } = useStaff({ 
+    centerDate: currentWeekStart, 
+    weeksWindow: 52 
+  });
   const addStaffMutation = useAddStaff();
   const updateStaffMutation = useUpdateStaff();
   const deleteStaffMutation = useDeleteStaff();
