@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { StaffMember, Task, ShiftStart, ShiftPattern } from "@/types";
+import type { StaffMember, Task, ShiftStart, ShiftPattern, AvailabilityType } from "@/types";
 
 interface TaskConfig {
   [task: string]: number[];
@@ -37,23 +37,22 @@ export function useStaff() {
           return [];
         }
 
-        // Fetch ALL availability data using RPC function (bypasses JS client limits)
-        console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset via RPC...`);
+        // Fetch ALL availability data directly
+        console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset...`);
         
-        // Use JSON RPC function to bypass Supabase PostgREST max-rows completely
-        const { data: rawData, error: availError } = await (supabase as any)
-          .rpc('get_all_availability_json');
+        const { data: rawData, error: availError } = await supabase
+          .from("availability")
+          .select("*");
 
         if (availError) {
-          console.error(`❌ [${fetchId}] Availability RPC error:`, availError);
+          console.error(`❌ [${fetchId}] Availability fetch error:`, availError);
           throw availError;
         }
         
-        // Parse the JSON array
-        const availabilityData: any[] = Array.isArray(rawData) ? rawData : (typeof rawData === 'string' ? JSON.parse(rawData) : []);
+        const availabilityData: any[] = rawData || [];
 
         const totalAvail = availabilityData.length;
-        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records via JSON RPC (NO CLIENT LIMITS)`);
+        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records`);
         
         if (totalAvail === 0) {
           console.warn(`⚠️ [${fetchId}] Database returned ZERO availability records!`);
