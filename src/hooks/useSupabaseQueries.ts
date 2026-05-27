@@ -12,73 +12,44 @@ export function useStaff() {
   return useQuery({
     queryKey: ["staff"],
     queryFn: async () => {
-      const fetchId = Math.random().toString(36).substring(7);
-      console.log(`🚨 [useStaff ${fetchId}] Starting staff fetch with pagination...`);
-      
       // Fetch all staff
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
         .select("*")
         .order("name");
 
-      if (staffError) {
-        console.error(`❌ [${fetchId}] Staff fetch error:`, staffError);
-        throw staffError;
-      }
-
-      if (!staffData || staffData.length === 0) {
-        console.warn(`⚠️ [${fetchId}] No staff data in database`);
-        return [];
-      }
-
-      console.log(`📊 [${fetchId}] Staff loaded: ${staffData.length} members`);
+      if (staffError) throw staffError;
+      if (!staffData || staffData.length === 0) return [];
 
       // Fetch ALL availability data with pagination to bypass 1000-row limit
-      console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset with pagination...`);
-      
       let allAvailability: any[] = [];
       let offset = 0;
       const chunkSize = 1000;
       let hasMore = true;
       
       while (hasMore) {
-        console.log(`   📦 Fetching chunk at offset ${offset}...`);
-        
         const { data: chunk, error: chunkError } = await supabase
           .from("availability")
           .select("*")
           .range(offset, offset + chunkSize - 1)
           .order("date");
         
-        if (chunkError) {
-          console.error(`❌ [${fetchId}] Availability fetch error at offset ${offset}:`, chunkError);
-          throw chunkError;
-        }
+        if (chunkError) throw chunkError;
         
         if (!chunk || chunk.length === 0) {
           hasMore = false;
-          console.log(`   ✅ No more records - pagination complete`);
         } else {
           allAvailability = [...allAvailability, ...chunk];
-          console.log(`   ✅ Fetched ${chunk.length} records (total so far: ${allAvailability.length})`);
           
           if (chunk.length < chunkSize) {
             hasMore = false;
-            console.log(`   ✅ Last chunk - pagination complete`);
           } else {
             offset += chunkSize;
           }
         }
       }
 
-      const totalAvail = allAvailability.length;
-      console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records (full year via pagination)`);
-      
-      if (totalAvail === 0) {
-        console.warn(`⚠️ [${fetchId}] Database returned ZERO availability records!`);
-      }
-
-      // Create a Map for O(1) lookups: staff_id -> array of availability entries
+      // Create a Map for O(1) lookups
       const availabilityMap = new Map<string, any[]>();
       
       allAvailability.forEach((entry) => {
@@ -88,27 +59,10 @@ export function useStaff() {
         }
         availabilityMap.get(staffId)!.push(entry);
       });
-      
-      console.log(`📊 [${fetchId}] Created availability map for ${availabilityMap.size} staff members`);
 
       // Map staff with their availability
       const mappedStaff: StaffMember[] = staffData.map((s) => {
         const staffAvailability = availabilityMap.get(s.id) || [];
-        
-        // DEBUG: Log for Brian Murray to verify his Saturday rest days
-        if (s.name?.includes('BRIAN')) {
-          console.log(`🔍 [${fetchId}] ${s.name}:`);
-          console.log(`   Staff ID: ${s.id}`);
-          console.log(`   Total availability entries: ${staffAvailability.length}`);
-          if (staffAvailability.length > 0) {
-            const saturdays = staffAvailability.filter(a => {
-              const date = new Date(a.date + 'T00:00:00');
-              return date.getDay() === 6; // Saturday
-            });
-            console.log(`   Saturday rest days: ${saturdays.length}`);
-            console.log(`   Sample Saturdays:`, saturdays.slice(0, 3));
-          }
-        }
 
         return {
           id: s.id,
@@ -125,17 +79,9 @@ export function useStaff() {
         };
       });
 
-      console.log(`✅ [${fetchId}] Successfully mapped ${mappedStaff.length} staff members with availability`);
-      
-      // Verify Brian Murray has his data
-      const brian = mappedStaff.find(s => s.name?.includes('BRIAN'));
-      if (brian) {
-        console.log(`✅ [${fetchId}] Brian Murray availability loaded: ${brian.availability.length} entries`);
-      }
-
       return mappedStaff;
     },
-    staleTime: 1000 * 10, // 10 seconds
+    staleTime: 1000 * 30, // 30 seconds cache
   });
 }
 
@@ -144,8 +90,6 @@ export function useStaffQuery() {
   return useQuery({
     queryKey: ["staff", "full"],
     queryFn: async () => {
-      console.log('🔍 useStaffQuery: Starting staff fetch...');
-      
       // Fetch staff with their availability via JOIN
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -161,13 +105,7 @@ export function useStaffQuery() {
         `)
         .order("name");
 
-      if (staffError) {
-        console.error('❌ useStaffQuery: Staff fetch error:', staffError);
-        throw staffError;
-      }
-
-      console.log(`✅ useStaffQuery: Fetched ${staffData?.length || 0} staff members`);
-      console.log('📊 useStaffQuery: Raw staff data sample:', staffData?.[0]);
+      if (staffError) throw staffError;
 
       // Transform to match StaffMember interface
       const staff: StaffMember[] = (staffData || []).map((s) => {
@@ -186,13 +124,9 @@ export function useStaffQuery() {
         };
       });
 
-      console.log(`✅ useStaffQuery: Transformed ${staff.length} staff members`);
-      console.log('📊 useStaffQuery: First staff member availability count:', staff[0]?.availability?.length || 0);
-      console.log('📊 useStaffQuery: First staff availability sample:', staff[0]?.availability?.[0]);
-
       return staff;
     },
-    staleTime: 1000 * 10, // 10 seconds
+    staleTime: 1000 * 30, // 30 seconds cache
   });
 }
 
@@ -201,27 +135,12 @@ export function useTaskConfig() {
   return useQuery({
     queryKey: ["taskConfig"],
     queryFn: async () => {
-      console.log("🔍 Starting task config query...");
-      
       const { data, error } = await supabase
         .from("task_config")
         .select("*");
 
-      console.log("📊 Task config query result:", {
-        rowCount: data?.length || 0,
-        error: error?.message,
-        tasks: data?.map(d => d.task) || []
-      });
-
-      if (error) {
-        console.error("❌ Task config query error:", error);
-        throw error;
-      }
-
-      if (!data || data.length === 0) {
-        console.warn("⚠️ No task config data returned from database");
-        return null;
-      }
+      if (error) throw error;
+      if (!data || data.length === 0) return null;
 
       const config: TaskConfig = {};
       data.forEach((row) => {
@@ -236,11 +155,10 @@ export function useTaskConfig() {
         ];
       });
 
-      console.log("✅ Task config mapped:", Object.keys(config));
       return config;
     },
     retry: 1,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 5, // 5 minutes cache
   });
 }
 

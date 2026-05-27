@@ -150,24 +150,6 @@ export default function IndexPage() {
     }
   }, [taskConfig]);
 
-  // Debug logging
-  useEffect(() => {
-    console.log("Staff Query State:", { 
-      staff, 
-      staffCount: staff.length, 
-      staffLoading, 
-      staffError: staffError?.message 
-    });
-  }, [staff, staffLoading, staffError]);
-
-  useEffect(() => {
-    console.log("Task Config Query State:", { 
-      taskConfig, 
-      configLoading, 
-      configError: configError?.message 
-    });
-  }, [taskConfig, configLoading, configError]);
-
   useEffect(() => {
     try {
       // Load locked assignments and history from localStorage
@@ -210,33 +192,38 @@ export default function IndexPage() {
 
     loadRotaFromSupabase();
 
-    // Set up real-time subscription
+    // Set up real-time subscription with debouncing
+    let updateTimeout: NodeJS.Timeout;
     const channel = rotaRealtimeService.subscribeToRotas((payload) => {
-      // Only update if the change is for the current week
-      const changedWeek = new Date(payload.new.week_start);
-      if (changedWeek.toISOString().split("T")[0] === weekStart.toISOString().split("T")[0]) {
-        setAssignments(payload.new.assignments);
-        if (payload.new.fairness_metrics) {
-          setFairnessMetrics(payload.new.fairness_metrics as any);
+      // Debounce rapid updates
+      clearTimeout(updateTimeout);
+      updateTimeout = setTimeout(() => {
+        const changedWeek = new Date(payload.new.week_start);
+        if (changedWeek.toISOString().split("T")[0] === weekStart.toISOString().split("T")[0]) {
+          setAssignments(payload.new.assignments);
+          if (payload.new.fairness_metrics) {
+            setFairnessMetrics(payload.new.fairness_metrics as any);
+          }
+          
+          addNotification({
+            staffName: "System",
+            message: `Rota updated by colleague`,
+            type: "info",
+          });
         }
-        
-        addNotification({
-          staffName: "System",
-          message: `Rota updated by colleague`,
-          type: "info",
-        });
-      }
+      }, 300); // 300ms debounce
     });
 
     setRotaChannel(channel);
 
-    // Cleanup subscription on unmount or week change
+    // Cleanup
     return () => {
+      clearTimeout(updateTimeout);
       if (channel) {
         rotaRealtimeService.unsubscribe(channel);
       }
     };
-  }, [weekStart]);
+  }, [weekStart, addNotification]);
 
   // Save assignments to Supabase whenever they change
   useEffect(() => {
@@ -255,8 +242,8 @@ export default function IndexPage() {
       }
     };
 
-    // Debounce to avoid excessive saves
-    const timeoutId = setTimeout(saveRotaToSupabase, 500);
+    // Longer debounce to reduce excessive saves
+    const timeoutId = setTimeout(saveRotaToSupabase, 2000); // 2 seconds
     return () => clearTimeout(timeoutId);
   }, [assignments, weekStart, fairnessMetrics, lockedAssignments.length]);
 
