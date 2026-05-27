@@ -68,6 +68,7 @@ export default function StaffPage() {
   const [shiftStart, setShiftStart] = useState<ShiftStart>("06:00");
   const [dayShiftPattern, setDayShiftPattern] = useState<DayShiftPattern>("06:00-14:30");
   const [shiftPattern, setShiftPattern] = useState<"Early" | "Late" | "All">("All");
+  const [recurringRestDays, setRecurringRestDays] = useState<number[]>([]);
   const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
@@ -100,6 +101,7 @@ export default function StaffPage() {
   const [editShift, setEditShift] = useState<ShiftStart>("06:00");
   const [editDayShiftPattern, setEditDayShiftPattern] = useState<DayShiftPattern>("06:00-14:30");
   const [editShiftPattern, setEditShiftPattern] = useState<"Early" | "Late" | "All">("All");
+  const [editRecurringRestDays, setEditRecurringRestDays] = useState<number[]>([]);
   
   // Expanded staff IDs for collapsible sections
   const [expandedStaffIds, setExpandedStaffIds] = useState<Set<string>>(new Set());
@@ -220,6 +222,7 @@ export default function StaffPage() {
         shiftStart,
         dayShiftPattern,
         shiftPattern,
+        recurringRestDays,
       } as any,
       {
         onSuccess: (newStaff) => {
@@ -234,6 +237,7 @@ export default function StaffPage() {
           setSelectedTasks([]);
           setDayShiftPattern("06:00-14:30");
           setShiftPattern("All");
+          setRecurringRestDays([]);
           toast({
             title: "Staff added",
             description: `${newStaff.name} has been added successfully`,
