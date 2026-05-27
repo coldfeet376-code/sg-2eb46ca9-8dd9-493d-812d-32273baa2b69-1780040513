@@ -1021,6 +1021,18 @@ export default function StaffPage() {
                                       size="sm"
                                       onClick={(e) => {
                                         e.stopPropagation();
+                                        openEditAvailabilityDialog(member.id, member.name);
+                                      }}
+                                      className="h-8 px-3 font-mono text-xs border-primary/20 text-primary hover:bg-primary/10"
+                                    >
+                                      <CalendarIcon className="h-3.5 w-3.5 mr-1" />
+                                      Set Status
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
                                         handleEditStaff(member);
                                       }}
                                       className="h-8 px-3 font-mono text-xs"
