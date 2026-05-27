@@ -899,6 +899,69 @@ export default function IndexPage() {
     return colorMap[task] || "bg-primary text-primary-foreground border-primary";
   };
 
+  const handleSmartSuggestion = async () => {
+    const suggestions = suggestSwaps(
+      assignments,
+      staff,
+      weekDates.map(date => getLocalDateString(date))
+    );
+
+    if (suggestions.length === 0) {
+      toast({
+        title: "No Improvements Found",
+        description: "The current rota is already well-balanced",
+      });
+      return;
+    }
+
+    setShowSmartAssignment(true);
+  };
+
+  const implementAllSwaps = (swaps: Array<{ from: Assignment; to: Assignment; improvement: string }>) => {
+    const updatedAssignments = [...assignments];
+    let successCount = 0;
+
+    swaps.forEach(swap => {
+      // Find indices
+      const fromIndex = updatedAssignments.findIndex(
+        a => a.staffId === swap.from.staffId && a.task === swap.from.task && a.date === swap.from.date
+      );
+      const toIndex = updatedAssignments.findIndex(
+        a => a.staffId === swap.to.staffId && a.task === swap.to.task && a.date === swap.to.date
+      );
+
+      if (fromIndex !== -1 && toIndex !== -1) {
+        // Perform the swap
+        const tempStaffId = updatedAssignments[fromIndex].staffId;
+        const tempStaffName = updatedAssignments[fromIndex].staffName;
+        
+        updatedAssignments[fromIndex].staffId = updatedAssignments[toIndex].staffId;
+        updatedAssignments[fromIndex].staffName = updatedAssignments[toIndex].staffName;
+        
+        updatedAssignments[toIndex].staffId = tempStaffId;
+        updatedAssignments[toIndex].staffName = tempStaffName;
+        
+        successCount++;
+      }
+    });
+
+    setAssignments(updatedAssignments);
+    setShowSmartAssignment(false);
+
+    toast({
+      title: "Swaps Implemented",
+      description: `Successfully applied ${successCount} swaps to improve fairness`,
+    });
+
+    addAuditEntry({
+      user: "System",
+      action: "updated",
+      entity: "rota",
+      entityId: getLocalDateString(weekStart),
+      details: `Implemented ${successCount} smart swaps`,
+    });
+  };
+
   return (
     <Layout>
       <OnboardingTour />
@@ -1610,27 +1673,45 @@ export default function IndexPage() {
         
         {/* Smart Assignment Dialog */}
         <SmartAssignmentDialog
-          open={smartAssignDialog.open}
-          onClose={() => setSmartAssignDialog({ open: false, task: null, date: "" })}
-          task={smartAssignDialog.task || "Frozen"}
-          date={smartAssignDialog.date}
-          staff={staff}
+          open={showSmartAssignment}
+          onClose={() => setShowSmartAssignment(false)}
           assignments={assignments}
-          onAssign={(staffId) => {
-            if (smartAssignDialog.task && smartAssignDialog.date) {
-              const staffMember = staff.find((s) => s.id === staffId);
-              if (staffMember) {
-                const newAssignment = {
-                  staffId: staffId,
-                  staffName: staffMember.name,
-                  task: smartAssignDialog.task!,
-                  date: smartAssignDialog.date,
-                };
-                
-                setAssignments(prev => [...prev, newAssignment]);
-              }
+          staff={staff}
+          weekDates={weekDates.map(date => getLocalDateString(date))}
+          onApplySwap={(fromAssignment, toAssignment) => {
+            const fromIndex = assignments.findIndex(
+              (a) => a.staffId === fromAssignment.staffId && a.task === fromAssignment.task && a.date === fromAssignment.date
+            );
+            const toIndex = assignments.findIndex(
+              (a) => a.staffId === toAssignment.staffId && a.task === toAssignment.task && a.date === toAssignment.date
+            );
+
+            if (fromIndex !== -1 && toIndex !== -1) {
+              const newAssignments = [...assignments];
+              const tempStaffId = newAssignments[fromIndex].staffId;
+              const tempStaffName = newAssignments[fromIndex].staffName;
+              newAssignments[fromIndex].staffId = newAssignments[toIndex].staffId;
+              newAssignments[fromIndex].staffName = newAssignments[toIndex].staffName;
+              newAssignments[toIndex].staffId = tempStaffId;
+              newAssignments[toIndex].staffName = tempStaffName;
+
+              setAssignments(newAssignments);
+
+              addAuditEntry({
+                user: "System",
+                action: "updated",
+                entity: "rota",
+                entityId: getLocalDateString(weekStart),
+                details: `Applied smart swap: ${fromAssignment.staffName} ↔ ${toAssignment.staffName}`,
+              });
+
+              toast({
+                title: "Swap Applied",
+                description: `${fromAssignment.staffName} ↔ ${toAssignment.staffName}`,
+              });
             }
           }}
+          onImplementAll={implementAllSwaps}
         />
 
         {/* Diagnostics Dialog */}
