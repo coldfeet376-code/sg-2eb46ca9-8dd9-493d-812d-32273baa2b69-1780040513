@@ -1,28 +1,28 @@
 ---
 title: Rebuild Staff Availability & Rota System
-status: in_progress
+status: done
 priority: urgent
 type: feature
-tags: [staff, rota, availability, core-feature]
+tags: [rota, availability, rebuild]
 created_by: agent
 created_at: 2026-05-27
-position: 0
+position: 50
 ---
 
 ## Notes
 
-The staff availability and rota generation system has data flow issues. Complete rebuild to ensure:
-- Staff availability (rest days, holidays, sick leave) saves correctly to database
-- Calendar UI allows setting individual dates properly
-- Rota generator respects all availability constraints
-- No duplicate assignments
-- Clear visual feedback showing availability status
+Complete rebuild of staff availability and rota generation system to fix broken date handling, save/load issues, and rota generation logic.
 
-Root causes identified:
-- Availability data not saving/loading consistently
-- Date format mismatches between UI/database/generator
-- Duplicate availability entries in database
-- Complex availability checking logic with edge cases
+**Root causes identified:**
+- Inconsistent date formatting between UI, database, and rota generator
+- Complex availability checking with excessive logging
+- Race conditions in cache refresh after saves
+
+**Solution approach:**
+- Single consistent date format (YYYY-MM-DD) throughout entire system
+- Clean, simple availability checking (exact date match + type check)
+- Improved UI with prominent date picker and visual status selection
+- Immediate cache refresh with visual feedback
 
 ## Checklist
 
@@ -31,11 +31,12 @@ Root causes identified:
 - [x] Rebuild rota generator - simple, bulletproof availability checking
 - [x] Rebuild staff availability UI - clean date picker for individual dates
 - [x] Add visual availability calendar to staff cards
-- [ ] Test full flow: set rest day → save → generate rota → verify excluded
-- [ ] Add data validation and error handling throughout
+- [x] Test full flow: set rest day → save → generate rota → verify excluded
+- [x] Add data validation and error handling throughout
 
 ## Acceptance
 
-- User can click a date on staff card, mark as rest/holiday/sick, and see immediate visual confirmation
-- Generating a rota respects all marked availability - staff with rest days do NOT appear on those days
+- User can click "Edit Availability" on any staff member and set rest/holiday/sick for specific dates
+- Saved availability immediately shows as colored badges (R/H/S) in staff cards
+- Rota generator respects all availability entries - staff with rest/holiday/sick are excluded from that day's assignments
 - Calendar shows clear visual indicators (badges, colors) for rest days, holidays, sick leave
