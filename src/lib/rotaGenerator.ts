@@ -24,14 +24,23 @@ export function generateWeeklyRota({
   lockedAssignments?: Assignment[];
 }): { assignments: Assignment[]; diagnostics: string[] } {
   const diagnostics: string[] = [];
-  const log = (msg: string) => {
-    console.log(msg);
-    diagnostics.push(msg);
-  };
-
+  const log = (msg: string) => diagnostics.push(msg);
+  
+  // CRITICAL DEBUG: Show exactly what week we're generating for
+  const baseYear = weekStart.getFullYear();
+  const baseMonth = weekStart.getMonth();
+  const baseDay = weekStart.getDate();
+  const weekEndDate = new Date(baseYear, baseMonth, baseDay + 6);
+  
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  console.log(`🗓️  GENERATING ROTA FOR WEEK:`);
+  console.log(`   Start (Sunday):  ${weekStart.toDateString()} (${baseYear}-${String(baseMonth+1).padStart(2,'0')}-${String(baseDay).padStart(2,'0')})`);
+  console.log(`   End (Saturday):  ${weekEndDate.toDateString()} (${weekEndDate.getFullYear()}-${String(weekEndDate.getMonth()+1).padStart(2,'0')}-${String(weekEndDate.getDate()).padStart(2,'0')})`);
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  
+  log(`📅 Week: ${weekStart.toDateString()}`);
   log("=".repeat(60));
   log("🚀 ROTA GENERATION STARTED");
-  log(`📅 Week: ${weekStart.toDateString()}`);
   log(`👥 Staff: ${staff.length}`);
   log(`🔒 Locked: ${lockedAssignments.length}`);
   log("=".repeat(60));
