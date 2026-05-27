@@ -37,12 +37,13 @@ export function useStaff() {
           return [];
         }
 
-        // Fetch ALL availability data directly
-        console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset...`);
+        // Fetch ALL availability data directly - remove default 1000 row limit
+        console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset (full year)...`);
         
         const { data: rawData, error: availError } = await supabase
           .from("availability")
-          .select("*");
+          .select("*")
+          .limit(20000); // Set high limit to get all 52 weeks for all staff
 
         if (availError) {
           console.error(`❌ [${fetchId}] Availability fetch error:`, availError);
@@ -52,7 +53,7 @@ export function useStaff() {
         const availabilityData: any[] = rawData || [];
 
         const totalAvail = availabilityData.length;
-        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records`);
+        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records (full year)`);
         
         if (totalAvail === 0) {
           console.warn(`⚠️ [${fetchId}] Database returned ZERO availability records!`);
