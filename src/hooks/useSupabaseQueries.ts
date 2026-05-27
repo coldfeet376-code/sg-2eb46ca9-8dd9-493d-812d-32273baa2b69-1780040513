@@ -129,6 +129,47 @@ export function useStaff() {
   });
 }
 
+// Staff Query Hook - Full availability join
+export function useStaffQuery() {
+  return useQuery({
+    queryKey: ["staff", "full"],
+    queryFn: async () => {
+      // Fetch staff with their availability via JOIN
+      const { data: staffData, error: staffError } = await supabase
+        .from("staff")
+        .select(`
+          *,
+          availability (
+            id,
+            date,
+            type,
+            notes,
+            created_at
+          )
+        `)
+        .order("name");
+
+      if (staffError) throw staffError;
+
+      // Transform to match StaffMember interface
+      const staff: StaffMember[] = (staffData || []).map((s) => ({
+        id: s.id,
+        name: s.name,
+        trainedTasks: (s.trained_tasks || []) as Task[],
+        availability: (s.availability || []).map((a: any) => ({
+          id: a.id,
+          date: a.date,
+          type: a.type as AvailabilityType,
+          notes: a.notes || undefined,
+        })),
+      }));
+
+      return staff;
+    },
+    staleTime: 1000 * 10, // 10 seconds
+  });
+}
+
 // Task Config Query Hook
 export function useTaskConfig() {
   return useQuery({
