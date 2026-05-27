@@ -135,7 +135,22 @@ export function generateWeeklyRota({
       // Find available staff for this task on this day
       const availableStaff: StaffMember[] = [];
 
+      // CRITICAL DEBUG: Extra logging for Saturday (day 6)
+      if (dayIndex === 6) {
+        console.log(`\n🚨 SATURDAY DEBUG - ${task}`);
+        console.log(`   Date: ${dateStr}`);
+        console.log(`   All staff being checked:`);
+      }
+
       for (const staffMember of staff) {
+        // SATURDAY SPECIFIC DEBUG
+        if (dayIndex === 6 && staffMember.name.includes('MURRAY')) {
+          console.log(`\n   🔍 DETAILED CHECK: ${staffMember.name} for Saturday ${dateStr}`);
+          console.log(`      All availability entries for this person:`, 
+            staffMember.availability?.map(a => ({ date: a.date, type: a.type })) || []
+          );
+        }
+
         // Check 1: Is staff trained for this task?
         const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
         if (!staffMember.trainedTasks.includes(taskToCheck)) {
