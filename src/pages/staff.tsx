@@ -79,7 +79,6 @@ export default function StaffPage() {
   const [batchDate, setBatchDate] = useState("");
   const [batchAvailability, setBatchAvailability] = useState<AvailabilityType>("rest");
   const [openDayDropdown, setOpenDayDropdown] = useState<{ staffId: string; date: string } | null>(null);
-  const [loadingCell, setLoadingCell] = useState<{ staffId: string; date: string } | null>(null);
   
   const [editAvailabilityStaff, setEditAvailabilityStaff] = useState<{ id: string; name: string } | null>(null);
   const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
@@ -130,6 +129,8 @@ export default function StaffPage() {
   const addStaffMutation = useAddStaff();
   const updateStaffMutation = useUpdateStaff();
   const deleteStaffMutation = useDeleteStaff();
+  const deleteAvailabilityMutation = useDeleteAvailability();
+  const createAvailabilityMutation = useAddAvailability();
 
   // DEBUG: Log staff data when it changes
   useEffect(() => {
@@ -186,16 +187,8 @@ export default function StaffPage() {
   // Derived selected staff
   const selectedStaff = staff.filter((s) => selectedStaffIds.has(s.id));
 
-  const stats = useMemo(() => {
-    const availability = staffMember.availability || [];
-    
-    // DEBUG: Log for first few staff
-    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
-      console.log(`📊 getAvailabilityStats: ${staffMember.name}`);
-      console.log(`   Raw availability array:`, availability);
-      console.log(`   Array length: ${availability.length}`);
-      console.log(`   Array is array? ${Array.isArray(availability)}`);
-    }
+  const getAvailabilityStats = (member: StaffMember) => {
+    const availability = member.availability || [];
     
     const stats = {
       rest: availability.filter((a) => a.type === "rest").length,
@@ -203,12 +196,8 @@ export default function StaffPage() {
       sick: availability.filter((a) => a.type === "sick").length,
     };
     
-    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
-      console.log(`   Calculated stats:`, stats);
-    }
-    
     return stats;
-  }, [staffMember]);
+  };
 
   // Get week dates (Saturday to Sunday)
   const getWeekDates = (weekStart: Date): Date[] => {
@@ -223,14 +212,14 @@ export default function StaffPage() {
 
   const weekDates = useMemo(() => {
     const dates: Date[] = [];
-    const start = new Date(weekStart);
+    const start = new Date(currentWeekStart);
     for (let i = 0; i < 7; i++) {
       const date = new Date(start);
       date.setDate(start.getDate() + i);
       dates.push(date);
     }
     return dates;
-  }, [weekStart]);
+  }, [currentWeekStart]);
 
   const navigateWeek = (direction: "prev" | "next") => {
     const newStart = new Date(currentWeekStart);
