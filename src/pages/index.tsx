@@ -23,14 +23,14 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useStaff, useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
-import { Info, Calendar, Download, Eye, RefreshCw, Lock, Unlock, Shuffle, TrendingUp, Users, Target, Settings, HelpCircle } from "lucide-react";
+import { Info, Calendar, Download, Eye, RefreshCw, Lock, Unlock, Shuffle, TrendingUp, Users, Target, Settings, HelpCircle, AlertCircle, Zap, History, RotateCcw, Printer } from "lucide-react";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { FairnessMeter } from "@/components/rota/FairnessMeter";
 import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
 import { useToast } from "@/hooks/use-toast";
 import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
 import { RecentChangesPanel } from "@/components/RecentChangesPanel";
-import { useTour } from "@/hooks/useTour";
+import { useTour } from "@/contexts/TourContext";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -101,6 +101,7 @@ export default function IndexPage() {
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const [fairnessMetrics, setFairnessMetrics] = useState<ReturnType<typeof calculateFairnessMetrics> | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<string[]>([]);
   const [showSundayDebug, setShowSundayDebug] = useState(false);
   const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<RealtimeChannel | null>(null);

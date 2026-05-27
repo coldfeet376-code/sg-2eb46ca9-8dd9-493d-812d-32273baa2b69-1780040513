@@ -6,7 +6,7 @@ interface TourContextType {
   startTour: () => void;
   completeTour: () => void;
   setCurrentStep: (step: number) => void;
-  resetAllTours: () => void;
+  resetTour: () => void;
 }
 
 const TourContext = createContext<TourContextType | undefined>(undefined);
@@ -77,9 +77,6 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     </TourContext.Provider>
   );
 }
-
-// Export resetTour for external use
-export { resetTour as resetTourExternal };
 
 export function useTour() {
   const context = useContext(TourContext);
