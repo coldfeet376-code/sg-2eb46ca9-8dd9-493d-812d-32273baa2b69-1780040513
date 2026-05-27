@@ -135,14 +135,7 @@ export function OnboardingTour() {
     };
   }, [run, tourActive, hasStarted, stepIndex, steps.length]);
 
-  if (!run || !tourActive) {
-    console.log("⏸️ Tour not running - run:", run, "active:", tourActive);
-    return null;
-  }
-
-  console.log(`📍 Rendering tour step ${stepIndex + 1}/${steps.length}`);
-
-  const currentTourStep = steps[stepIndex];
+  const currentTourStep = steps[stepIndex] || steps[0];
   const isLastStep = stepIndex === steps.length - 1;
   const isFirstStep = stepIndex === 0;
 
@@ -157,7 +150,7 @@ export function OnboardingTour() {
     if (router.pathname !== currentTourStep.route) {
       router.push(currentTourStep.route);
     }
-  }, [stepIndex, tourActive, currentTourStep?.route, router]);
+  }, [stepIndex, tourActive, currentTourStep?.route, router.pathname]);
 
   // Calculate positions
   useEffect(() => {
@@ -247,7 +240,7 @@ export function OnboardingTour() {
     completeTour();
   };
 
-  if (!tourActive || !mounted) return null;
+  if (!run || !tourActive || !mounted) return null;
 
   return (
     <>
