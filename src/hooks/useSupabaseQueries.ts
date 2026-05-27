@@ -6,12 +6,15 @@ interface TaskConfig {
   [task: string]: number[];
 }
 
-// Staff Query Hook
+// Staff Query Hook - v6 with timestamp-based cache bypass
 export function useStaff() {
+  // Use current timestamp to force fresh data fetch (bypasses ALL caching)
+  const cacheBypass = new Date().getTime();
+  
   return useQuery({
-    queryKey: ["staff", "v5-full-dataset"], // Changed to v5 to force cache invalidation
+    queryKey: ["staff", "v6-live", cacheBypass], // Timestamp forces refetch every time
     queryFn: async () => {
-      console.log("🔍 Starting staff query with v5-full-dataset...");
+      console.log("🔍 Starting staff query with v6-live (cache bypass:", cacheBypass, ")");
       
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -46,6 +49,7 @@ export function useStaff() {
       }
 
       console.log(`✅ Fetched ${availabilityData?.length || 0} availability records (full dataset)`);
+      console.log(`📊 Total availability entries in database: ${availabilityData?.length}`);
 
       if (!availabilityData || availabilityData.length === 0) {
         console.warn("⚠️ No availability data found");
@@ -72,9 +76,12 @@ export function useStaff() {
           }));
         
         console.log(`   📋 ${s.name}: ${staffAvail.length} availability entries`);
-        if (s.name.toLowerCase().includes('abbo')) {
-          console.log(`      First 3: ${staffAvail.slice(0, 3).map(a => a.date).join(', ')}`);
-          console.log(`      Last 3: ${staffAvail.slice(-3).map(a => a.date).join(', ')}`);
+        if (s.name.toLowerCase().includes('abbo') || s.name.toLowerCase().includes('brian')) {
+          console.log(`      🔍 ${s.name} date range:`);
+          if (staffAvail.length > 0) {
+            console.log(`         First: ${staffAvail[0].date} (${staffAvail[0].type})`);
+            console.log(`         Last: ${staffAvail[staffAvail.length - 1].date} (${staffAvail[staffAvail.length - 1].type})`);
+          }
         }
         
         return {
