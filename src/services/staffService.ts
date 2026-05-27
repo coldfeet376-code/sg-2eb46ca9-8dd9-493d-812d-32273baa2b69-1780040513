@@ -41,7 +41,7 @@ export const staffService = {
       trainedTasks: (s.trained_tasks || []) as Task[],
       shiftStart: (s.shift_start || "06:00") as ShiftStart,
       shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
-      restDays: s.rest_days || [],
+      restDays: (Array.isArray(s.rest_days) ? s.rest_days : []) as number[],
       availability: (availabilityData || [])
         .filter((a) => a.staff_id === s.id)
         .map((a) => ({
