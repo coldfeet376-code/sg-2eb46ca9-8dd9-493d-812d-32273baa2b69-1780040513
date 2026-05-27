@@ -107,7 +107,11 @@ const tourSteps: TourStep[] = [
 
 export function OnboardingTour() {
   const router = useRouter();
-  const { run, stepIndex, steps, tourActive } = useTour();
+  const { isTourActive, currentStep, completeTour, setCurrentStep } = useTour();
+  const run = isTourActive;
+  const tourActive = isTourActive;
+  const stepIndex = currentStep;
+  const steps = tourSteps;
   const [hasStarted, setHasStarted] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [targetElement, setTargetElement] = useState<HTMLElement | null>(null);
@@ -227,20 +231,20 @@ export function OnboardingTour() {
 
   const handleNext = () => {
     if (isLastStep) {
-      steps[0].action?.onClick();
+      completeTour();
     } else {
-      steps[stepIndex + 1].action?.onClick();
+      setCurrentStep(stepIndex + 1);
     }
   };
 
   const handlePrevious = () => {
     if (stepIndex > 0) {
-      steps[stepIndex - 1].action?.onClick();
+      setCurrentStep(stepIndex - 1);
     }
   };
 
   const handleSkip = () => {
-    steps[0].action?.onClick();
+    completeTour();
   };
 
   if (!tourActive || !mounted) return null;
