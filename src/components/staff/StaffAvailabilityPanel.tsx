@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,29 +9,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar, Check, X } from "lucide-react";
-import type { AvailabilityType, StaffMember as Staff } from "@/types";
+import { Calendar } from "lucide-react";
+import type { AvailabilityType, StaffMember, AvailabilityEntry } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 
 interface StaffAvailabilityPanelProps {
-  selectedStaff: Staff[];
-  selectedDate: string;
-  selectedAvailability: AvailabilityType;
-  onDateChange: (date: string) => void;
-  onAvailabilityChange: (type: AvailabilityType) => void;
-  onApply: () => void;
-  onClearSelection: () => void;
+  staffMember: StaffMember;
+  onUpdate: (staffId: string, availability: AvailabilityEntry[]) => Promise<void>;
 }
 
 export function StaffAvailabilityPanel({
-  selectedStaff,
-  selectedDate,
-  selectedAvailability,
-  onDateChange,
-  onAvailabilityChange,
-  onApply,
-  onClearSelection,
+  staffMember,
+  onUpdate,
 }: StaffAvailabilityPanelProps) {
   const [open, setOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -65,82 +54,71 @@ export function StaffAvailabilityPanel({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="font-condensed text-xl flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
-          Batch Availability ({selectedStaff.length} selected)
-        </CardTitle>
-        <CardDescription className="font-mono text-xs">
-          Set availability for multiple staff members
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <Label htmlFor="batch-date" className="font-mono text-xs">
-            Date
-          </Label>
-          <Input
-            id="batch-date"
-            type="date"
-            value={selectedDate ? selectedDate.toISOString().split("T")[0] : ""}
-            onChange={(e) => {
-              if (e.target.value) {
-                setSelectedDate(new Date(e.target.value + "T00:00:00"));
-              }
-            }}
-            className="font-mono mt-1.5"
-          />
-        </div>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <Calendar className="h-4 w-4" />
+          Set Availability
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="font-condensed text-xl">
+            Set Availability - {staffMember.name}
+          </DialogTitle>
+          <DialogDescription>
+            Set rest days, holidays, or sick leave for any date
+          </DialogDescription>
+        </DialogHeader>
 
-        <div>
-          <Label htmlFor="batch-availability" className="font-mono text-xs">
-            Status
-          </Label>
-          <Select
-            value={selectedType}
-            onValueChange={(value) => setSelectedType(value as AvailabilityType)}
-          >
-            <SelectTrigger className="font-mono mt-1.5">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="rest">Rest Day</SelectItem>
-              <SelectItem value="holiday">Holiday</SelectItem>
-              <SelectItem value="sick">Sick Leave</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <div className="space-y-4 pt-4">
+          <div className="space-y-2">
+            <Label htmlFor="date">Date</Label>
+            <Input
+              id="date"
+              type="date"
+              value={selectedDate ? selectedDate.toISOString().split("T")[0] : ""}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSelectedDate(new Date(e.target.value + "T00:00:00"));
+                } else {
+                  setSelectedDate(undefined);
+                }
+              }}
+              className="font-mono"
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="notes">Notes (Optional)</Label>
-          <Textarea
-            id="notes"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="Additional notes..."
-            className="font-mono text-sm"
-          />
-        </div>
+          <div className="space-y-2">
+            <Label htmlFor="type">Status</Label>
+            <Select value={selectedType} onValueChange={(value) => setSelectedType(value as AvailabilityType)}>
+              <SelectTrigger id="type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="rest">Rest Day</SelectItem>
+                <SelectItem value="holiday">Holiday</SelectItem>
+                <SelectItem value="sick">Sick Leave</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-        <div className="flex gap-2">
-          <Button onClick={handleSubmit} disabled={!selectedDate} className="rounded-lg gap-2 flex-1">
-            <Check className="h-4 w-4" />
-            Apply to Selected
-          </Button>
-          <Button
-            variant="outline"
-            onClick={onClearSelection}
-            className="rounded-lg"
-          >
-            <X className="h-4 w-4" />
+          <div className="space-y-2">
+            <Label htmlFor="notes">Notes (Optional)</Label>
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Reason or additional notes..."
+              className="font-mono text-sm"
+            />
+          </div>
+
+          <Button onClick={handleSubmit} disabled={!selectedDate} className="w-full">
+            Apply Status
           </Button>
         </div>
-
-        <div className="text-xs text-muted-foreground font-mono">
-          Selected: {selectedStaff.map(s => s.name).join(", ")}
-        </div>
-      </CardContent>
-    </Card>
+      </DialogContent>
+    </Dialog>
   );
 }
