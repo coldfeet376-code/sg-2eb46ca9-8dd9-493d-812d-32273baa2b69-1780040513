@@ -27,6 +27,8 @@ import { Info, Calendar, Download, Eye, RefreshCw, Lock, Unlock, Shuffle, Trendi
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { FairnessMeter } from "@/components/rota/FairnessMeter";
 import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
+import { SwapSuggestionsDialog } from "@/components/rota/SwapSuggestionsDialog";
+import { suggestSwaps, type SwapSuggestion } from "@/lib/swapSuggester";
 import { useToast } from "@/hooks/use-toast";
 import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
 import { RecentChangesPanel } from "@/components/RecentChangesPanel";
@@ -90,7 +92,8 @@ export default function IndexPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [lockedAssignments, setLockedAssignments] = useState<Assignment[]>([]);
-  const [showSmartAssignment, setShowSmartAssignment] = useState(false);
+  const [showSwapSuggestions, setShowSwapSuggestions] = useState(false);
+  const [swapSuggestions, setSwapSuggestions] = useState<SwapSuggestion[]>([]);
   const { resetTour } = useTour();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [history, setHistory] = useState<RotaSnapshot[]>([]);
@@ -917,49 +920,39 @@ export default function IndexPage() {
     setShowSmartAssignment(true);
   };
 
-  const implementAllSwaps = (swaps: Array<{ from: Assignment; to: Assignment; improvement: string }>) => {
+  const implementAllSwaps = async (swaps: SwapSuggestion[]) => {
     const updatedAssignments = [...assignments];
     let successCount = 0;
 
     swaps.forEach(swap => {
-      // Find indices
       const fromIndex = updatedAssignments.findIndex(
-        a => a.staffId === swap.from.staffId && a.task === swap.from.task && a.date === swap.from.date
+        a => a.staffId === swap.fromStaffId && a.task === swap.task && a.date === swap.date
       );
-      const toIndex = updatedAssignments.findIndex(
-        a => a.staffId === swap.to.staffId && a.task === swap.to.task && a.date === swap.to.date
-      );
-
-      if (fromIndex !== -1 && toIndex !== -1) {
-        // Perform the swap
-        const tempStaffId = updatedAssignments[fromIndex].staffId;
-        const tempStaffName = updatedAssignments[fromIndex].staffName;
-        
-        updatedAssignments[fromIndex].staffId = updatedAssignments[toIndex].staffId;
-        updatedAssignments[fromIndex].staffName = updatedAssignments[toIndex].staffName;
-        
-        updatedAssignments[toIndex].staffId = tempStaffId;
-        updatedAssignments[toIndex].staffName = tempStaffName;
-        
+      
+      if (fromIndex !== -1) {
+        updatedAssignments[fromIndex] = {
+          ...updatedAssignments[fromIndex],
+          staffId: swap.toStaffId,
+          staffName: swap.toStaffName
+        };
         successCount++;
       }
     });
 
     setAssignments(updatedAssignments);
-    setShowSmartAssignment(false);
+    setShowSwapSuggestions(false);
 
     toast({
       title: "Swaps Implemented",
       description: `Successfully applied ${successCount} swaps to improve fairness`,
     });
 
-    addAuditEntry({
-      user: "System",
-      action: "updated",
-      entity: "rota",
-      entityId: getLocalDateString(weekStart),
-      details: `Implemented ${successCount} smart swaps`,
-    });
+    await rotaRealtimeService.logAction(
+      "updated",
+      "rota",
+      getLocalDateString(weekStart),
+      `Implemented ${successCount} smart swaps`
+    );
   };
 
   return (
@@ -1094,6 +1087,28 @@ export default function IndexPage() {
               >
                 <Zap className="h-5 w-5" />
                 Generate Rota
+              </Button>
+
+              <Button
+                onClick={() => {
+                  const suggestions = suggestSwaps(assignments, staff, 10);
+                  if (suggestions.length === 0) {
+                    toast({
+                      title: "No Improvements Found",
+                      description: "The current rota is already well-balanced",
+                    });
+                    return;
+                  }
+                  setSwapSuggestions(suggestions);
+                  setShowSwapSuggestions(true);
+                }}
+                disabled={assignments.length === 0}
+                variant="outline"
+                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
+                size="lg"
+              >
+                <Shuffle className="h-5 w-5" />
+                Suggest Swaps
               </Button>
 
               <Button
@@ -1671,44 +1686,68 @@ export default function IndexPage() {
         {/* Recent Changes Panel */}
         <RecentChangesPanel />
         
-        {/* Smart Assignment Dialog */}
-        <SmartAssignmentDialog
-          open={showSmartAssignment}
-          onClose={() => setShowSmartAssignment(false)}
-          assignments={assignments}
-          staff={staff}
-          weekDates={weekDates.map(date => getLocalDateString(date))}
-          onApplySwap={(fromAssignment, toAssignment) => {
-            const fromIndex = assignments.findIndex(
-              (a) => a.staffId === fromAssignment.staffId && a.task === fromAssignment.task && a.date === fromAssignment.date
-            );
-            const toIndex = assignments.findIndex(
-              (a) => a.staffId === toAssignment.staffId && a.task === toAssignment.task && a.date === toAssignment.date
-            );
+        {smartAssignDialog.task && (
+          <SmartAssignmentDialog
+            open={smartAssignDialog.open}
+            onClose={() => setSmartAssignDialog({ open: false, task: null, date: "" })}
+            task={smartAssignDialog.task}
+            date={smartAssignDialog.date}
+            staff={staff}
+            assignments={assignments}
+            onAssign={async (staffId) => {
+              const staffMember = staff.find(s => s.id === staffId);
+              if (!staffMember) return;
+              
+              const newAssignment = {
+                staffId: staffMember.id,
+                staffName: staffMember.name,
+                task: smartAssignDialog.task!,
+                date: smartAssignDialog.date
+              };
+              
+              setAssignments([...assignments, newAssignment]);
+              setSmartAssignDialog({ open: false, task: null, date: "" });
+              
+              await rotaRealtimeService.logAction(
+                "assigned",
+                "assignment",
+                `${smartAssignDialog.date}-${smartAssignDialog.task}`,
+                `Smart assigned ${staffMember.name} to ${smartAssignDialog.task}`
+              );
+            }}
+          />
+        )}
 
-            if (fromIndex !== -1 && toIndex !== -1) {
-              const newAssignments = [...assignments];
-              const tempStaffId = newAssignments[fromIndex].staffId;
-              const tempStaffName = newAssignments[fromIndex].staffName;
-              newAssignments[fromIndex].staffId = newAssignments[toIndex].staffId;
-              newAssignments[fromIndex].staffName = newAssignments[toIndex].staffName;
-              newAssignments[toIndex].staffId = tempStaffId;
-              newAssignments[toIndex].staffName = tempStaffName;
-
+        <SwapSuggestionsDialog
+          open={showSwapSuggestions}
+          onClose={() => setShowSwapSuggestions(false)}
+          suggestions={swapSuggestions}
+          onApplySwap={async (swap) => {
+            const newAssignments = [...assignments];
+            const fromIndex = newAssignments.findIndex(
+              (a) => a.staffId === swap.fromStaffId && a.task === swap.task && a.date === swap.date
+            );
+            
+            if (fromIndex !== -1) {
+              newAssignments[fromIndex] = {
+                ...newAssignments[fromIndex],
+                staffId: swap.toStaffId,
+                staffName: swap.toStaffName
+              };
               setAssignments(newAssignments);
-
-              addAuditEntry({
-                user: "System",
-                action: "updated",
-                entity: "rota",
-                entityId: getLocalDateString(weekStart),
-                details: `Applied smart swap: ${fromAssignment.staffName} ↔ ${toAssignment.staffName}`,
-              });
-
+              setShowSwapSuggestions(false);
+              
               toast({
                 title: "Swap Applied",
-                description: `${fromAssignment.staffName} ↔ ${toAssignment.staffName}`,
+                description: `${swap.fromStaffName} ↔ ${swap.toStaffName} for ${swap.task}`,
               });
+              
+              await rotaRealtimeService.logAction(
+                "swapped",
+                "assignment",
+                `${swap.date}-${swap.task}`,
+                `Smart swapped ${swap.fromStaffName} → ${swap.toStaffName} for ${swap.task}`
+              );
             }
           }}
           onImplementAll={implementAllSwaps}

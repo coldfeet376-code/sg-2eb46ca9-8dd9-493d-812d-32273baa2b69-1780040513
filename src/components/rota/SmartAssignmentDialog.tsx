@@ -20,7 +20,6 @@ interface SmartAssignmentDialogProps {
   staff: StaffMember[];
   assignments: Assignment[];
   onAssign: (staffId: string) => void;
-  onImplementAll: (swaps: Array<{ from: Assignment; to: Assignment; improvement: string }>) => void;
 }
 
 interface Suggestion {
@@ -40,7 +39,6 @@ export function SmartAssignmentDialog({
   staff,
   assignments,
   onAssign,
-  onImplementAll,
 }: SmartAssignmentDialogProps) {
   const suggestions = useMemo(() => {
     return generateSmartSuggestions(task, date, staff, assignments);
@@ -170,15 +168,6 @@ export function SmartAssignmentDialog({
         <div className="flex justify-end pt-4 border-t">
           <Button onClick={onClose} variant="outline">
             Close
-          </Button>
-          <Button
-            onClick={() => {
-              onImplementAll(suggestions);
-            }}
-            className="gap-2"
-          >
-            <Zap className="h-4 w-4" />
-            Implement All ({suggestions.length})
           </Button>
         </div>
       </DialogContent>
