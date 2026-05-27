@@ -58,61 +58,54 @@ export function useStaff() {
           console.warn(`⚠️ [${fetchId}] Database returned ZERO availability records!`);
         }
 
-        if (!availabilityData || availabilityData.length === 0) {
-          console.warn(`⚠️ [${fetchId}] No availability data in database`);
-          // Return staff without availability
-          return staffData.map((s) => ({
-            id: s.id,
-            name: s.name,
-            trainedTasks: (s.trained_tasks || []) as Task[],
-            shiftStart: (s.shift_start || "06:00") as ShiftStart,
-            shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
-            availability: [],
-          }));
-        }
+        // Create a Map for O(1) lookups: staff_id -> array of availability entries
+        const availabilityMap = new Map<string, any[]>();
+        
+        availabilityData.forEach((entry) => {
+          const staffId = entry.staff_id;
+          if (!availabilityMap.has(staffId)) {
+            availabilityMap.set(staffId, []);
+          }
+          availabilityMap.get(staffId)!.push(entry);
+        });
+        
+        console.log(`📊 [${fetchId}] Created availability map for ${availabilityMap.size} staff members`);
+        console.log(`📊 [${fetchId}] Sample staff_id keys:`, Array.from(availabilityMap.keys()).slice(0, 3));
 
-        // Map staff with availability
-        const staffMembers: StaffMember[] = staffData.map((s) => {
-          const staffIdStr = String(s.id);
+        // Map staff with their availability
+        const mappedStaff: StaffMember[] = staffData.map((s) => {
+          const staffAvailability = availabilityMap.get(s.id) || [];
           
-          const staffAvail = availabilityData
-            .filter((a) => String(a.staff_id) === staffIdStr)
-            .map((a) => ({
-              date: a.date,
-              type: a.type as "rest" | "holiday" | "sick" | "available",
-              notes: a.notes || undefined,
-            }));
-          
-          // Detailed logging for Abbo and Brian
-          if (s.name.toLowerCase().includes('abbo') || s.name.toLowerCase().includes('brian')) {
+          // DEBUG: Log for specific staff to trace mapping
+          if (s.name?.includes('ABBO') || s.name?.includes('BRIAN')) {
             console.log(`🔍 [${fetchId}] ${s.name}:`);
-            console.log(`   Total entries: ${staffAvail.length}`);
-            if (staffAvail.length > 0) {
-              console.log(`   Date range: ${staffAvail[0].date} → ${staffAvail[staffAvail.length - 1].date}`);
-              console.log(`   First 3: ${staffAvail.slice(0, 3).map(a => `${a.date}(${a.type})`).join(', ')}`);
-              console.log(`   Last 3: ${staffAvail.slice(-3).map(a => `${a.date}(${a.type})`).join(', ')}`);
-              
-              // Check May 24-30 week specifically
-              const mayWeek = staffAvail.filter(a => a.date >= '2026-05-24' && a.date <= '2026-05-30');
-              console.log(`   May 24-30 entries: ${mayWeek.map(a => `${a.date}(${a.type})`).join(', ')}`);
+            console.log(`   Staff ID: ${s.id}`);
+            console.log(`   Total entries: ${staffAvailability.length}`);
+            if (staffAvailability.length > 0) {
+              console.log(`   First entry:`, staffAvailability[0]);
             } else {
-              console.warn(`   ⚠️ NO availability entries for ${s.name}!`);
+              console.log(`   ⚠️ NO availability entries for ${s.name}!`);
             }
           }
-          
+
           return {
             id: s.id,
             name: s.name,
-            trainedTasks: (s.trained_tasks || []) as Task[],
-            shiftStart: (s.shift_start || "06:00") as ShiftStart,
-            shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
-            availability: staffAvail,
+            trainedTasks: s.trained_tasks as Task[],
+            shiftStart: s.shift_start as ShiftStart,
+            shiftPattern: s.shift_pattern as ShiftPattern,
+            availability: staffAvailability.map((a) => ({
+              id: a.id,
+              date: a.date,
+              type: a.type as AvailabilityType,
+              notes: a.notes || undefined,
+            })),
           };
         });
 
-        console.log(`✅ [${fetchId}] Successfully mapped ${staffMembers.length} staff members`);
+        console.log(`✅ [${fetchId}] Successfully mapped ${mappedStaff.length} staff members`);
         console.log(`📊 [${fetchId}] Query complete - returning fresh data to React Query`);
-        return staffMembers;
+        return mappedStaff;
         
       } catch (error) {
         console.error(`❌ [${fetchId}] Fatal error:`, error);
