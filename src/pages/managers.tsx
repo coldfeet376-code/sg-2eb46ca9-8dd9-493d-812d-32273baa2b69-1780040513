@@ -227,12 +227,14 @@ export default function Managers() {
       // Add managers with recurring rest days for this day of week
       managers.forEach(manager => {
         if (manager.recurring_rest_days && manager.recurring_rest_days.includes(dayOfWeek)) {
+          console.log(`⛔ ${manager.name}: Recurring rest day on ${DAYS[dayOfWeek]} (${dateStr})`);
           unavailableManagerIds.add(manager.id);
         }
       });
 
       // Get list of available managers for this day
       const availableManagers = managers.filter(m => !unavailableManagerIds.has(m.id));
+      console.log(`📅 ${dateStr} (${DAYS[dayOfWeek]}): ${availableManagers.length} managers available, ${unavailableManagerIds.size} unavailable`);
       const assignedManagerIdsThisDay = new Set<string>();
       let outloadingIntakeManager: Manager | null = null;
 
@@ -596,7 +598,26 @@ export default function Managers() {
 
   const getAvailabilityForManagerDate = (managerId: string, dateStr: string): AvailabilityType => {
     const key = `${managerId}-${dateStr}`;
-    return availabilityMap[key]?.type || "available";
+    const availEntry = availabilityMap[key];
+    
+    // If there's an explicit availability entry, use that
+    if (availEntry) {
+      return availEntry.type;
+    }
+    
+    // Otherwise check if this date falls on a recurring rest day
+    const manager = managers.find(m => m.id === managerId);
+    if (manager && manager.recurring_rest_days && manager.recurring_rest_days.length > 0) {
+      const date = new Date(dateStr);
+      const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, etc.
+      
+      if (manager.recurring_rest_days.includes(dayOfWeek)) {
+        return "rest";
+      }
+    }
+    
+    // Default to available
+    return "available";
   };
 
   const exportPDF = () => {
