@@ -153,17 +153,15 @@ export function generateWeeklyRota({
         
         // Create assignment
         const assignment: Assignment = {
-          id: crypto.randomUUID(),
           date: dateStr, // Already in YYYY-MM-DD format from getLocalDateString
           task,
           staffId: staffMember.id,
           staffName: staffMember.name,
-          notes: `Auto-assigned - Availability: yes, Previous task: ${lastTaskAssigned[staffMember.id] || "none"}`,
         };
         assignments.push(assignment);
 
         assignmentCounts[staffMember.id]++;
-        taskCounts[staffMember.id] = taskCounts[staffMember.id] || initTaskRecord();
+        taskCounts[staffMember.id] = taskCounts[staffMember.id] || ({} as Record<Task, number>);
         taskCounts[staffMember.id][task] = (taskCounts[staffMember.id][task] || 0) + 1;
 
         const taskCount = taskCounts[staffMember.id][task];
