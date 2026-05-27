@@ -1214,7 +1214,7 @@ export default function StaffPage() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => clearAllAvailability(member.id, member.name)}
+                                      onClick={() => setSelectedStaffForDialog(member === selectedStaffForDialog ? null : member)}
                                       className="h-7 text-xs font-mono text-destructive hover:text-destructive hover:bg-destructive/10"
                                     >
                                       <X className="h-3 w-3 mr-1" />
@@ -1224,78 +1224,45 @@ export default function StaffPage() {
                                 </div>
 
                                 {/* Calendar grid */}
-                                <div className="grid grid-cols-7 gap-2" key={`${member.id}-${renderKey}`}>
-                                  {weekDates.map((date, idx) => {
-                                    const availType = getAvailabilityForDate(member, date);
-                                    // Use LOCAL date formatting to avoid timezone shifts
+                                <div className="grid grid-cols-7 gap-2">
+                                  {getDatesForWeek(currentWeekStart).map((date, idx) => {
+                                    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
+                                    const availType = getAvailabilityForDate(selectedStaffForDialog, date);
                                     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-                                    const isOpen = openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr;
-                                    const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
-                                    const dayLabel = DAYS[date.getDay()];
                                     
+                                    const bgColor = 
+                                      availType === "rest" ? "bg-blue-100 dark:bg-blue-900" :
+                                      availType === "holiday" ? "bg-amber-100 dark:bg-amber-900" :
+                                      availType === "sick" ? "bg-red-100 dark:bg-red-900" :
+                                      availType === "available" ? "bg-green-100 dark:bg-green-900" :
+                                      "bg-muted";
+                                    
+                                    const textColor =
+                                      availType === "rest" ? "text-blue-700 dark:text-blue-300" :
+                                      availType === "holiday" ? "text-amber-700 dark:text-amber-300" :
+                                      availType === "sick" ? "text-red-700 dark:text-red-300" :
+                                      availType === "available" ? "text-green-700 dark:text-green-300" :
+                                      "text-muted-foreground";
+
                                     return (
-                                      <Popover key={`${idx}-${renderKey}`} open={isOpen} onOpenChange={(open) => {
-                                        if (open) {
-                                          setOpenDayDropdown({ staffId: member.id, date: dateStr });
-                                        } else if (openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr) {
-                                          setOpenDayDropdown(null);
-                                        }
-                                      }}>
-                                        <PopoverTrigger asChild>
-                                          <button
-                                            disabled={isLoading}
-                                            className={cn(
-                                              "aspect-square rounded-lg border-2 transition-all font-mono text-xs font-bold flex flex-col items-center justify-center min-h-[56px] hover:scale-105 gap-0.5",
-                                              getDayColor(availType),
-                                              isLoading && "opacity-50 cursor-wait animate-pulse"
-                                            )}
-                                          >
-                                            <span className="text-[10px] opacity-80 font-semibold">
-                                              {dayLabel}
-                                            </span>
-                                            <span className="text-lg leading-none">
-                                              {isLoading ? "..." : getDayLabel(availType)}
-                                            </span>
-                                          </button>
-                                        </PopoverTrigger>
-                                        <PopoverContent align="center" className="w-56 p-2">
-                                          <div className="space-y-1">
-                                            <button
-                                              onClick={() => setDayAvailability(member.id, dateStr, "rest")}
-                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-blue-500/10 transition-colors font-mono text-sm"
-                                            >
-                                              <span className="w-8 h-8 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center shrink-0">R</span>
-                                              <span className="font-semibold">Rest Day</span>
-                                            </button>
-                                            <button
-                                              onClick={() => setDayAvailability(member.id, dateStr, "holiday")}
-                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-purple-500/10 transition-colors font-mono text-sm"
-                                            >
-                                              <span className="w-8 h-8 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center shrink-0">H</span>
-                                              <span className="font-semibold">Holiday</span>
-                                            </button>
-                                            <button
-                                              onClick={() => setDayAvailability(member.id, dateStr, "sick")}
-                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-red-500/10 transition-colors font-mono text-sm"
-                                            >
-                                              <span className="w-8 h-8 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center shrink-0">S</span>
-                                              <span className="font-semibold">Sick Leave</span>
-                                            </button>
-                                            {availType !== null && (
-                                              <>
-                                                <div className="border-t my-2"></div>
-                                                <button
-                                                  onClick={() => setDayAvailability(member.id, dateStr, "clear")}
-                                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors font-mono text-sm text-muted-foreground"
-                                                >
-                                                  <X className="h-5 w-5 shrink-0" />
-                                                  <span className="font-semibold">Clear (Working)</span>
-                                                </button>
-                                              </>
-                                            )}
-                                          </div>
-                                        </PopoverContent>
-                                      </Popover>
+                                      <button
+                                        key={idx}
+                                        onClick={() => {
+                                          setSelectedStaffForDialog(selectedStaffForDialog);
+                                          setIsAvailabilityDialogOpen(true);
+                                        }}
+                                        className={`p-2 rounded text-center hover:ring-2 hover:ring-primary transition-all ${bgColor}`}
+                                      >
+                                        <div className="text-xs font-medium text-muted-foreground mb-1">{dayName}</div>
+                                        <div className="text-xs text-muted-foreground mb-1">{date.getDate()}</div>
+                                        <div className={`text-xs font-semibold ${textColor}`}>
+                                          {availType === "rest" ? "Rest" :
+                                           availType === "holiday" ? "Holiday" :
+                                           availType === "sick" ? "Sick" :
+                                           availType === "available" ? "Avail" :
+                                           "—"}
+                                        </div>
+                                      </button>
                                     );
                                   })}
                                 </div>
