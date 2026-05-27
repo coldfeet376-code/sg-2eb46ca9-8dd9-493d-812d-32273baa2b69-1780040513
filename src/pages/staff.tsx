@@ -73,7 +73,7 @@ export default function StaffPage() {
     sunday.setHours(0, 0, 0, 0);
     return sunday;
   });
-  const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [selectedStaffForDialog, setSelectedStaffForDialog] = useState<StaffMember | null>(null);
   const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
   const hasJumpedToData = useRef(false);
   
