@@ -647,14 +647,20 @@ export default function StaffPage() {
     }
     
     if (earliestDate) {
-      // Calculate the Saturday that starts the week containing earliestDate
+      // Calculate the Saturday that STARTS the week containing earliestDate
+      // Saturday = day 6, Sunday = day 0
+      // If today is Sunday (0), we need to go back 1 day to get Saturday
+      // If today is Monday (1), we need to go back 2 days to get Saturday
+      // If today is Saturday (6), we stay on Saturday (go back 0 days)
       const day = earliestDate.getDay();
-      const diff = day === 0 ? 0 : 7 - day; // Days until next Saturday
+      const daysToGoBack = (day + 1) % 7; // Days since last Saturday
       const saturday = new Date(earliestDate);
-      saturday.setDate(earliestDate.getDate() + diff);
+      saturday.setDate(earliestDate.getDate() - daysToGoBack);
       saturday.setHours(0, 0, 0, 0);
       
-      console.log(`📅 Auto-jumping to first week with data: ${saturday.toISOString().split('T')[0]}`);
+      console.log(`📅 Auto-jumping to first week with data:`);
+      console.log(`   Earliest availability date: ${earliestDate.toISOString().split('T')[0]} (${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][day]})`);
+      console.log(`   Week start (Saturday): ${saturday.toISOString().split('T')[0]}`);
       setCurrentWeekStart(saturday);
     }
   }, [staff, staffLoading]);
