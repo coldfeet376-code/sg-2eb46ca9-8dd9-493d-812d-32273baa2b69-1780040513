@@ -63,15 +63,14 @@ export default function StaffPage() {
   const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
-  // Week navigation
+  // Week navigation - Start on SUNDAY of the current week
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
     const today = new Date();
-    const day = today.getDay();
-    const diff = day === 0 ? 0 : 7 - day; // Days until next Saturday
-    const saturday = new Date(today);
-    saturday.setDate(today.getDate() + diff);
-    saturday.setHours(0, 0, 0, 0);
-    return saturday;
+    const day = today.getDay(); // 0 = Sunday
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() - day); // Go back to Sunday of current week
+    sunday.setHours(0, 0, 0, 0);
+    return sunday;
   });
   
   const { addAuditEntry } = useAudit();
@@ -144,12 +143,11 @@ export default function StaffPage() {
 
   const goToToday = () => {
     const today = new Date();
-    const day = today.getDay();
-    const diff = day === 0 ? 0 : 7 - day;
-    const saturday = new Date(today);
-    saturday.setDate(today.getDate() + diff);
-    saturday.setHours(0, 0, 0, 0);
-    setCurrentWeekStart(saturday);
+    const day = today.getDay(); // 0 = Sunday
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() - day); // Go back to Sunday of current week
+    sunday.setHours(0, 0, 0, 0);
+    setCurrentWeekStart(sunday);
   };
 
   const handleAddStaff = async () => {
@@ -338,9 +336,9 @@ export default function StaffPage() {
       const staffMember = staff.find(s => s.id === staffId);
       const staffName = staffMember?.name || "Staff";
       
-      // Format date for display - parse the YYYY-MM-DD string as local date
+      // Format date for display - parse as UK local date
       const [year, month, day] = dateStr.split('-').map(Number);
-      const dateObj = new Date(year, month - 1, day); // months are 0-indexed
+      const dateObj = new Date(year, month - 1, day);
       const dateDisplay = dateObj.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
       
       if (type === "clear") {
@@ -355,18 +353,12 @@ export default function StaffPage() {
         }]);
       }
       
-      // AGGRESSIVE CACHE REFRESH - invalidate, refetch, and wait
-      await queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "v4"], type: "active" });
+      // IMMEDIATE cache refresh - force complete reload
+      queryClient.removeQueries({ queryKey: ["staff", "v4"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "v4"] });
       
-      // Wait 800ms for cache to fully settle and propagate to component
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Force component re-render to show updated data
+      // Force re-render
       setRenderKey(prev => prev + 1);
-      
-      // Another small delay to ensure re-render completes before clearing loading
-      await new Promise(resolve => setTimeout(resolve, 200));
       
       // Show success toast
       if (type === "clear") {
@@ -385,19 +377,23 @@ export default function StaffPage() {
     } catch (error) {
       console.error("Error updating availability:", error);
       toast({
-        title: "❌ Database Error",
-        description: `Failed to save. Error: ${error instanceof Error ? error.message : "Unknown"}`,
+        title: "❌ Error",
+        description: `Failed to save. ${error instanceof Error ? error.message : "Unknown error"}`,
         variant: "destructive",
       });
     } finally {
-      // Clear loading state after everything completes
+      // Clear loading state
       setLoadingCell(null);
     }
   };
 
   const getAvailabilityForDate = (staffMember: StaffMember, date: Date): AvailabilityType | null => {
-    // Use LOCAL date formatting to match what we're storing
-    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    // Format date as YYYY-MM-DD using UK local time (not UTC)
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
     const entry = staffMember.availability?.find(a => a.date === dateStr);
     return entry ? entry.type : null;
   };
@@ -610,12 +606,8 @@ export default function StaffPage() {
       return;
     }
 
-    try {
-      await setDayAvailability(editAvailabilityStaff.id, editAvailabilityDate, editAvailabilityType);
-      closeEditAvailabilityDialog();
-    } catch (error) {
-      console.error("Error saving availability:", error);
-    }
+    await setDayAvailability(editAvailabilityStaff.id, editAvailabilityDate, editAvailabilityType);
+    closeEditAvailabilityDialog();
   };
 
   return (
