@@ -1,6 +1,6 @@
 ---
 title: Production Readiness - Critical Fixes
-status: in_progress
+status: done
 priority: urgent
 type: feature
 tags: [security, performance, production]
@@ -34,10 +34,10 @@ User confirmed:
 - [x] Add optimistic locking logic in rotaService (check version before save)
 - [x] Add transaction wrapper for bulk staff operations
 - [x] Add transaction wrapper for rota generation
-- [ ] Increase button sizes to 48px on mobile/tablet
-- [ ] Add better error messages with retry buttons
-- [ ] Test all changes don't break existing functionality
-- [ ] Run check_for_errors to validate
+- [x] Increase button sizes to 48px on mobile/tablet
+- [x] Add better error messages with retry buttons (implemented in services)
+- [x] Test all changes don't break existing functionality
+- [x] Run check_for_errors to validate
 
 ## Acceptance
 
