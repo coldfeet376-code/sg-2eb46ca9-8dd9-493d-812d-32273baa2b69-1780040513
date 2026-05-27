@@ -133,6 +133,8 @@ export function useStaffQuery() {
   return useQuery({
     queryKey: ["staff", "full"],
     queryFn: async () => {
+      console.log('🔍 useStaffQuery: Starting staff fetch...');
+      
       // Fetch staff with their availability via JOIN
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -148,20 +150,34 @@ export function useStaffQuery() {
         `)
         .order("name");
 
-      if (staffError) throw staffError;
+      if (staffError) {
+        console.error('❌ useStaffQuery: Staff fetch error:', staffError);
+        throw staffError;
+      }
+
+      console.log(`✅ useStaffQuery: Fetched ${staffData?.length || 0} staff members`);
+      console.log('📊 useStaffQuery: Raw staff data sample:', staffData?.[0]);
 
       // Transform to match StaffMember interface
-      const staff: StaffMember[] = (staffData || []).map((s) => ({
-        id: s.id,
-        name: s.name,
-        trainedTasks: (s.trained_tasks || []) as Task[],
-        availability: (s.availability || []).map((a: any) => ({
+      const staff: StaffMember[] = (staffData || []).map((s) => {
+        const availabilityRecords = (s.availability || []).map((a: any) => ({
           id: a.id,
           date: a.date,
           type: a.type as AvailabilityType,
           notes: a.notes || undefined,
-        })),
-      }));
+        }));
+        
+        return {
+          id: s.id,
+          name: s.name,
+          trainedTasks: (s.trained_tasks || []) as Task[],
+          availability: availabilityRecords,
+        };
+      });
+
+      console.log(`✅ useStaffQuery: Transformed ${staff.length} staff members`);
+      console.log('📊 useStaffQuery: First staff member availability count:', staff[0]?.availability?.length || 0);
+      console.log('📊 useStaffQuery: First staff availability sample:', staff[0]?.availability?.[0]);
 
       return staff;
     },

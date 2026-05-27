@@ -119,6 +119,35 @@ export default function StaffPage() {
   const updateStaffMutation = useUpdateStaff();
   const deleteStaffMutation = useDeleteStaff();
 
+  // DEBUG: Log staff data when it changes
+  useEffect(() => {
+    console.log('🚨 STAFF DATA UPDATED in component');
+    console.log(`   Total staff: ${staff.length}`);
+    if (staff.length > 0) {
+      console.log(`   First staff member:`, staff[0]);
+      console.log(`   First staff availability:`, staff[0].availability);
+      console.log(`   Is availability an array?`, Array.isArray(staff[0].availability));
+      
+      // Check a few specific people
+      const brian = staff.find(s => s.name.includes('BRIAN'));
+      const abbo = staff.find(s => s.name.includes('ABBO'));
+      
+      if (brian) {
+        console.log(`   BRIAN MURRAY availability:`, brian.availability?.length || 0, 'entries');
+        if (brian.availability && brian.availability.length > 0) {
+          console.log(`   Sample:`, brian.availability.slice(0, 3));
+        }
+      }
+      
+      if (abbo) {
+        console.log(`   ABBO availability:`, abbo.availability?.length || 0, 'entries');
+        if (abbo.availability && abbo.availability.length > 0) {
+          console.log(`   Sample:`, abbo.availability.slice(0, 3));
+        }
+      }
+    }
+  }, [staff]);
+
   // Derived selected staff
   const selectedStaff = staff.filter(s => selectedStaffIds.has(s.id));
 
@@ -386,7 +415,22 @@ export default function StaffPage() {
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     
+    // DEBUG: Log for first staff member only to avoid spam
+    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
+      console.log(`🔍 getAvailabilityForDate: ${staffMember.name} on ${dateStr}`);
+      console.log(`   Total availability entries: ${staffMember.availability?.length || 0}`);
+      if (staffMember.availability && staffMember.availability.length > 0) {
+        console.log(`   First 3 entries:`, staffMember.availability.slice(0, 3));
+        console.log(`   Looking for exact match: ${dateStr}`);
+      }
+    }
+    
     const entry = staffMember.availability?.find(a => a.date === dateStr);
+    
+    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
+      console.log(`   Match found:`, entry || 'NONE');
+    }
+    
     if (!entry) return null;
     
     // Normalize type
@@ -401,11 +445,24 @@ export default function StaffPage() {
 
   const getAvailabilityStats = (staffMember: StaffMember) => {
     const availability = staffMember.availability || [];
+    
+    // DEBUG: Log for first few staff
+    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
+      console.log(`📊 getAvailabilityStats: ${staffMember.name}`);
+      console.log(`   Raw availability array:`, availability);
+      console.log(`   Array length: ${availability.length}`);
+      console.log(`   Array is array? ${Array.isArray(availability)}`);
+    }
+    
     const stats = {
       rest: availability.filter((a) => a.type === "rest").length,
       holiday: availability.filter((a) => a.type === "holiday").length,
       sick: availability.filter((a) => a.type === "sick").length,
     };
+    
+    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
+      console.log(`   Calculated stats:`, stats);
+    }
     
     return stats;
   };
