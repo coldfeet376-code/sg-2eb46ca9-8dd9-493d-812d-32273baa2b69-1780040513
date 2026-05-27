@@ -130,6 +130,17 @@ export default function StaffPage() {
       date.setDate(weekStart.getDate() + i);
       dates.push(date);
     }
+    
+    // DEBUG: Show the exact week being displayed
+    console.log('📅 CALENDAR WEEK DATES:');
+    dates.forEach((d, i) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      console.log(`   ${DAYS[i]}: ${d.toDateString()} → DB lookup: "${dateStr}"`);
+    });
+    
     return dates;
   };
 
@@ -395,6 +406,28 @@ export default function StaffPage() {
     const dateStr = `${year}-${month}-${day}`;
     
     const entry = staffMember.availability?.find(a => a.date === dateStr);
+    
+    // EMERGENCY DEBUG - Show exact dates being looked up
+    if (staffMember.name.toLowerCase().includes('brian') && staffMember.name.toLowerCase().includes('murray')) {
+      console.log(`🔍 BRIAN MURRAY - ${date.toDateString()} (${DAYS[date.getDay()]})`);
+      console.log(`   Looking for: "${dateStr}"`);
+      console.log(`   Total entries: ${staffMember.availability?.length || 0}`);
+      if (staffMember.availability && staffMember.availability.length > 0) {
+        console.log(`   First 5 dates in DB:`, staffMember.availability.slice(0, 5).map(a => `${a.date} (${a.type})`));
+        console.log(`   Last 5 dates in DB:`, staffMember.availability.slice(-5).map(a => `${a.date} (${a.type})`));
+        
+        // Check for dates near this one
+        const nearDates = staffMember.availability.filter(a => {
+          const dbDate = new Date(a.date + 'T00:00:00');
+          const diff = Math.abs(dbDate.getTime() - date.getTime());
+          const daysDiff = diff / (1000 * 60 * 60 * 24);
+          return daysDiff < 7;
+        });
+        console.log(`   Dates within 7 days:`, nearDates.map(a => `${a.date} (${a.type})`));
+      }
+      console.log(`   Match: ${entry ? `YES - ${entry.type}` : 'NO'}`);
+    }
+    
     return entry ? entry.type : null;
   };
 
