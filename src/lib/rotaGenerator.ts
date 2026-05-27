@@ -173,46 +173,36 @@ export function generateWeeklyRota({
 
         // Check 2: Is staff available on this date?
         // Match EXACT date string format (YYYY-MM-DD)
-        // Find ALL entries for this date (in case of duplicates) and use the most restrictive
+        // FAIL-SAFE: Check ALL entries for this date and block if ANY are rest/sick/holiday
         const availabilityEntries = staffMember.availability?.filter(a => a.date === dateStr) || [];
         
-        console.log(`    🔍 Checking ${staffMember.name} for ${dateStr}:`, {
-          totalAvailabilityEntries: staffMember.availability?.length || 0,
-          entriesForThisDate: availabilityEntries.length,
-          entries: availabilityEntries.map(e => ({ date: e.date, type: e.type }))
-        });
-        
-        // Normalize all availability types and pick the most restrictive
-        let normalizedType: string | null = null;
-        
-        for (const availability of availabilityEntries) {
-          const rawType = availability.type.toString().toLowerCase().trim();
-          console.log(`      Raw type: "${availability.type}" → normalized check: "${rawType}"`);
-          
-          // Most restrictive statuses win (rest/sick/holiday override available)
-          if (rawType.includes('rest')) {
-            normalizedType = 'rest';
-            break; // Rest day is most restrictive, stop checking
-          } else if (rawType.includes('sick') && normalizedType !== 'rest') {
-            normalizedType = 'sick';
-          } else if ((rawType.includes('holiday') || rawType.includes('hol')) && !['rest', 'sick'].includes(normalizedType || '')) {
-            normalizedType = 'holiday';
-          } else if ((rawType.includes('available') || rawType.includes('avail')) && !normalizedType) {
-            normalizedType = 'available';
-          }
+        // SATURDAY SPECIFIC DEBUG
+        if (dayIndex === 6 && staffMember.name.includes('MURRAY')) {
+          console.log(`\n   🔍 DETAILED CHECK: ${staffMember.name} for Saturday ${dateStr}`);
+          console.log(`      Entries found for this exact date:`, availabilityEntries.map(e => ({ date: e.date, type: e.type })));
+          console.log(`      All availability entries:`, staffMember.availability?.map(a => ({ date: a.date, type: a.type })) || []);
         }
         
-        console.log(`      Final normalized type: "${normalizedType}"`);
+        // FAIL-SAFE: If ANY entry for this date is rest/sick/holiday, SKIP this person
+        const hasRestrictiveStatus = availabilityEntries.some(entry => {
+          const rawType = entry.type.toString().toLowerCase().trim();
+          return rawType.includes('rest') || rawType.includes('sick') || 
+                 rawType.includes('holiday') || rawType.includes('hol');
+        });
         
-        // Skip if staff has a rest day, holiday, or sick leave entry
-        if (normalizedType && ['rest', 'holiday', 'sick'].includes(normalizedType)) {
-          log(`      ⛔ ${staffMember.name}: ${normalizedType.toUpperCase()} on ${dateStr}`);
-          console.log(`      ⛔ SKIPPING ${staffMember.name} - ${normalizedType}`);
+        if (hasRestrictiveStatus) {
+          const restrictiveEntry = availabilityEntries.find(entry => {
+            const rawType = entry.type.toString().toLowerCase().trim();
+            return rawType.includes('rest') || rawType.includes('sick') || 
+                   rawType.includes('holiday') || rawType.includes('hol');
+          });
+          log(`      ⛔ ${staffMember.name}: ${restrictiveEntry?.type} on ${dateStr}`);
+          console.log(`      ⛔ SKIPPING ${staffMember.name} - has restrictive status: ${restrictiveEntry?.type}`);
           continue;
         }
         
-        // If no availability record OR explicitly marked "available", they can work
-        log(`      ✓ ${staffMember.name}: ${normalizedType || 'working (no entry)'}`);
+        // If no availability records OR only "available" entries, they can work
+        log(`      ✓ ${staffMember.name}: working (${availabilityEntries.length} entries, all available)`);
         console.log(`      ✅ AVAILABLE: ${staffMember.name}`);
         availableStaff.push(staffMember);
       }
