@@ -9,9 +9,9 @@ interface TaskConfig {
 // Staff Query Hook
 export function useStaff() {
   return useQuery({
-    queryKey: ["staff", "v4"],
+    queryKey: ["staff", "v5-full-dataset"], // Changed to v5 to force cache invalidation
     queryFn: async () => {
-      console.log("🔍 Starting staff query with v4...");
+      console.log("🔍 Starting staff query with v5-full-dataset...");
       
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -34,7 +34,7 @@ export function useStaff() {
       }
 
       // Fetch ALL availability data (no date filter - load complete imported data)
-      console.log("📅 Fetching ALL availability data...");
+      console.log("📅 Fetching ALL availability data (no date limits)...");
       const { data: availabilityData, error: availError } = await supabase
         .from("availability")
         .select("*")
@@ -71,6 +71,12 @@ export function useStaff() {
             notes: a.notes || undefined,
           }));
         
+        console.log(`   📋 ${s.name}: ${staffAvail.length} availability entries`);
+        if (s.name.toLowerCase().includes('abbo')) {
+          console.log(`      First 3: ${staffAvail.slice(0, 3).map(a => a.date).join(', ')}`);
+          console.log(`      Last 3: ${staffAvail.slice(-3).map(a => a.date).join(', ')}`);
+        }
+        
         return {
           id: s.id,
           name: s.name,
@@ -82,13 +88,10 @@ export function useStaff() {
       });
 
       console.log("✅ Staff members mapped:", staffMembers.length);
-      staffMembers.forEach(sm => {
-        console.log(`   ${sm.name}: ${sm.availability?.length || 0} availability entries`);
-      });
       return staffMembers;
     },
     retry: 1,
-    staleTime: 1000 * 30,
+    staleTime: 0, // Force refetch - no stale time
     refetchOnMount: "always",
     refetchOnWindowFocus: true,
   });
@@ -163,7 +166,7 @@ export function useAddStaff() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
     },
   });
 }
@@ -186,7 +189,7 @@ export function useUpdateStaff() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
     },
   });
 }
@@ -200,7 +203,7 @@ export function useDeleteStaff() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
     },
   });
 }
@@ -252,7 +255,7 @@ export function useAddAvailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
     },
   });
 }
@@ -270,7 +273,7 @@ export function useDeleteAvailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v4"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
     },
   });
 }
