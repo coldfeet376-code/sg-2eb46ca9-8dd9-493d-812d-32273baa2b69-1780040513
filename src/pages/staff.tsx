@@ -116,6 +116,17 @@ export default function StaffManagement() {
   const deleteAvailabilityMutation = useDeleteAvailability();
   const createAvailabilityMutation = useAddAvailability();
 
+  const weekDates = useMemo(() => {
+    const dates: Date[] = [];
+    const start = new Date(currentWeekStart);
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  }, [currentWeekStart]);
+
   // DEBUG: Log staff data when it changes
   useEffect(() => {
     console.log('🚨 STAFF DATA UPDATED in component');
@@ -193,17 +204,6 @@ export default function StaffManagement() {
     }
     return dates;
   };
-
-  const weekDates = useMemo(() => {
-    const dates: Date[] = [];
-    const start = new Date(currentWeekStart);
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(start);
-      date.setDate(start.getDate() + i);
-      dates.push(date);
-    }
-    return dates;
-  }, [currentWeekStart]);
 
   const navigateWeek = (direction: "prev" | "next") => {
     const newStart = new Date(currentWeekStart);
