@@ -4,54 +4,45 @@ import type { StaffMember, AvailabilityEntry, Task, ShiftStart, ShiftPattern } f
 export const staffService = {
   // Fetch all staff members with their availability (12-week window)
   async getAllStaff(): Promise<StaffMember[]> {
-    const { data: staffData, error: staffError } = await supabase
+    console.log("📡 staffService.getAllStaff - Fetching from Supabase...");
+    
+    const { data, error } = await supabase
       .from("staff")
-      .select("*")
+      .select(`
+        *,
+        availability:staff_availability(date, type, notes)
+      `)
       .order("name");
 
-    if (staffError) {
-      console.error("Error fetching staff:", staffError);
-      throw staffError;
+    if (error) {
+      console.error("❌ Error fetching staff:", error);
+      throw error;
     }
 
-    // Calculate date range: 4 weeks back, 8 weeks forward
-    const today = new Date();
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - (4 * 7));
-    const endDate = new Date(today);
-    endDate.setDate(today.getDate() + (8 * 7));
+    console.log(`✅ Fetched ${data?.length || 0} staff from database`);
     
-    const startDateStr = startDate.toISOString().split('T')[0];
-    const endDateStr = endDate.toISOString().split('T')[0];
-
-    const { data: availabilityData, error: availError } = await supabase
-      .from("availability")
-      .select("*")
-      .gte('date', startDateStr)
-      .lte('date', endDateStr);
-
-    if (availError) {
-      console.error("Error fetching availability:", availError);
-      throw availError;
+    if (data && data.length > 0) {
+      console.log("📦 First staff member structure:", {
+        name: data[0].name,
+        availabilityCount: data[0].availability?.length || 0,
+        availabilityIsArray: Array.isArray(data[0].availability),
+        firstAvailability: data[0].availability?.[0]
+      });
     }
 
-    const staff: StaffMember[] = (staffData || []).map((s) => ({
-      id: s.id,
-      name: s.name,
-      trainedTasks: (s.trained_tasks || []) as Task[],
-      shiftStart: (s.shift_start || "06:00") as ShiftStart,
-      shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
-      restDays: (Array.isArray(s.rest_days) ? s.rest_days : []) as number[],
-      availability: (availabilityData || [])
-        .filter((a) => a.staff_id === s.id)
-        .map((a) => ({
-          date: a.date,
-          type: a.type as "rest" | "holiday" | "sick" | "available",
-          notes: a.notes || undefined,
-        })),
+    // Ensure availability is always an array
+    return (data || []).map((staff: any) => ({
+      id: staff.id,
+      name: staff.name,
+      trainedTasks: staff.trained_tasks || [],
+      shiftStart: staff.shift_start,
+      dayShiftPattern: staff.day_shift_pattern,
+      shiftPattern: staff.shift_pattern,
+      restDays: staff.rest_days || [],
+      availability: Array.isArray(staff.availability) ? staff.availability : [],
+      createdAt: staff.created_at,
+      updatedAt: staff.updated_at,
     }));
-
-    return staff;
   },
 
   // Add new staff member
