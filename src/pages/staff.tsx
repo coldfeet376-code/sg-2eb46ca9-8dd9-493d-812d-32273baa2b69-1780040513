@@ -1115,159 +1115,43 @@ export default function StaffPage() {
                           </CardHeader>
 
                           <CollapsibleContent>
-                            <CardContent className="pt-2 px-6 pb-6">
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between mb-4">
-                                  <div className="text-xs font-mono text-muted-foreground">
-                                    Click any day to set availability
-                                  </div>
-                                  <div className="flex gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openEditAvailabilityDialog(member.id, member.name)}
-                                      className="h-7 text-xs font-mono"
-                                    >
-                                      <Edit className="h-3 w-3 mr-1" />
-                                      Edit Availability
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => clearAllAvailability(member.id, member.name)}
-                                      className="h-7 text-xs font-mono text-destructive hover:text-destructive hover:bg-destructive/10"
-                                    >
-                                      <X className="h-3 w-3 mr-1" />
-                                      Clear All
-                                    </Button>
-                                  </div>
+                            <CardContent className="space-y-3 pb-6">
+                              <div>
+                                <div className="text-xs font-medium text-muted-foreground mb-2 font-mono">
+                                  TRAINED TASKS
                                 </div>
-
-                                {/* Calendar grid */}
-                                <div className="grid grid-cols-7 gap-2" key={`${member.id}-${renderKey}`}>
-                                  {weekDates.map((date, dayIndex) => {
-                                    const availability = getAvailabilityForDate(member, date);
-                                    const isLoadingThisCell = loadingCell?.staffId === member.id && loadingCell?.date === getLocalDateString(date);
-                                    
-                                    // Get visual badge based on availability type
-                                    const getBadge = () => {
-                                      if (isLoadingThisCell) {
-                                        return <span className="text-xs">⏳</span>;
-                                      }
-  
-                                      if (!availability) {
-                                        return <span className="text-xs text-muted-foreground">-</span>;
-                                      }
-  
-                                      switch (availability) {
-                                        case 'rest':
-                                          return <Badge variant="outline" className="px-1.5 py-0 h-5 text-xs font-mono font-bold bg-blue-500/20 text-blue-700 border-blue-500">R</Badge>;
-                                        case 'holiday':
-                                          return <Badge variant="outline" className="px-1.5 py-0 h-5 text-xs font-mono font-bold bg-purple-500/20 text-purple-700 border-purple-500">H</Badge>;
-                                        case 'sick':
-                                          return <Badge variant="outline" className="px-1.5 py-0 h-5 text-xs font-mono font-bold bg-red-500/20 text-red-700 border-red-500">S</Badge>;
-                                        case 'available':
-                                          return <Badge variant="outline" className="px-1.5 py-0 h-5 text-xs font-mono font-bold bg-green-500/20 text-green-700 border-green-500">A</Badge>;
-                                        default:
-                                          return <span className="text-xs text-muted-foreground">-</span>;
-                                      }
-                                    };
-
-                                    return (
-                                      <div key={dayIndex} className="p-1 text-center relative border border-border/50 rounded flex flex-col justify-between min-h-[4rem]">
-                                        <div className="text-[10px] font-mono mb-1 text-muted-foreground">
-                                          {date.toLocaleDateString("en-GB", { weekday: "short" })}
-                                        </div>
-                                        <DropdownMenu 
-                                          open={openDayDropdown?.staffId === member.id && openDayDropdown?.date === getLocalDateString(date)}
-                                          onOpenChange={(open) => {
-                                            if (open) {
-                                              setOpenDayDropdown({ staffId: member.id, date: getLocalDateString(date) });
-                                            } else {
-                                              setOpenDayDropdown(null);
-                                            }
-                                          }}
-                                        >
-                                          <DropdownMenuTrigger asChild>
-                                            <button 
-                                              className="w-full h-8 flex items-center justify-center hover:bg-accent/50 rounded transition-colors"
-                                              disabled={isLoadingThisCell}
-                                            >
-                                              {getBadge()}
-                                            </button>
-                                          </DropdownMenuTrigger>
-                                          <DropdownMenuContent align="center" className="w-36">
-                                            <DropdownMenuLabel className="font-mono text-xs">
-                                              {date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
-                                            </DropdownMenuLabel>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem 
-                                              onClick={() => setDayAvailability(member.id, getLocalDateString(date), "rest")}
-                                              className="font-mono text-xs gap-2 cursor-pointer"
-                                            >
-                                              <span className="w-4 h-4 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center">R</span>
-                                              Rest Day
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem 
-                                              onClick={() => setDayAvailability(member.id, getLocalDateString(date), "holiday")}
-                                              className="font-mono text-xs gap-2 cursor-pointer"
-                                            >
-                                              <span className="w-4 h-4 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center">H</span>
-                                              Holiday
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem 
-                                              onClick={() => setDayAvailability(member.id, getLocalDateString(date), "sick")}
-                                              className="font-mono text-xs gap-2 cursor-pointer"
-                                            >
-                                              <span className="w-4 h-4 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center">S</span>
-                                              Sick Leave
-                                            </DropdownMenuItem>
-                                            <DropdownMenuItem 
-                                              onClick={() => setDayAvailability(member.id, getLocalDateString(date), "available")}
-                                              className="font-mono text-xs gap-2 cursor-pointer"
-                                            >
-                                              <span className="w-4 h-4 rounded bg-green-500 text-white text-xs font-bold flex items-center justify-center">A</span>
-                                              Available
-                                            </DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem 
-                                              onClick={() => setDayAvailability(member.id, getLocalDateString(date), "clear")}
-                                              className="font-mono text-xs text-muted-foreground cursor-pointer"
-                                            >
-                                              Clear (Working)
-                                            </DropdownMenuItem>
-                                          </DropdownMenuContent>
-                                        </DropdownMenu>
-                                      </div>
-                                    );
-                                  })}
+                                <div className="flex flex-wrap gap-2">
+                                  {member.trainedTasks.length > 0 ? (
+                                    member.trainedTasks.map((task) => (
+                                      <Badge
+                                        key={task}
+                                        variant="secondary"
+                                        className="font-mono text-xs"
+                                      >
+                                        {task}
+                                      </Badge>
+                                    ))
+                                  ) : (
+                                    <span className="text-sm text-muted-foreground">
+                                      No tasks assigned
+                                    </span>
+                                  )}
                                 </div>
-
-                                {/* Training Assignment Section */}
-                                <div className="border-t pt-4">
-                                  <h4 className="font-condensed font-semibold text-sm mb-3 flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
-                                    Trained Tasks
-                                  </h4>
-                                  <div className="flex flex-wrap gap-2">
-                                    {TASKS.map(task => {
-                                      const isTrained = member.trainedTasks?.includes(task);
-                                      return (
-                                        <Button
-                                          key={task}
-                                          variant={isTrained ? "default" : "outline"}
-                                          size="sm"
-                                          onClick={() => toggleTaskTraining(member.id, task)}
-                                          className={cn(
-                                            "font-mono text-xs transition-all",
-                                            isTrained ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                                          )}
-                                        >
-                                          {task}
-                                        </Button>
-                                      );
-                                    })}
-                                  </div>
+                              </div>
+                              
+                              {/* Fixed spacing - prevent clipping */}
+                              <div className="grid grid-cols-3 gap-2 pt-4 mt-4 border-t">
+                                <div className="text-center">
+                                  <div className="text-xs text-muted-foreground font-mono mb-1">REST DAYS</div>
+                                  <div className="text-lg font-semibold font-mono">{stats.rest}</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-xs text-muted-foreground font-mono mb-1">HOLIDAYS</div>
+                                  <div className="text-lg font-semibold font-mono">{stats.holiday}</div>
+                                </div>
+                                <div className="text-center">
+                                  <div className="text-xs text-muted-foreground font-mono mb-1">SICK LEAVE</div>
+                                  <div className="text-lg font-semibold font-mono">{stats.sick}</div>
                                 </div>
                               </div>
                             </CardContent>

@@ -1364,13 +1364,13 @@ export default function IndexPage() {
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50 rounded-tl-lg">
+                    <th className="text-left p-3 font-condensed text-sm font-semibold bg-muted/50 rounded-tl-lg w-32 min-w-[8rem]">
                       Task
                     </th>
                     {weekDates.map((date, i) => (
                       <th 
                         key={i} 
-                        className={`text-center p-3 font-mono text-xs font-medium bg-muted/50 ${i === 6 ? 'rounded-tr-lg' : ''}`}
+                        className={`text-center p-3 font-mono text-xs font-medium bg-muted/50 ${i === 6 ? 'rounded-tr-lg' : ''} w-auto min-w-[120px]`}
                       >
                         <div>{DAYS[i]}</div>
                         <div className="text-muted-foreground mt-1">
@@ -1383,7 +1383,7 @@ export default function IndexPage() {
                 <tbody>
                   {TASKS.map((task) => (
                     <tr key={task} className="border-b border-border hover:bg-muted/30 transition-smooth">
-                      <td className="p-4 font-condensed text-sm font-semibold bg-muted/30">
+                      <td className="p-4 font-condensed text-sm font-semibold bg-muted/30 w-32 min-w-[8rem]">
                         <div className="flex items-center gap-2">
                           <div className={`w-3 h-3 rounded ${getTaskColor(task)}`}></div>
                           {task}
@@ -1395,7 +1395,7 @@ export default function IndexPage() {
                         return (
                           <td 
                             key={dayIdx} 
-                            className="p-4 text-center align-top"
+                            className="p-3 text-center align-top w-auto min-w-[120px]"
                           >
                             <div className="space-y-2">
                               {/* Assigned staff */}
