@@ -395,6 +395,25 @@ export default function StaffPage() {
     const dateStr = `${year}-${month}-${day}`;
     
     const entry = staffMember.availability?.find(a => a.date === dateStr);
+    
+    // EMERGENCY DEBUG for Abbo specifically
+    if (staffMember.name.toLowerCase().includes('abbo') && staffMember.availability && staffMember.availability.length > 0) {
+      console.log(`🔍 ABBO LOOKUP DEBUG:`);
+      console.log(`   Looking for: "${dateStr}" (${date.toDateString()})`);
+      console.log(`   Total availability entries: ${staffMember.availability.length}`);
+      console.log(`   First 3 dates in array:`, staffMember.availability.slice(0, 3).map(a => `"${a.date}" (${a.type})`));
+      console.log(`   Match found: ${entry ? `YES - ${entry.type}` : 'NO'}`);
+      
+      // Check if ANY dates match
+      const exactMatches = staffMember.availability.filter(a => a.date === dateStr);
+      const similarDates = staffMember.availability.filter(a => a.date.includes(dateStr.substring(5))); // Match month-day
+      console.log(`   Exact matches: ${exactMatches.length}`);
+      console.log(`   Partial month-day matches: ${similarDates.length}`);
+      if (similarDates.length > 0) {
+        console.log(`   Similar dates found:`, similarDates.map(a => a.date));
+      }
+    }
+    
     return entry ? entry.type : null;
   };
 
