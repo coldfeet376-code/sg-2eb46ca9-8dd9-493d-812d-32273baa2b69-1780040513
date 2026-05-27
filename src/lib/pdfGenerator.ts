@@ -7,6 +7,14 @@ const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 const DUTIES = ["Intake", "Out-loading", "Admin", "Floor"];
 
+// Get local date string without timezone conversion
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 interface StaffReportData {
   weekStart: Date;
   assignments: Assignment[];
@@ -78,7 +86,7 @@ export function generateStaffRotaPDF(data: StaffReportData): void {
   TASKS.forEach((task) => {
     const row: string[] = [task];
     weekDates.forEach((date) => {
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = getLocalDateString(date);
       const dayAssignments = data.assignments.filter(
         (a) => a.task === task && a.date === dateStr
       );
@@ -156,7 +164,7 @@ export function generateStaffRotaPDF(data: StaffReportData): void {
   }
 
   // Save
-  const fileName = `staff-rota-${weekDates[0].toISOString().split("T")[0]}.pdf`;
+  const fileName = `staff-rota-${getLocalDateString(weekDates[0])}.pdf`;
   doc.save(fileName);
 }
 
@@ -214,7 +222,7 @@ export function generateManagerDutiesPDF(data: ManagerReportData): void {
   DUTIES.forEach((duty) => {
     const row: string[] = [duty];
     weekDates.forEach((date) => {
-      const dateStr = date.toISOString().split("T")[0];
+      const dateStr = getLocalDateString(date);
       const dayAssignments = data.assignments.filter(
         (a) => a.duty === duty && a.date === dateStr
       );
@@ -313,6 +321,6 @@ export function generateManagerDutiesPDF(data: ManagerReportData): void {
   }
 
   // Save
-  const fileName = `manager-duties-${weekDates[0].toISOString().split("T")[0]}.pdf`;
+  const fileName = `manager-duties-${getLocalDateString(weekDates[0])}.pdf`;
   doc.save(fileName);
 }

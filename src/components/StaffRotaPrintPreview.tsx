@@ -17,6 +17,14 @@ interface StaffRotaPrintPreviewProps {
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 
+// Get local date string without timezone conversion
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function StaffRotaPrintPreview({
   open,
   onClose,
@@ -34,7 +42,7 @@ export function StaffRotaPrintPreview({
   };
 
   const getAssignment = (date: Date, task: string) => {
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = getLocalDateString(date);
     const assignment = assignments.find(
       (a) => a.date === dateStr && a.task === task
     );
@@ -50,7 +58,7 @@ export function StaffRotaPrintPreview({
   const getStaffRestDays = (staffMember: StaffMember) => {
     return weekDates
       .filter((date) => {
-        const dateStr = date.toISOString().split("T")[0];
+        const dateStr = getLocalDateString(date);
         const availability = staffMember.availability?.find((a) => a.date === dateStr);
         return availability && availability.type !== "available";
       })
