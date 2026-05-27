@@ -6,101 +6,97 @@ interface TaskConfig {
   [task: string]: number[];
 }
 
-// Staff Query Hook - v6 with timestamp-based cache bypass
+// Staff Query Hook - Stable with full dataset loading
 export function useStaff() {
-  // Use current timestamp to force fresh data fetch (bypasses ALL caching)
-  const cacheBypass = new Date().getTime();
-  
   return useQuery({
-    queryKey: ["staff", "v6-live", cacheBypass], // Timestamp forces refetch every time
+    queryKey: ["staff", "full"], // Stable key
     queryFn: async () => {
-      console.log("🔍 Starting staff query with v6-live (cache bypass:", cacheBypass, ")");
+      console.log("🔍 [useStaff] Starting query...");
       
-      const { data: staffData, error: staffError } = await supabase
-        .from("staff")
-        .select("*")
-        .order("name");
+      try {
+        const { data: staffData, error: staffError } = await supabase
+          .from("staff")
+          .select("*")
+          .order("name");
 
-      console.log("📊 Staff query result:", { 
-        staffCount: staffData?.length || 0, 
-        error: staffError?.message,
-      });
-
-      if (staffError) {
-        console.error("❌ Staff query error:", staffError);
-        throw staffError;
-      }
-
-      if (!staffData || staffData.length === 0) {
-        console.warn("⚠️ No staff data returned from database");
-        return [];
-      }
-
-      // Fetch ALL availability data (no date filter - load complete imported data)
-      console.log("📅 Fetching ALL availability data (no date limits)...");
-      const { data: availabilityData, error: availError } = await supabase
-        .from("availability")
-        .select("*")
-        .order('date', { ascending: true });
-
-      if (availError) {
-        console.error("❌ Availability query error:", availError);
-        throw availError;
-      }
-
-      console.log(`✅ Fetched ${availabilityData?.length || 0} availability records (full dataset)`);
-      console.log(`📊 Total availability entries in database: ${availabilityData?.length}`);
-
-      if (!availabilityData || availabilityData.length === 0) {
-        console.warn("⚠️ No availability data found");
-        const staffMembers: StaffMember[] = (staffData || []).map((s) => ({
-          id: s.id,
-          name: s.name,
-          trainedTasks: (s.trained_tasks || []) as Task[],
-          shiftStart: (s.shift_start || "06:00") as ShiftStart,
-          shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
-          availability: [],
-        }));
-        return staffMembers;
-      }
-
-      const staffMembers: StaffMember[] = (staffData || []).map((s) => {
-        const staffIdStr = String(s.id);
-        
-        const staffAvail = (availabilityData || [])
-          .filter((a) => String(a.staff_id) === staffIdStr)
-          .map((a) => ({
-            date: a.date,
-            type: a.type as "rest" | "holiday" | "sick" | "available",
-            notes: a.notes || undefined,
-          }));
-        
-        console.log(`   📋 ${s.name}: ${staffAvail.length} availability entries`);
-        if (s.name.toLowerCase().includes('abbo') || s.name.toLowerCase().includes('brian')) {
-          console.log(`      🔍 ${s.name} date range:`);
-          if (staffAvail.length > 0) {
-            console.log(`         First: ${staffAvail[0].date} (${staffAvail[0].type})`);
-            console.log(`         Last: ${staffAvail[staffAvail.length - 1].date} (${staffAvail[staffAvail.length - 1].type})`);
-          }
+        if (staffError) {
+          console.error("❌ [useStaff] Staff query error:", staffError);
+          throw staffError;
         }
-        
-        return {
-          id: s.id,
-          name: s.name,
-          trainedTasks: (s.trained_tasks || []) as Task[],
-          shiftStart: (s.shift_start || "06:00") as ShiftStart,
-          shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
-          availability: staffAvail,
-        };
-      });
 
-      console.log("✅ Staff members mapped:", staffMembers.length);
-      return staffMembers;
+        console.log("📊 [useStaff] Staff loaded:", staffData?.length || 0, "members");
+
+        if (!staffData || staffData.length === 0) {
+          console.warn("⚠️ [useStaff] No staff data in database");
+          return [];
+        }
+
+        // Fetch ALL availability data
+        console.log("📅 [useStaff] Fetching availability data...");
+        const { data: availabilityData, error: availError } = await supabase
+          .from("availability")
+          .select("*")
+          .order('date', { ascending: true });
+
+        if (availError) {
+          console.error("❌ [useStaff] Availability query error:", availError);
+          throw availError;
+        }
+
+        console.log(`✅ [useStaff] Fetched ${availabilityData?.length || 0} availability records`);
+
+        if (!availabilityData || availabilityData.length === 0) {
+          console.warn("⚠️ [useStaff] No availability data in database");
+          // Return staff without availability
+          return staffData.map((s) => ({
+            id: s.id,
+            name: s.name,
+            trainedTasks: (s.trained_tasks || []) as Task[],
+            shiftStart: (s.shift_start || "06:00") as ShiftStart,
+            shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
+            availability: [],
+          }));
+        }
+
+        // Map staff with availability
+        const staffMembers: StaffMember[] = staffData.map((s) => {
+          const staffIdStr = String(s.id);
+          
+          const staffAvail = availabilityData
+            .filter((a) => String(a.staff_id) === staffIdStr)
+            .map((a) => ({
+              date: a.date,
+              type: a.type as "rest" | "holiday" | "sick" | "available",
+              notes: a.notes || undefined,
+            }));
+          
+          // Debug logging for specific staff
+          if (s.name.toLowerCase().includes('abbo') || s.name.toLowerCase().includes('brian')) {
+            console.log(`   📋 [${s.name}] ${staffAvail.length} entries | Range: ${staffAvail[0]?.date || 'N/A'} → ${staffAvail[staffAvail.length - 1]?.date || 'N/A'}`);
+          }
+          
+          return {
+            id: s.id,
+            name: s.name,
+            trainedTasks: (s.trained_tasks || []) as Task[],
+            shiftStart: (s.shift_start || "06:00") as ShiftStart,
+            shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
+            availability: staffAvail,
+          };
+        });
+
+        console.log(`✅ [useStaff] Successfully mapped ${staffMembers.length} staff members with availability`);
+        return staffMembers;
+        
+      } catch (error) {
+        console.error("❌ [useStaff] Fatal error:", error);
+        throw error;
+      }
     },
-    retry: 1,
-    staleTime: 0, // Force refetch - no stale time
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
+    retry: 2,
+    staleTime: 1000 * 10, // 10 seconds
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -173,7 +169,7 @@ export function useAddStaff() {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
     },
   });
 }
@@ -196,7 +192,7 @@ export function useUpdateStaff() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
     },
   });
 }
@@ -210,7 +206,7 @@ export function useDeleteStaff() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
     },
   });
 }
@@ -262,7 +258,7 @@ export function useAddAvailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
     },
   });
 }
@@ -280,7 +276,7 @@ export function useDeleteAvailability() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["staff", "v5-full-dataset"] });
+      queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
     },
   });
 }
