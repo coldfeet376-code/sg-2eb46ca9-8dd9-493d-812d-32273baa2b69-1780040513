@@ -85,46 +85,39 @@ export function generateWeeklyRota({
 
       log(`   🔍 Need to assign ${needed} more staff`);
 
-      // Find available staff for this task on this day
-      const availableStaff: StaffMember[] = [];
-
-      for (const staffMember of staff) {
-        // Check 1: Is staff trained for this task?
-        const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
-        if (!staffMember.trainedTasks.includes(taskToCheck)) {
-          log(`      ❌ ${staffMember.name}: Not trained on ${taskToCheck}`);
-          continue;
+      // Filter available staff for this task on this day
+      const availableStaff = staff.filter((s) => {
+        // Must be trained for this task
+        if (!s.trainedTasks.includes(task)) {
+          return false;
         }
 
-        // Check 1.5: Weekly Inbound limit for part-time staff
-        const partTimeInboundLimit = ["POPE R", "FLAHERTY P", "WILSON I"];
-        if (partTimeInboundLimit.includes(staffMember.name) && (task === "Inbound" || task === "Inbound Late")) {
-          const inboundThisWeek = assignments.filter(
-            a => a.staffId === staffMember.id && (a.task === "Inbound" || a.task === "Inbound Late")
-          ).length;
-          
-          if (inboundThisWeek >= 1) {
-            log(`      ❌ ${staffMember.name}: Already has ${inboundThisWeek} Inbound this week (max 1)`);
-            continue;
+        // Check availability for this specific date
+        const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest');
+        const hasHoliday = s.availability?.some(a => a.date === dateStr && a.type === 'holiday');
+        const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'sick');
+        
+        // DEBUG: Log Brian Murray's availability check
+        if (s.name.includes('BRIAN')) {
+          log(`   🔍 BRIAN MURRAY availability check for ${dateStr}:`);
+          log(`      Total availability entries: ${s.availability?.length || 0}`);
+          log(`      Has rest day? ${hasRestDay}`);
+          log(`      Has holiday? ${hasHoliday}`);
+          log(`      Has sick leave? ${hasSickLeave}`);
+          if (s.availability && s.availability.length > 0) {
+            const matchingEntry = s.availability.find(a => a.date === dateStr);
+            log(`      Matching entry for ${dateStr}: ${matchingEntry ? JSON.stringify(matchingEntry) : 'NONE'}`);
+            log(`      Sample availability dates: ${s.availability.slice(0, 5).map(a => `${a.date}(${a.type})`).join(', ')}`);
           }
         }
-
-        // Check 2: Is staff available on this date?
-        // Simple, bulletproof: find exact date match, check type
-        const unavailableEntry = staffMember.availability?.find(a => {
-          if (a.date !== dateStr) return false;
-          const type = a.type.toString().toLowerCase().trim();
-          return type.includes('rest') || type.includes('holiday') || type.includes('sick');
-        });
         
-        if (unavailableEntry) {
-          log(`      ⛔ ${staffMember.name}: ${unavailableEntry.type} on ${dateStr}`);
-          continue;
+        if (hasRestDay || hasHoliday || hasSickLeave) {
+          log(`   ❌ ${s.name} - unavailable (${hasRestDay ? 'rest' : hasHoliday ? 'holiday' : 'sick'})`);
+          return false;
         }
-        
-        log(`      ✓ ${staffMember.name}: available`);
-        availableStaff.push(staffMember);
-      }
+
+        return true;
+      });
 
       log(`   📊 ${availableStaff.length} staff available: ${availableStaff.map(s => s.name).join(", ")}`);
 
@@ -199,10 +192,14 @@ export function generateWeeklyRota({
 }
 
 export function getWeekStart(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day);
-  d.setHours(0, 0, 0, 0);
+  // Create a new date at midnight local time
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay(); // 0=Sunday, 1=Monday, ..., 6=Saturday
+  
+  // Go back to the most recent Sunday (or stay on Sunday if already Sunday)
+  const daysToSubtract = day; // If day=0 (Sunday), subtract 0; if day=6 (Saturday), subtract 6
+  d.setDate(d.getDate() - daysToSubtract);
+  
   return d;
 }
 
