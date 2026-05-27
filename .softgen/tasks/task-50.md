@@ -26,10 +26,10 @@ Root causes identified:
 
 ## Checklist
 
-- [ ] Review and fix database schema (availability table, constraints, indexes)
+- [x] Review and fix database schema (availability table, constraints, indexes)
+- [x] Rebuild availability service layer - clean save/load/delete operations
+- [x] Rebuild rota generator - simple, bulletproof availability checking
 - [ ] Rebuild staff availability UI - clean date picker for individual dates
-- [ ] Rebuild availability service layer - clean save/load/delete operations
-- [ ] Rebuild rota generator - simple, bulletproof availability checking
 - [ ] Add visual availability calendar to staff cards
 - [ ] Test full flow: set rest day → save → generate rota → verify excluded
 - [ ] Add data validation and error handling throughout

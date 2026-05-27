@@ -327,95 +327,60 @@ export default function StaffPage() {
   };
 
   const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
-    // Close dropdown and show loading
     setOpenDayDropdown(null);
     setLoadingCell({ staffId, date: dateStr });
     
-    console.log('🔧 setDayAvailability called:', {
-      staffId,
-      dateStr,
-      type,
-      timestamp: new Date().toISOString()
-    });
-    
     try {
-      // Find staff name for better feedback
       const staffMember = staff.find(s => s.id === staffId);
       const staffName = staffMember?.name || "Staff";
       
-      console.log(`   Staff: ${staffName} (${staffId})`);
-      console.log(`   Date: ${dateStr}`);
-      console.log(`   Action: ${type === 'clear' ? 'DELETE' : 'UPSERT'} ${type}`);
-      
-      // Format date for display - parse as UK local date
+      // Parse date for display
       const [year, month, day] = dateStr.split('-').map(Number);
       const dateObj = new Date(year, month - 1, day);
       const dateDisplay = dateObj.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
       
       if (type === "clear") {
-        // Remove availability
-        console.log(`   🗑️  Calling staffService.deleteAvailability(${staffId}, ${dateStr})`);
         await staffService.deleteAvailability(staffId, dateStr);
-        console.log('   ✅ Delete successful');
       } else {
-        // Add or update (UPSERT)
-        console.log(`   💾 Calling staffService.addAvailability with:`, {
-          staffId,
-          entry: { date: dateStr, type: type, notes: `Marked as ${type}` }
-        });
         await staffService.addAvailability(staffId, [{
           date: dateStr,
           type: type,
-          notes: `Marked as ${type}`,
+          notes: `Set as ${type}`,
         }]);
-        console.log('   ✅ Upsert successful');
       }
       
-      // IMMEDIATE cache refresh - force complete reload
-      console.log('   🔄 Invalidating React Query cache...');
-      queryClient.removeQueries({ queryKey: ["staff", "full"] });
+      // Immediate refresh
+      await queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
       await queryClient.refetchQueries({ queryKey: ["staff", "full"] });
-      console.log('   ✅ Cache refreshed');
-      
-      // Force re-render
       setRenderKey(prev => prev + 1);
-      console.log('   🎨 Re-render triggered');
       
-      // Show success toast
+      // Success feedback
       if (type === "clear") {
         toast({
           title: "✓ Cleared",
           description: `${staffName} - ${dateDisplay} marked as WORKING`,
         });
       } else {
-        const typeLabel = type.toUpperCase();
         toast({
-          title: `✓ Saved ${typeLabel}`,
-          description: `${staffName} - ${dateDisplay} = ${typeLabel}`,
+          title: `✓ ${type.toUpperCase()}`,
+          description: `${staffName} - ${dateDisplay}`,
         });
-        console.log(`   ✅ SUCCESS: ${staffName} marked as ${typeLabel} on ${dateStr}`);
       }
       
     } catch (error) {
-      console.error("❌ Error updating availability:", error);
-      console.error('   Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
+      console.error("Error updating availability:", error);
       toast({
         title: "❌ Error",
-        description: `Failed to save. ${error instanceof Error ? error.message : "Unknown error"}`,
+        description: error instanceof Error ? error.message : "Failed to save",
         variant: "destructive",
       });
     } finally {
-      // Clear loading state
       setLoadingCell(null);
-      console.log('   🏁 setDayAvailability complete\n');
     }
   };
 
   const getAvailabilityForDate = (staffMember: StaffMember, date: Date): AvailabilityType | null => {
-    // Format date as YYYY-MM-DD using UK local time (not UTC)
+    // Format date as YYYY-MM-DD
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -424,14 +389,13 @@ export default function StaffPage() {
     const entry = staffMember.availability?.find(a => a.date === dateStr);
     if (!entry) return null;
     
-    // Normalize the type value (handle case variations, whitespace, "Rest Day" → "rest")
-    const normalizedType = entry.type.toString().toLowerCase().trim();
-    if (normalizedType.includes('rest')) return 'rest';
-    if (normalizedType.includes('holiday') || normalizedType.includes('hol')) return 'holiday';
-    if (normalizedType.includes('sick')) return 'sick';
-    if (normalizedType.includes('available') || normalizedType.includes('avail')) return 'available';
+    // Normalize type
+    const type = entry.type.toString().toLowerCase().trim();
+    if (type.includes('rest')) return 'rest';
+    if (type.includes('holiday')) return 'holiday';
+    if (type.includes('sick')) return 'sick';
+    if (type.includes('available')) return 'available';
     
-    // Fallback to original value
     return entry.type;
   };
 

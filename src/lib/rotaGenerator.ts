@@ -26,27 +26,6 @@ export function generateWeeklyRota({
   const diagnostics: string[] = [];
   const log = (msg: string) => diagnostics.push(msg);
   
-  // CRITICAL DEBUG: Show exactly what week we're generating for
-  // Note: baseYear, baseMonth, baseDay are defined below in the main loop
-  const debugYear = weekStart.getFullYear();
-  const debugMonth = weekStart.getMonth();
-  const debugDay = weekStart.getDate();
-  const weekEndDate = new Date(debugYear, debugMonth, debugDay + 6);
-  
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log(`🗓️  GENERATING ROTA FOR WEEK:`);
-  console.log(`   Start (Sunday):  ${weekStart.toDateString()} (${debugYear}-${String(debugMonth+1).padStart(2,'0')}-${String(debugDay).padStart(2,'0')})`);
-  console.log(`   End (Saturday):  ${weekEndDate.toDateString()} (${weekEndDate.getFullYear()}-${String(weekEndDate.getMonth()+1).padStart(2,'0')}-${String(weekEndDate.getDate()).padStart(2,'0')})`);
-  console.log('');
-  console.log('   Full Week Dates:');
-  for (let i = 0; i < 7; i++) {
-    const dayDate = new Date(debugYear, debugMonth, debugDay + i);
-    const dayStr = getLocalDateString(dayDate);
-    const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i];
-    console.log(`   ${dayName.padEnd(10)}: ${dayDate.toDateString()} (${dayStr})`);
-  }
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  
   log(`📅 Week: ${weekStart.toDateString()}`);
   log("=".repeat(60));
   log("🚀 ROTA GENERATION STARTED");
@@ -135,22 +114,7 @@ export function generateWeeklyRota({
       // Find available staff for this task on this day
       const availableStaff: StaffMember[] = [];
 
-      // CRITICAL DEBUG: Extra logging for Saturday (day 6)
-      if (dayIndex === 6) {
-        console.log(`\n🚨 SATURDAY DEBUG - ${task}`);
-        console.log(`   Date: ${dateStr}`);
-        console.log(`   All staff being checked:`);
-      }
-
       for (const staffMember of staff) {
-        // SATURDAY SPECIFIC DEBUG
-        if (dayIndex === 6 && staffMember.name.includes('MURRAY')) {
-          console.log(`\n   🔍 DETAILED CHECK: ${staffMember.name} for Saturday ${dateStr}`);
-          console.log(`      All availability entries for this person:`, 
-            staffMember.availability?.map(a => ({ date: a.date, type: a.type })) || []
-          );
-        }
-
         // Check 1: Is staff trained for this task?
         const taskToCheck = task === "Inbound Late" ? "Inbound" : task;
         if (!staffMember.trainedTasks.includes(taskToCheck)) {
@@ -172,15 +136,16 @@ export function generateWeeklyRota({
         }
 
         // Check 2: Is staff available on this date?
-        const availability = staffMember.availability?.find(a => a.date === dateStr);
+        // Simple, bulletproof: find exact date match, check type
+        const unavailableEntry = staffMember.availability?.find(a => {
+          if (a.date !== dateStr) return false;
+          const type = a.type.toString().toLowerCase().trim();
+          return type.includes('rest') || type.includes('holiday') || type.includes('sick');
+        });
         
-        // Skip if staff has a rest day, holiday, or sick leave
-        if (availability) {
-          const type = availability.type.toString().toLowerCase();
-          if (type.includes('rest') || type.includes('holiday') || type.includes('sick')) {
-            log(`      ⛔ ${staffMember.name}: ${availability.type} on ${dateStr}`);
-            continue;
-          }
+        if (unavailableEntry) {
+          log(`      ⛔ ${staffMember.name}: ${unavailableEntry.type} on ${dateStr}`);
+          continue;
         }
         
         log(`      ✓ ${staffMember.name}: available`);
