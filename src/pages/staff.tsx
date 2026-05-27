@@ -1060,6 +1060,57 @@ export default function StaffPage() {
                           <CollapsibleContent>
                             <CardContent className="pt-2 px-6 pb-6">
                               <div className="space-y-3">
+                                {/* EMERGENCY DEBUG PANEL - Shows date matching info */}
+                                {member === staff[0] && (
+                                  <Alert className="bg-amber-50 border-amber-200 mb-4">
+                                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                                    <AlertTitle className="text-amber-900 font-mono text-xs font-bold">
+                                      DEBUG: Date Matching Info (First Staff Only)
+                                    </AlertTitle>
+                                    <AlertDescription className="text-amber-800 font-mono text-[10px] space-y-1 mt-2">
+                                      <div className="font-bold">Week being displayed:</div>
+                                      <div className="pl-2">
+                                        {weekDates.map((d, i) => {
+                                          const year = d.getFullYear();
+                                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                                          const day = String(d.getDate()).padStart(2, '0');
+                                          const dateStr = `${year}-${month}-${day}`;
+                                          return (
+                                            <div key={i}>
+                                              {DAYS[i]}: {d.toDateString()} → Lookup: "{dateStr}"
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                      <div className="font-bold mt-2">Database entries for {member.name}:</div>
+                                      <div className="pl-2">
+                                        Total: {member.availability?.length || 0} entries
+                                        {member.availability && member.availability.length > 0 && (
+                                          <>
+                                            <div>First 5: {member.availability.slice(0, 5).map(a => `${a.date}(${a.type[0].toUpperCase()})`).join(', ')}</div>
+                                            <div>Last 5: {member.availability.slice(-5).map(a => `${a.date}(${a.type[0].toUpperCase()})`).join(', ')}</div>
+                                          </>
+                                        )}
+                                      </div>
+                                      <div className="font-bold mt-2">Matches found this week:</div>
+                                      <div className="pl-2">
+                                        {weekDates.map((d, i) => {
+                                          const year = d.getFullYear();
+                                          const month = String(d.getMonth() + 1).padStart(2, '0');
+                                          const day = String(d.getDate()).padStart(2, '0');
+                                          const dateStr = `${year}-${month}-${day}`;
+                                          const entry = member.availability?.find(a => a.date === dateStr);
+                                          return (
+                                            <div key={i} className={entry ? "text-green-700 font-bold" : "text-red-700"}>
+                                              {DAYS[i]} ({dateStr}): {entry ? `FOUND - ${entry.type.toUpperCase()}` : "NOT FOUND"}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </AlertDescription>
+                                  </Alert>
+                                )}
+
                                 <div className="flex items-center justify-between mb-4">
                                   <div className="text-xs font-mono text-muted-foreground">
                                     Click any day to set availability
