@@ -9,141 +9,133 @@ interface TaskConfig {
 
 // Staff Query Hook - Emergency cache bypass
 export function useStaff() {
-  // Generate unique timestamp for this page load to force fresh fetch
-  const loadTimestamp = useRef(Date.now()).current;
-  
   return useQuery({
-    queryKey: ["staff", "emergency-bypass", loadTimestamp],
+    queryKey: ["staff"],
     queryFn: async () => {
       const fetchId = Math.random().toString(36).substring(7);
-      console.log(`🚨 [EMERGENCY FETCH ${fetchId}] Starting with cache bypass at ${new Date().toISOString()}`);
+      console.log(`🚨 [useStaff ${fetchId}] Starting staff fetch with pagination...`);
       
-      try {
-        // Add cache-busting query parameter to Supabase request
-        const { data: staffData, error: staffError } = await supabase
-          .from("staff")
-          .select("*")
-          .order("name");
+      // Fetch all staff
+      const { data: staffData, error: staffError } = await supabase
+        .from("staff")
+        .select("*")
+        .order("name");
 
-        if (staffError) {
-          console.error(`❌ [${fetchId}] Staff query error:`, staffError);
-          throw staffError;
-        }
-
-        console.log(`📊 [${fetchId}] Staff loaded:`, staffData?.length || 0, "members");
-
-        if (!staffData || staffData.length === 0) {
-          console.warn(`⚠️ [${fetchId}] No staff data in database`);
-          return [];
-        }
-
-        // Fetch ALL availability data directly - use pagination to bypass limits
-        console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset with pagination...`);
-        
-        let allAvailability: any[] = [];
-        let offset = 0;
-        const chunkSize = 1000;
-        let hasMore = true;
-        
-        while (hasMore) {
-          console.log(`   📦 Fetching chunk at offset ${offset}...`);
-          
-          const { data: chunk, error: chunkError } = await supabase
-            .from("availability")
-            .select("*")
-            .range(offset, offset + chunkSize - 1)
-            .order("date");
-          
-          if (chunkError) {
-            console.error(`❌ [${fetchId}] Availability fetch error at offset ${offset}:`, chunkError);
-            throw chunkError;
-          }
-          
-          if (!chunk || chunk.length === 0) {
-            hasMore = false;
-            console.log(`   ✅ No more records - pagination complete`);
-          } else {
-            allAvailability = [...allAvailability, ...chunk];
-            console.log(`   ✅ Fetched ${chunk.length} records (total so far: ${allAvailability.length})`);
-            
-            if (chunk.length < chunkSize) {
-              hasMore = false;
-              console.log(`   ✅ Last chunk - pagination complete`);
-            } else {
-              offset += chunkSize;
-            }
-          }
-        }
-        
-        const availabilityData: any[] = allAvailability;
-
-        const totalAvail = availabilityData.length;
-        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records (full year via pagination)`);
-        
-        if (totalAvail === 0) {
-          console.warn(`⚠️ [${fetchId}] Database returned ZERO availability records!`);
-        }
-
-        // Create a Map for O(1) lookups: staff_id -> array of availability entries
-        const availabilityMap = new Map<string, any[]>();
-        
-        availabilityData.forEach((entry) => {
-          const staffId = entry.staff_id;
-          if (!availabilityMap.has(staffId)) {
-            availabilityMap.set(staffId, []);
-          }
-          availabilityMap.get(staffId)!.push(entry);
-        });
-        
-        console.log(`📊 [${fetchId}] Created availability map for ${availabilityMap.size} staff members`);
-        console.log(`📊 [${fetchId}] Sample staff_id keys:`, Array.from(availabilityMap.keys()).slice(0, 3));
-
-        // Map staff with their availability
-        const mappedStaff: StaffMember[] = staffData.map((s) => {
-          const staffAvailability = availabilityMap.get(s.id) || [];
-          
-          // DEBUG: Log for specific staff to trace mapping
-          if (s.name?.includes('ABBO') || s.name?.includes('BRIAN')) {
-            console.log(`🔍 [${fetchId}] ${s.name}:`);
-            console.log(`   Staff ID: ${s.id}`);
-            console.log(`   Total entries: ${staffAvailability.length}`);
-            if (staffAvailability.length > 0) {
-              console.log(`   First entry:`, staffAvailability[0]);
-            } else {
-              console.log(`   ⚠️ NO availability entries for ${s.name}!`);
-            }
-          }
-
-          return {
-            id: s.id,
-            name: s.name,
-            trainedTasks: s.trained_tasks as Task[],
-            shiftStart: s.shift_start as ShiftStart,
-            shiftPattern: s.shift_pattern as ShiftPattern,
-            availability: staffAvailability.map((a) => ({
-              id: a.id,
-              date: a.date,
-              type: a.type as AvailabilityType,
-              notes: a.notes || undefined,
-            })),
-          };
-        });
-
-        console.log(`✅ [${fetchId}] Successfully mapped ${mappedStaff.length} staff members`);
-        console.log(`📊 [${fetchId}] Query complete - returning fresh data to React Query`);
-        return mappedStaff;
-        
-      } catch (error) {
-        console.error(`❌ [${fetchId}] Fatal error:`, error);
-        throw error;
+      if (staffError) {
+        console.error(`❌ [${fetchId}] Staff fetch error:`, staffError);
+        throw staffError;
       }
+
+      if (!staffData || staffData.length === 0) {
+        console.warn(`⚠️ [${fetchId}] No staff data in database`);
+        return [];
+      }
+
+      console.log(`📊 [${fetchId}] Staff loaded: ${staffData.length} members`);
+
+      // Fetch ALL availability data with pagination to bypass 1000-row limit
+      console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset with pagination...`);
+      
+      let allAvailability: any[] = [];
+      let offset = 0;
+      const chunkSize = 1000;
+      let hasMore = true;
+      
+      while (hasMore) {
+        console.log(`   📦 Fetching chunk at offset ${offset}...`);
+        
+        const { data: chunk, error: chunkError } = await supabase
+          .from("availability")
+          .select("*")
+          .range(offset, offset + chunkSize - 1)
+          .order("date");
+        
+        if (chunkError) {
+          console.error(`❌ [${fetchId}] Availability fetch error at offset ${offset}:`, chunkError);
+          throw chunkError;
+        }
+        
+        if (!chunk || chunk.length === 0) {
+          hasMore = false;
+          console.log(`   ✅ No more records - pagination complete`);
+        } else {
+          allAvailability = [...allAvailability, ...chunk];
+          console.log(`   ✅ Fetched ${chunk.length} records (total so far: ${allAvailability.length})`);
+          
+          if (chunk.length < chunkSize) {
+            hasMore = false;
+            console.log(`   ✅ Last chunk - pagination complete`);
+          } else {
+            offset += chunkSize;
+          }
+        }
+      }
+
+      const totalAvail = allAvailability.length;
+      console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records (full year via pagination)`);
+      
+      if (totalAvail === 0) {
+        console.warn(`⚠️ [${fetchId}] Database returned ZERO availability records!`);
+      }
+
+      // Create a Map for O(1) lookups: staff_id -> array of availability entries
+      const availabilityMap = new Map<string, any[]>();
+      
+      allAvailability.forEach((entry) => {
+        const staffId = entry.staff_id;
+        if (!availabilityMap.has(staffId)) {
+          availabilityMap.set(staffId, []);
+        }
+        availabilityMap.get(staffId)!.push(entry);
+      });
+      
+      console.log(`📊 [${fetchId}] Created availability map for ${availabilityMap.size} staff members`);
+
+      // Map staff with their availability
+      const mappedStaff: StaffMember[] = staffData.map((s) => {
+        const staffAvailability = availabilityMap.get(s.id) || [];
+        
+        // DEBUG: Log for Brian Murray to verify his Saturday rest days
+        if (s.name?.includes('BRIAN')) {
+          console.log(`🔍 [${fetchId}] ${s.name}:`);
+          console.log(`   Staff ID: ${s.id}`);
+          console.log(`   Total availability entries: ${staffAvailability.length}`);
+          if (staffAvailability.length > 0) {
+            const saturdays = staffAvailability.filter(a => {
+              const date = new Date(a.date + 'T00:00:00');
+              return date.getDay() === 6; // Saturday
+            });
+            console.log(`   Saturday rest days: ${saturdays.length}`);
+            console.log(`   Sample Saturdays:`, saturdays.slice(0, 3));
+          }
+        }
+
+        return {
+          id: s.id,
+          name: s.name,
+          trainedTasks: s.trained_tasks as Task[],
+          shiftStart: s.shift_start as ShiftStart,
+          shiftPattern: s.shift_pattern as ShiftPattern,
+          availability: staffAvailability.map((a) => ({
+            id: a.id,
+            date: a.date,
+            type: a.type as AvailabilityType,
+            notes: a.notes || undefined,
+          })),
+        };
+      });
+
+      console.log(`✅ [${fetchId}] Successfully mapped ${mappedStaff.length} staff members with availability`);
+      
+      // Verify Brian Murray has his data
+      const brian = mappedStaff.find(s => s.name?.includes('BRIAN'));
+      if (brian) {
+        console.log(`✅ [${fetchId}] Brian Murray availability loaded: ${brian.availability.length} entries`);
+      }
+
+      return mappedStaff;
     },
-    retry: 1,
-    staleTime: 0, // Never consider data stale
-    gcTime: 0, // Don't cache
-    refetchOnMount: "always",
-    refetchOnWindowFocus: "always",
-    refetchOnReconnect: "always",
+    staleTime: 1000 * 10, // 10 seconds
   });
 }
 
