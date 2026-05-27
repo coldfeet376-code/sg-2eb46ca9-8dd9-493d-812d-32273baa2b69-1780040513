@@ -832,34 +832,55 @@ export default function StaffPage() {
           </CardContent>
         </Card>
 
-        {/* Batch Availability Setting */}
-        {selectedStaff.length > 0 && (
-          <StaffAvailabilityPanel
-            selectedStaff={selectedStaff}
-            selectedDate={batchDate}
-            selectedAvailability={batchAvailability}
-            onDateChange={setBatchDate}
-            onAvailabilityChange={setBatchAvailability}
-            onApply={handleBatchAvailability}
-            onClearSelection={() => setSelectedStaffIds(new Set())}
-          />
-        )}
-
-        {/* Staff List */}
-
-        {/* Bulk Operations */}
+        {/* Bulk Operations & Batch Availability */}
         {selectedStaff.length > 0 && (
           <Card className="shadow-sm bg-primary/5 border-primary/20" data-tour="bulk-operations">
             <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-condensed font-bold tracking-tight">
-                Bulk Operations
-              </CardTitle>
-              <CardDescription className="text-sm font-sans">
-                {selectedStaff.length} staff members selected
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg font-condensed font-bold tracking-tight">
+                    Bulk Update Availability
+                  </CardTitle>
+                  <CardDescription className="text-sm font-sans">
+                    Apply status to {selectedStaff.length} selected staff members
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedStaffIds(new Set())}>
+                  <X className="h-4 w-4 mr-2" />
+                  Clear Selection
+                </Button>
+              </div>
             </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1 space-y-2">
+                  <Label>Date</Label>
+                  <Input type="date" value={batchDate} onChange={e => setBatchDate(e.target.value)} />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <Label>Status</Label>
+                  <Select value={batchAvailability} onValueChange={(v) => setBatchAvailability(v as AvailabilityType)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rest">Rest Day</SelectItem>
+                      <SelectItem value="holiday">Holiday</SelectItem>
+                      <SelectItem value="sick">Sick Leave</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={handleBatchAvailability} className="w-full sm:w-auto" disabled={!batchDate}>
+                    Apply to {selectedStaff.length} Staff
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
           </Card>
         )}
+
+        {/* Staff List */}
 
         {/* Quick Shift Filter */}
         <Card className="shadow-sm">
