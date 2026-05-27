@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useQuery } from "@tanstack/react-query";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const DUTIES: ManagerDuty[] = ["Intake", "Out-loading", "Admin", "Floor"];
@@ -83,6 +84,14 @@ export default function Managers() {
   const [selectedManager, setSelectedManager] = useState<any>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [deleteConfirmManager, setDeleteConfirmManager] = useState<Manager | null>(null);
+
+  const { data: managersData = [], isLoading: managersLoading, error: managersError } = useQuery({
+    queryKey: ["managers"],
+    queryFn: async () => {
+      const managers = await managerService.getAllManagers();
+      return managers;
+    },
+  });
 
   useEffect(() => {
     const auth = sessionStorage.getItem("manager-auth");

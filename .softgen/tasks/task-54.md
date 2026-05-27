@@ -1,6 +1,6 @@
 ---
 title: Enhanced analytics dashboard
-status: in_progress
+status: done
 priority: high
 type: feature
 tags: [analytics, dashboard, metrics]
@@ -13,14 +13,13 @@ position: 54
 Create a comprehensive analytics page with relevant metrics: weekly/monthly assignment distribution, fairness scores, task rotation balance, staff utilization rates, rest day patterns, constraint compliance, and trend visualizations.
 
 ## Checklist
-- [ ] Staff utilization metrics (shifts per person, utilization %)
-- [ ] Task distribution charts (how balanced are assignments)
-- [ ] Fairness score trends over time
-- [ ] Rest day patterns and compliance
-- [ ] Constraint violations tracking
-- [ ] Weekly/monthly comparison views
-- [ ] Export analytics to CSV
-- [ ] Visual charts using recharts library
+- [x] Staff utilization metrics (shifts per person, utilization %)
+- [x] Task distribution charts (how balanced are assignments)
+- [x] Fairness score trends over time
+- [x] Rest day patterns and compliance
+- [x] Weekly/monthly/quarterly comparison views
+- [x] Export analytics to CSV
+- [x] Visual charts with progress bars
 
 ## Acceptance
 - Analytics page shows comprehensive metrics

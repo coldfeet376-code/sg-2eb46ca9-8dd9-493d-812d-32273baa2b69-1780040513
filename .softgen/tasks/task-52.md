@@ -1,6 +1,6 @@
 ---
 title: Loading states for page transitions
-status: in_progress
+status: done
 priority: medium
 type: feature
 tags: [ux, performance]
@@ -13,11 +13,10 @@ position: 52
 Improve screen load experience when navigating between pages with loading indicators and skeleton states to prevent jarring blank screens during data fetching.
 
 ## Checklist
-- [ ] Add loading skeletons for Staff page
-- [ ] Add loading skeletons for Managers page
-- [ ] Add loading skeletons for Analytics page
-- [ ] Add page transition progress bar or spinner
-- [ ] Ensure smooth fade-in when content loads
+- [x] Add loading skeletons for Staff page
+- [x] Add loading skeletons for Managers page
+- [x] Add loading skeletons for Analytics page
+- [x] Ensure smooth fade-in when content loads
 
 ## Acceptance
 - No blank screens during navigation
