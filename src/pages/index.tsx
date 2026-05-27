@@ -231,7 +231,7 @@ export default function IndexPage() {
     };
   }, [weekStart, addNotification]);
 
-  // Save assignments to Supabase whenever they change
+  // Save assignments to Supabase whenever they change (excluding initial load and generates)
   useEffect(() => {
     const saveRotaToSupabase = async () => {
       if (assignments.length > 0) {
@@ -248,8 +248,8 @@ export default function IndexPage() {
       }
     };
 
-    // Longer debounce to reduce excessive saves
-    const timeoutId = setTimeout(saveRotaToSupabase, 2000); // 2 seconds
+    // Debounce saves - generateRota already saves immediately
+    const timeoutId = setTimeout(saveRotaToSupabase, 3000); // 3 seconds
     return () => clearTimeout(timeoutId);
   }, [assignments, weekStart, fairnessMetrics, lockedAssignments.length]);
 
@@ -335,29 +335,47 @@ export default function IndexPage() {
       lockedAssignments
     });
     const newAssignments = result.assignments;
-    setAssignments(newAssignments);
-    setDiagnostics(result.diagnostics);
-    // Don't auto-show diagnostics - user can click button if needed
-    // setShowDiagnostics(true);
     
     const metrics = calculateFairnessMetrics(newAssignments, staff);
-    setFairnessMetrics(metrics);
     
     // Auto-lock all assignments after generation
-    setLockedAssignments([...newAssignments]);
+    const newLocked = [...newAssignments];
     
-    await rotaRealtimeService.logAction(
-      "generated",
-      "rota",
-      getLocalDateString(weekStart),
-      `Generated rota for week of ${weekStart.toLocaleDateString()} (auto-locked)`
-    );
-    
-    addNotification({
-      staffName: "System",
-      message: "Rota generated and locked successfully",
-      type: "info",
-    });
+    // Save immediately to Supabase to prevent race condition with real-time subscription
+    try {
+      await rotaRealtimeService.saveRota(
+        weekStart,
+        newAssignments,
+        metrics,
+        newLocked.length
+      );
+      
+      // Only update local state after successful save
+      setAssignments(newAssignments);
+      setFairnessMetrics(metrics);
+      setLockedAssignments(newLocked);
+      setDiagnostics(result.diagnostics);
+      
+      await rotaRealtimeService.logAction(
+        "generated",
+        "rota",
+        getLocalDateString(weekStart),
+        `Generated rota for week of ${weekStart.toLocaleDateString()} (auto-locked)`
+      );
+      
+      addNotification({
+        staffName: "System",
+        message: "Rota generated and locked successfully",
+        type: "info",
+      });
+    } catch (error) {
+      console.error("Error saving rota:", error);
+      toast({
+        title: "❌ Save Failed",
+        description: "Rota generated but failed to save. Try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const forceGenerateRota = () => {
