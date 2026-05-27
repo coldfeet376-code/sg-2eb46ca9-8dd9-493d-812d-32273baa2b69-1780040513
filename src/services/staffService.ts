@@ -160,7 +160,7 @@ export const staffService = {
     }
   },
 
-  // Bulk import staff from CSV/Excel
+  // Bulk import staff from CSV/Excel with transaction-like behavior
   async bulkImportStaff(
     staffData: Array<{
       name: string;
@@ -168,19 +168,96 @@ export const staffService = {
       shiftStart?: string;
       shiftPattern?: string;
     }>
-  ): Promise<void> {
-    const insertData = staffData.map((s) => ({
-      name: s.name,
-      trained_tasks: s.trainedTasks,
-      shift_start: s.shiftStart || "06:00",
-      shift_pattern: s.shiftPattern || "All",
-    }));
+  ): Promise<{ success: boolean; error?: string; importedCount?: number }> {
+    try {
+      // Validate all entries first
+      const errors: string[] = [];
+      staffData.forEach((staff, index) => {
+        if (!staff.name || staff.name.trim() === "") {
+          errors.push(`Row ${index + 1}: Name is required`);
+        }
+        if (!staff.trainedTasks || staff.trainedTasks.length === 0) {
+          errors.push(`Row ${index + 1}: At least one trained task is required`);
+        }
+      });
 
-    const { error } = await supabase.from("staff").insert(insertData);
+      if (errors.length > 0) {
+        return { 
+          success: false, 
+          error: `Validation failed:\n${errors.join('\n')}` 
+        };
+      }
 
-    if (error) {
-      console.error("Error bulk importing staff:", error);
-      throw error;
+      // Insert all at once (Supabase will rollback all if any fail)
+      const insertData = staffData.map((s) => ({
+        name: s.name,
+        trained_tasks: s.trainedTasks,
+        shift_start: s.shiftStart || "06:00",
+        shift_pattern: s.shiftPattern || "All",
+      }));
+
+      const { data, error } = await supabase
+        .from("staff")
+        .insert(insertData)
+        .select();
+
+      if (error) {
+        console.error("Error bulk importing staff:", error);
+        return { 
+          success: false, 
+          error: `Failed to import staff: ${error.message}` 
+        };
+      }
+
+      return { 
+        success: true, 
+        importedCount: data?.length || 0 
+      };
+    } catch (error: any) {
+      console.error("Unexpected error during bulk import:", error);
+      return { 
+        success: false, 
+        error: error.message || "Unknown error occurred" 
+      };
+    }
+  },
+
+  // Bulk update availability with transaction-like behavior
+  async bulkUpdateAvailability(
+    staffId: string,
+    entries: AvailabilityEntry[]
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      if (entries.length === 0) {
+        return { success: true };
+      }
+
+      const insertData = entries.map((entry) => ({
+        staff_id: staffId,
+        date: entry.date,
+        type: entry.type,
+        notes: entry.notes || null,
+      }));
+
+      const { error } = await supabase
+        .from("availability")
+        .upsert(insertData, { onConflict: "staff_id,date" });
+
+      if (error) {
+        console.error("Error bulk updating availability:", error);
+        return { 
+          success: false, 
+          error: `Failed to update availability: ${error.message}` 
+        };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error("Unexpected error during bulk availability update:", error);
+      return { 
+        success: false, 
+        error: error.message || "Unknown error occurred" 
+      };
     }
   },
 };

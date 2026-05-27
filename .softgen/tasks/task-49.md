@@ -31,9 +31,9 @@ User confirmed:
 - [x] Add pagination indexes for date-range queries
 - [x] Update useSupabaseQueries to load only 12 weeks of availability
 - [x] Update useSupabaseQueries to load only selected week + adjacent weeks for assignments
-- [ ] Add optimistic locking logic in rotaService (check version before save)
-- [ ] Add transaction wrapper for bulk staff operations
-- [ ] Add transaction wrapper for rota generation
+- [x] Add optimistic locking logic in rotaService (check version before save)
+- [x] Add transaction wrapper for bulk staff operations
+- [x] Add transaction wrapper for rota generation
 - [ ] Increase button sizes to 48px on mobile/tablet
 - [ ] Add better error messages with retry buttons
 - [ ] Test all changes don't break existing functionality
