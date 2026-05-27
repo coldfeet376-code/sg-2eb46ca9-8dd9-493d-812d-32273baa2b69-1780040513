@@ -37,23 +37,20 @@ export function useStaff() {
           return [];
         }
 
-        // Fetch ALL availability data with NO date filtering
-        console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset (no filters)...`);
+        // Fetch ALL availability data using RPC function (bypasses JS client limits)
+        console.log(`📅 [${fetchId}] Fetching COMPLETE availability dataset via RPC...`);
         
-        // Use range(0, 99999) instead of limit() to bypass Supabase's default 1000-row limit
+        // Use RPC function to bypass Supabase JS client's row limits
         const { data: availabilityData, error: availError } = await supabase
-          .from("availability")
-          .select("*", { count: 'exact' })
-          .range(0, 99999)
-          .order('date', { ascending: true });
+          .rpc('get_all_availability');
 
         if (availError) {
-          console.error(`❌ [${fetchId}] Availability query error:`, availError);
+          console.error(`❌ [${fetchId}] Availability RPC error:`, availError);
           throw availError;
         }
 
         const totalAvail = availabilityData?.length || 0;
-        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records from database`);
+        console.log(`✅ [${fetchId}] Fetched ${totalAvail} total availability records via RPC (NO CLIENT LIMITS)`);
         
         if (totalAvail === 0) {
           console.warn(`⚠️ [${fetchId}] Database returned ZERO availability records!`);
