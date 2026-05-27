@@ -395,7 +395,17 @@ export default function StaffPage() {
     const dateStr = `${year}-${month}-${day}`;
     
     const entry = staffMember.availability?.find(a => a.date === dateStr);
-    return entry ? entry.type : null;
+    if (!entry) return null;
+    
+    // Normalize the type value (handle case variations, whitespace, "Rest Day" → "rest")
+    const normalizedType = entry.type.toString().toLowerCase().trim();
+    if (normalizedType.includes('rest')) return 'rest';
+    if (normalizedType.includes('holiday') || normalizedType.includes('hol')) return 'holiday';
+    if (normalizedType.includes('sick')) return 'sick';
+    if (normalizedType.includes('available') || normalizedType.includes('avail')) return 'available';
+    
+    // Fallback to original value
+    return entry.type;
   };
 
   const getAvailabilityStats = (staffMember: StaffMember) => {
@@ -410,12 +420,13 @@ export default function StaffPage() {
   };
 
   const getDayColor = (type: AvailabilityType | null) => {
-    if (!type) return "bg-background hover:bg-muted border-muted-foreground/20";
+    if (!type) return "bg-muted/40 hover:bg-muted/60 border-border text-muted-foreground";
     switch (type) {
       case "rest": return "bg-blue-500 hover:bg-blue-600 border-blue-600 text-white";
       case "holiday": return "bg-purple-500 hover:bg-purple-600 border-purple-600 text-white";
       case "sick": return "bg-red-500 hover:bg-red-600 border-red-600 text-white";
-      default: return "bg-green-500 hover:bg-green-600 border-green-600 text-white";
+      case "available": return "bg-green-500 hover:bg-green-600 border-green-600 text-white";
+      default: return "bg-muted/40 hover:bg-muted/60 border-border text-muted-foreground";
     }
   };
 
