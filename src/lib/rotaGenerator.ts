@@ -27,19 +27,20 @@ export function generateWeeklyRota({
   const log = (msg: string) => diagnostics.push(msg);
   
   // CRITICAL DEBUG: Show exactly what week we're generating for
-  const baseYear = weekStart.getFullYear();
-  const baseMonth = weekStart.getMonth();
-  const baseDay = weekStart.getDate();
-  const weekEndDate = new Date(baseYear, baseMonth, baseDay + 6);
+  // Note: baseYear, baseMonth, baseDay are defined below in the main loop
+  const debugYear = weekStart.getFullYear();
+  const debugMonth = weekStart.getMonth();
+  const debugDay = weekStart.getDate();
+  const weekEndDate = new Date(debugYear, debugMonth, debugDay + 6);
   
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log(`🗓️  GENERATING ROTA FOR WEEK:`);
-  console.log(`   Start (Sunday):  ${weekStart.toDateString()} (${baseYear}-${String(baseMonth+1).padStart(2,'0')}-${String(baseDay).padStart(2,'0')})`);
+  console.log(`   Start (Sunday):  ${weekStart.toDateString()} (${debugYear}-${String(debugMonth+1).padStart(2,'0')}-${String(debugDay).padStart(2,'0')})`);
   console.log(`   End (Saturday):  ${weekEndDate.toDateString()} (${weekEndDate.getFullYear()}-${String(weekEndDate.getMonth()+1).padStart(2,'0')}-${String(weekEndDate.getDate()).padStart(2,'0')})`);
   console.log('');
   console.log('   Full Week Dates:');
   for (let i = 0; i < 7; i++) {
-    const dayDate = new Date(baseYear, baseMonth, baseDay + i);
+    const dayDate = new Date(debugYear, debugMonth, debugDay + i);
     const dayStr = getLocalDateString(dayDate);
     const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i];
     console.log(`   ${dayName.padEnd(10)}: ${dayDate.toDateString()} (${dayStr})`);
