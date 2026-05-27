@@ -399,9 +399,21 @@ export default function StaffPage() {
   };
 
   const getAvailabilityForDate = (staffMember: StaffMember, date: Date): AvailabilityType | null => {
-    // Use LOCAL date formatting to match what we're storing
-    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    // Convert Date object to YYYY-MM-DD format (ISO 8601 date string)
+    // This must match exactly how dates are stored in the database
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    // Find matching availability entry
     const entry = staffMember.availability?.find(a => a.date === dateStr);
+    
+    // DEBUG: Log for specific dates to verify matching
+    if (staffMember.name.toLowerCase().includes('wilson') && entry) {
+      console.log(`✅ MATCH FOUND for ${staffMember.name} on ${dateStr}:`, entry.type);
+    }
+    
     return entry ? entry.type : null;
   };
 
