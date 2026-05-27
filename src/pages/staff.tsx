@@ -401,7 +401,9 @@ export default function StaffPage() {
     }
   };
 
-  const getAvailabilityForDate = (staffMember: StaffMember, date: Date): AvailabilityType | null => {
+  const getAvailabilityForDate = (staffMember: StaffMember | null, date: Date): AvailabilityType | null => {
+    if (!staffMember) return null;
+    
     // Convert Date object to YYYY-MM-DD format (ISO 8601 date string)
     // This must match exactly how dates are stored in the database
     const year = date.getFullYear();
@@ -1225,9 +1227,9 @@ export default function StaffPage() {
 
                                 {/* Calendar grid */}
                                 <div className="grid grid-cols-7 gap-2">
-                                  {getDatesForWeek(currentWeekStart).map((date, idx) => {
+                                  {getWeekDates(currentWeekStart).map((date, idx) => {
                                     const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
-                                    const availType = getAvailabilityForDate(selectedStaffForDialog, date);
+                                    const availType = getAvailabilityForDate(member, date);
                                     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
                                     
                                     const bgColor = 
@@ -1248,7 +1250,7 @@ export default function StaffPage() {
                                       <button
                                         key={idx}
                                         onClick={() => {
-                                          setSelectedStaffForDialog(selectedStaffForDialog);
+                                          setSelectedStaffForDialog(member);
                                           setIsAvailabilityDialogOpen(true);
                                         }}
                                         className={`p-2 rounded text-center hover:ring-2 hover:ring-primary transition-all ${bgColor}`}
