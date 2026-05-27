@@ -112,6 +112,14 @@ export function useTaskConfig() {
     queryFn: async () => {
       console.log("🔍 Starting task config query...");
       
+      // Check auth status first
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log("🔐 Auth session status:", {
+        hasSession: !!session,
+        userId: session?.user?.id,
+        expiresAt: session?.expires_at
+      });
+      
       const { data, error } = await supabase
         .from("task_config")
         .select("*");
@@ -119,6 +127,7 @@ export function useTaskConfig() {
       console.log("📊 Task config query result:", {
         rowCount: data?.length || 0,
         error: error?.message,
+        errorDetails: error,
         tasks: data?.map(d => d.task) || []
       });
 
@@ -129,6 +138,7 @@ export function useTaskConfig() {
 
       if (!data || data.length === 0) {
         console.warn("⚠️ No task config data returned from database");
+        console.warn("This might be an RLS policy issue - check if user is authenticated");
         return null;
       }
 
