@@ -127,29 +127,6 @@ export default function StaffPage() {
   const updateStaffMutation = useUpdateStaff();
   const deleteStaffMutation = useDeleteStaff();
 
-  // Loading state
-  if (staffLoading) {
-    return (
-      <Layout>
-        <SEO title="Staff Management" description="Manage warehouse staff training and availability" />
-        <div className="space-y-6 animate-in fade-in duration-500">
-          <div className="h-8 bg-muted animate-pulse rounded w-1/3" />
-          <Card>
-            <CardHeader>
-              <div className="h-6 bg-muted animate-pulse rounded w-1/4 mb-2" />
-              <div className="h-4 bg-muted animate-pulse rounded w-1/3" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-20 bg-muted animate-pulse rounded" />
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
-    );
-  }
-
   // DEBUG: Log staff data when it changes
   useEffect(() => {
     console.log('🚨 STAFF DATA UPDATED in component');
@@ -178,6 +155,29 @@ export default function StaffPage() {
       }
     }
   }, [staff]);
+
+  // Loading state
+  if (staffLoading) {
+    return (
+      <Layout>
+        <SEO title="Staff Management" description="Manage warehouse staff training and availability" />
+        <div className="space-y-6 animate-in fade-in duration-500">
+          <div className="h-8 bg-muted animate-pulse rounded w-1/3" />
+          <Card>
+            <CardHeader>
+              <div className="h-6 bg-muted animate-pulse rounded w-1/4 mb-2" />
+              <div className="h-4 bg-muted animate-pulse rounded w-1/3" />
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-20 bg-muted animate-pulse rounded" />
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
+  }
 
   // Derived selected staff
   const selectedStaff = staff.filter(s => selectedStaffIds.has(s.id));

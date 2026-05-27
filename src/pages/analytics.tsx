@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { useStaff } from "@/hooks/useSupabaseQueries";
 import { useQuery } from "@tanstack/react-query";
-import { rotaRealtimeService } from "@/services/rotaRealtimeService";
+import { supabase } from "@/integrations/supabase/client";
 import { Download, TrendingUp, Users, Target, Calendar, BarChart3, PieChart, Activity } from "lucide-react";
 import type { StaffMember, Assignment } from "@/types";
 
@@ -47,8 +47,18 @@ export default function AnalyticsPage() {
         start.setMonth(end.getMonth() - 3);
       }
       
-      const rotas = await rotaRealtimeService.getRotasInRange(start, end);
-      return rotas;
+      const { data, error } = await supabase
+        .from("rotas")
+        .select("week_start, assignments")
+        .gte("week_start", start.toISOString().split('T')[0])
+        .lte("week_start", end.toISOString().split('T')[0]);
+
+      if (error) throw error;
+
+      return (data || []).map(r => ({
+        weekStart: r.week_start,
+        assignments: (r.assignments as unknown as Assignment[]) || []
+      }));
     },
   });
 

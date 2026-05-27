@@ -88,7 +88,7 @@ export default function Managers() {
   const { data: managersData = [], isLoading: managersLoading, error: managersError } = useQuery({
     queryKey: ["managers"],
     queryFn: async () => {
-      const managers = await managerService.getAllManagers();
+      const managers = await getAllManagers();
       return managers;
     },
   });
