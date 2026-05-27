@@ -41,6 +41,7 @@ export const staffService = {
       trainedTasks: (s.trained_tasks || []) as Task[],
       shiftStart: (s.shift_start || "06:00") as ShiftStart,
       shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
+      restDays: s.rest_days || [],
       availability: (availabilityData || [])
         .filter((a) => a.staff_id === s.id)
         .map((a) => ({
@@ -62,6 +63,7 @@ export const staffService = {
         trained_tasks: staff.trainedTasks,
         shift_start: staff.shiftStart,
         shift_pattern: staff.shiftPattern || "All",
+        rest_days: staff.restDays || [],
       })
       .select()
       .single();
@@ -91,6 +93,7 @@ export const staffService = {
     if (updates.trainedTasks !== undefined) updateData.trained_tasks = updates.trainedTasks;
     if (updates.shiftStart !== undefined) updateData.shift_start = updates.shiftStart;
     if (updates.shiftPattern !== undefined) updateData.shift_pattern = updates.shiftPattern;
+    if (updates.restDays !== undefined) updateData.rest_days = updates.restDays;
     updateData.updated_at = new Date().toISOString();
 
     const { error } = await supabase.from("staff").update(updateData).eq("id", id);

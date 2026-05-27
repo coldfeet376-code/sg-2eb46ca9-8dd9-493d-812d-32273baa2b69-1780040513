@@ -70,6 +70,7 @@ export function useStaff() {
           trainedTasks: s.trained_tasks as Task[],
           shiftStart: s.shift_start as ShiftStart,
           shiftPattern: s.shift_pattern as ShiftPattern,
+          restDays: s.rest_days || [],
           availability: staffAvailability.map((a) => ({
             id: a.id,
             date: a.date,
@@ -120,6 +121,9 @@ export function useStaffQuery() {
           id: s.id,
           name: s.name,
           trainedTasks: (s.trained_tasks || []) as Task[],
+          shiftStart: (s.shift_start || "06:00") as ShiftStart,
+          shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
+          restDays: s.rest_days || [],
           availability: availabilityRecords,
         };
       });
@@ -175,6 +179,7 @@ export function useAddStaff() {
           trained_tasks: staff.trainedTasks,
           shift_start: staff.shiftStart,
           shift_pattern: staff.shiftPattern || "All",
+          rest_days: staff.restDays || [],
         })
         .select()
         .single();
@@ -200,6 +205,7 @@ export function useUpdateStaff() {
           trained_tasks: updates.trainedTasks,
           shift_start: updates.shiftStart,
           shift_pattern: updates.shiftPattern,
+          rest_days: updates.restDays,
         })
         .eq("id", id);
 

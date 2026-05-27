@@ -254,6 +254,7 @@ export default function StaffPage() {
     setEditShift(member.shiftStart || "06:00");
     setEditDayShiftPattern((member as any).dayShiftPattern || "06:00-14:30");
     setEditShiftPattern((member as any).shiftPattern || "All");
+    setEditRecurringRestDays(member.restDays || []);
   };
 
   const handleCancelEdit = () => {
@@ -263,6 +264,7 @@ export default function StaffPage() {
     setEditShift("06:00");
     setEditDayShiftPattern("06:00-14:30");
     setEditShiftPattern("All");
+    setEditRecurringRestDays([]);
   };
 
   const handleSaveEdit = async () => {
@@ -277,6 +279,7 @@ export default function StaffPage() {
           shiftStart: editShift,
           dayShiftPattern: editDayShiftPattern,
           shiftPattern: editShiftPattern,
+          restDays: editRecurringRestDays,
         } as any,
       },
       {
@@ -829,6 +832,28 @@ export default function StaffPage() {
               </p>
             </div>
 
+            <div className="space-y-2">
+              <Label className="font-mono text-xs">Recurring Rest Days</Label>
+              <div className="flex flex-wrap gap-3">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
+                  <div key={day} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`add-rest-${idx}`}
+                      checked={recurringRestDays.includes(idx)}
+                      onCheckedChange={(checked) => {
+                        if (checked) setRecurringRestDays([...recurringRestDays, idx]);
+                        else setRecurringRestDays(recurringRestDays.filter(d => d !== idx));
+                      }}
+                    />
+                    <Label htmlFor={`add-rest-${idx}`} className="font-mono text-xs cursor-pointer">{day}</Label>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground font-mono">
+                Days this person NEVER works (e.g. Saturdays)
+              </p>
+            </div>
+
             <Button onClick={handleAddStaff} className="rounded-lg shadow-sm hover:shadow-md transition-smooth" disabled={addStaffMutation.isPending || !name.trim() || selectedTasks.length === 0}>
               <Plus className="h-4 w-4 mr-2" />
               <span className="font-mono text-xs">{addStaffMutation.isPending ? "Adding..." : "Add Staff"}</span>
@@ -1142,6 +1167,24 @@ export default function StaffPage() {
                                   <p className="text-xs text-muted-foreground font-mono">
                                     Staff work pattern - affects scheduling
                                   </p>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="font-mono text-xs">Recurring Rest Days</Label>
+                                  <div className="flex flex-wrap gap-3">
+                                    {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
+                                      <div key={day} className="flex items-center space-x-2">
+                                        <Checkbox
+                                          id={`edit-rest-${idx}`}
+                                          checked={editRecurringRestDays.includes(idx)}
+                                          onCheckedChange={(checked) => {
+                                            if (checked) setEditRecurringRestDays([...editRecurringRestDays, idx]);
+                                            else setEditRecurringRestDays(editRecurringRestDays.filter(d => d !== idx));
+                                          }}
+                                        />
+                                        <Label htmlFor={`edit-rest-${idx}`} className="font-mono text-xs cursor-pointer">{day}</Label>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                                 <div className="flex gap-2">
                                   <Button onClick={handleSaveEdit} className="flex-1 rounded-lg">Save</Button>
