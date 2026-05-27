@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -64,18 +64,15 @@ export default function StaffPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
   // Week navigation
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => {
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
     const today = new Date();
     const day = today.getDay();
-    const diff = day === 0 ? 0 : 7 - day;
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() + diff);
-    sunday.setHours(0, 0, 0, 0);
-    return sunday;
+    const diff = day === 0 ? 0 : 7 - day; // Days until next Saturday
+    const saturday = new Date(today);
+    saturday.setDate(today.getDate() + diff);
+    saturday.setHours(0, 0, 0, 0);
+    return saturday;
   });
-  const [selectedStaffForDialog, setSelectedStaffForDialog] = useState<StaffMember | null>(null);
-  const [isAvailabilityDialogOpen, setIsAvailabilityDialogOpen] = useState(false);
-  const hasJumpedToData = useRef(false);
   
   const { addAuditEntry } = useAudit();
   const { toast } = useToast();
@@ -117,11 +114,8 @@ export default function StaffPage() {
   const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
   const [editAvailabilityType, setEditAvailabilityType] = useState<AvailabilityType>("rest");
 
-  // React Query hooks - Load ALL historical data for staff page (no pagination limits)
-  const { data: staff = [], isLoading: staffLoading } = useStaff({ 
-    centerDate: currentWeekStart, 
-    weeksWindow: 999 // Large number = effectively loads all data
-  });
+  // React Query hooks
+  const { data: staff = [], isLoading: staffLoading } = useStaff();
   const addStaffMutation = useAddStaff();
   const updateStaffMutation = useUpdateStaff();
   const deleteStaffMutation = useDeleteStaff();
@@ -152,10 +146,10 @@ export default function StaffPage() {
     const today = new Date();
     const day = today.getDay();
     const diff = day === 0 ? 0 : 7 - day;
-    const sunday = new Date(today);
-    sunday.setDate(today.getDate() + diff);
-    sunday.setHours(0, 0, 0, 0);
-    setCurrentWeekStart(sunday);
+    const saturday = new Date(today);
+    saturday.setDate(today.getDate() + diff);
+    saturday.setHours(0, 0, 0, 0);
+    setCurrentWeekStart(saturday);
   };
 
   const handleAddStaff = async () => {
@@ -401,33 +395,10 @@ export default function StaffPage() {
     }
   };
 
-  const getAvailabilityForDate = (staffMember: StaffMember | null, date: Date): AvailabilityType | null => {
-    if (!staffMember) return null;
-    
-    // Convert Date object to YYYY-MM-DD format (ISO 8601 date string)
-    // This must match exactly how dates are stored in the database
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
-    
-    // Find matching availability entry
+  const getAvailabilityForDate = (staffMember: StaffMember, date: Date): AvailabilityType | null => {
+    // Use LOCAL date formatting to match what we're storing
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     const entry = staffMember.availability?.find(a => a.date === dateStr);
-    
-    // DEBUG: Log every lookup for Wilson I to diagnose
-    if (staffMember.name.toLowerCase().includes('wilson') && staffMember.availability && staffMember.availability.length > 0) {
-      console.log(`🔍 Calendar lookup for ${staffMember.name}:`);
-      console.log(`   Looking for: "${dateStr}"`);
-      console.log(`   Total availability entries: ${staffMember.availability.length}`);
-      console.log(`   Sample dates in array:`, staffMember.availability.slice(0, 5).map(a => a.date));
-      console.log(`   Match found: ${entry ? entry.type : 'NO'}`);
-      
-      // Check if the date exists with different formatting
-      const exactMatches = staffMember.availability.filter(a => a.date === dateStr);
-      const partialMatches = staffMember.availability.filter(a => a.date.includes(dateStr.slice(-5))); // Match day-month
-      console.log(`   Exact matches: ${exactMatches.length}, Partial matches: ${partialMatches.length}`);
-    }
-    
     return entry ? entry.type : null;
   };
 
@@ -646,46 +617,6 @@ export default function StaffPage() {
       console.error("Error saving availability:", error);
     }
   };
-
-  // Auto-jump to first week with availability data on page load (once only)
-  useEffect(() => {
-    if (hasJumpedToData.current || staff.length === 0 || staffLoading) return;
-    
-    // Find the earliest availability date across all staff
-    let earliestDate: Date | null = null;
-    
-    for (const member of staff) {
-      if (!member.availability || member.availability.length === 0) continue;
-      
-      for (const entry of member.availability) {
-        const entryDate = new Date(entry.date + 'T00:00:00');
-        if (!earliestDate || entryDate < earliestDate) {
-          earliestDate = entryDate;
-        }
-      }
-    }
-    
-    if (earliestDate) {
-      // Find Saturday that STARTS the week containing earliestDate
-      // Week runs: Saturday -> Friday (7 days)
-      // If date is Saturday (6) -> it's the start, no change
-      // If date is Sunday (0) -> go back 1 day to Saturday
-      // If date is Monday (1) -> go back 2 days to Saturday
-      // If date is Friday (5) -> go back 6 days to Saturday
-      const dayOfWeek = earliestDate.getDay();
-      const daysBack = dayOfWeek; // Sunday is 0
-      const sunday = new Date(earliestDate);
-      sunday.setDate(earliestDate.getDate() - daysBack);
-      sunday.setHours(0, 0, 0, 0);
-      
-      console.log(`📅 AUTO-JUMP TO FIRST WEEK WITH DATA:`);
-      console.log(`   Earliest date: ${earliestDate.toISOString().split('T')[0]}`);
-      console.log(`   Week start: ${sunday.toISOString().split('T')[0]}`);
-      
-      setCurrentWeekStart(sunday);
-      hasJumpedToData.current = true;
-    }
-  }, [staff, staffLoading]);
 
   return (
     <Layout>
@@ -1216,7 +1147,7 @@ export default function StaffPage() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => setSelectedStaffForDialog(member === selectedStaffForDialog ? null : member)}
+                                      onClick={() => clearAllAvailability(member.id, member.name)}
                                       className="h-7 text-xs font-mono text-destructive hover:text-destructive hover:bg-destructive/10"
                                     >
                                       <X className="h-3 w-3 mr-1" />
@@ -1226,45 +1157,78 @@ export default function StaffPage() {
                                 </div>
 
                                 {/* Calendar grid */}
-                                <div className="grid grid-cols-7 gap-2">
-                                  {getWeekDates(currentWeekStart).map((date, idx) => {
-                                    const dayName = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][date.getDay()];
+                                <div className="grid grid-cols-7 gap-2" key={`${member.id}-${renderKey}`}>
+                                  {weekDates.map((date, idx) => {
                                     const availType = getAvailabilityForDate(member, date);
+                                    // Use LOCAL date formatting to avoid timezone shifts
                                     const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+                                    const isOpen = openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr;
+                                    const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
+                                    const dayLabel = DAYS[date.getDay()];
                                     
-                                    const bgColor = 
-                                      availType === "rest" ? "bg-blue-100 dark:bg-blue-900" :
-                                      availType === "holiday" ? "bg-amber-100 dark:bg-amber-900" :
-                                      availType === "sick" ? "bg-red-100 dark:bg-red-900" :
-                                      availType === "available" ? "bg-green-100 dark:bg-green-900" :
-                                      "bg-muted";
-                                    
-                                    const textColor =
-                                      availType === "rest" ? "text-blue-700 dark:text-blue-300" :
-                                      availType === "holiday" ? "text-amber-700 dark:text-amber-300" :
-                                      availType === "sick" ? "text-red-700 dark:text-red-300" :
-                                      availType === "available" ? "text-green-700 dark:text-green-300" :
-                                      "text-muted-foreground";
-
                                     return (
-                                      <button
-                                        key={idx}
-                                        onClick={() => {
-                                          setSelectedStaffForDialog(member);
-                                          setIsAvailabilityDialogOpen(true);
-                                        }}
-                                        className={`p-2 rounded text-center hover:ring-2 hover:ring-primary transition-all ${bgColor}`}
-                                      >
-                                        <div className="text-xs font-medium text-muted-foreground mb-1">{dayName}</div>
-                                        <div className="text-xs text-muted-foreground mb-1">{date.getDate()}</div>
-                                        <div className={`text-xs font-semibold ${textColor}`}>
-                                          {availType === "rest" ? "Rest" :
-                                           availType === "holiday" ? "Holiday" :
-                                           availType === "sick" ? "Sick" :
-                                           availType === "available" ? "Avail" :
-                                           "—"}
-                                        </div>
-                                      </button>
+                                      <Popover key={`${idx}-${renderKey}`} open={isOpen} onOpenChange={(open) => {
+                                        if (open) {
+                                          setOpenDayDropdown({ staffId: member.id, date: dateStr });
+                                        } else if (openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr) {
+                                          setOpenDayDropdown(null);
+                                        }
+                                      }}>
+                                        <PopoverTrigger asChild>
+                                          <button
+                                            disabled={isLoading}
+                                            className={cn(
+                                              "aspect-square rounded-lg border-2 transition-all font-mono text-xs font-bold flex flex-col items-center justify-center min-h-[56px] hover:scale-105 gap-0.5",
+                                              getDayColor(availType),
+                                              isLoading && "opacity-50 cursor-wait animate-pulse"
+                                            )}
+                                          >
+                                            <span className="text-[10px] opacity-80 font-semibold">
+                                              {dayLabel}
+                                            </span>
+                                            <span className="text-lg leading-none">
+                                              {isLoading ? "..." : getDayLabel(availType)}
+                                            </span>
+                                          </button>
+                                        </PopoverTrigger>
+                                        <PopoverContent align="center" className="w-56 p-2">
+                                          <div className="space-y-1">
+                                            <button
+                                              onClick={() => setDayAvailability(member.id, dateStr, "rest")}
+                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-blue-500/10 transition-colors font-mono text-sm"
+                                            >
+                                              <span className="w-8 h-8 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center shrink-0">R</span>
+                                              <span className="font-semibold">Rest Day</span>
+                                            </button>
+                                            <button
+                                              onClick={() => setDayAvailability(member.id, dateStr, "holiday")}
+                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-purple-500/10 transition-colors font-mono text-sm"
+                                            >
+                                              <span className="w-8 h-8 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center shrink-0">H</span>
+                                              <span className="font-semibold">Holiday</span>
+                                            </button>
+                                            <button
+                                              onClick={() => setDayAvailability(member.id, dateStr, "sick")}
+                                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-red-500/10 transition-colors font-mono text-sm"
+                                            >
+                                              <span className="w-8 h-8 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center shrink-0">S</span>
+                                              <span className="font-semibold">Sick Leave</span>
+                                            </button>
+                                            {availType !== null && (
+                                              <>
+                                                <div className="border-t my-2"></div>
+                                                <button
+                                                  onClick={() => setDayAvailability(member.id, dateStr, "clear")}
+                                                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted transition-colors font-mono text-sm text-muted-foreground"
+                                                >
+                                                  <X className="h-5 w-5 shrink-0" />
+                                                  <span className="font-semibold">Clear (Working)</span>
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
                                     );
                                   })}
                                 </div>

@@ -6,16 +6,24 @@ interface TaskConfig {
   [task: string]: number[];
 }
 
-// Staff Query Hook with optional date range centered on a specific date
-export function useStaff(options?: { centerDate?: Date; weeksWindow?: number }) {
-  const centerDate = options?.centerDate || new Date();
-  const weeksWindow = options?.weeksWindow || 12; // Default 12 weeks for rota page
-  const loadAllData = weeksWindow >= 999; // If 999+, load everything
-  
+// Staff Query Hook
+export function useStaff() {
   return useQuery({
-    queryKey: ["staff", "v4", loadAllData ? "all" : centerDate.toISOString().split('T')[0], weeksWindow],
+    queryKey: ["staff", "v4"],
     queryFn: async () => {
       console.log("🔍 Starting staff query with v4 and date-range pagination...");
+      
+      // Calculate date range: 4 weeks back, 8 weeks forward (12 weeks total)
+      const today = new Date();
+      const startDate = new Date(today);
+      startDate.setDate(today.getDate() - (4 * 7)); // 4 weeks back
+      const endDate = new Date(today);
+      endDate.setDate(today.getDate() + (8 * 7)); // 8 weeks forward
+      
+      const startDateStr = startDate.toISOString().split('T')[0];
+      const endDateStr = endDate.toISOString().split('T')[0];
+      
+      console.log(`📅 Loading availability from ${startDateStr} to ${endDateStr} (12 weeks window)`);
       
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -37,44 +45,21 @@ export function useStaff(options?: { centerDate?: Date; weeksWindow?: number }) 
         return [];
       }
 
-      // Fetch availability - either ALL data or date-range filtered
-      console.log("📅 Fetching availability data...");
-      let availabilityQuery = supabase
+      // Fetch availability with date range filter
+      console.log("📅 Fetching availability data with date range...");
+      const { data: availabilityData, error: availError } = await supabase
         .from("availability")
         .select("*")
+        .gte('date', startDateStr)
+        .lte('date', endDateStr)
         .order('date', { ascending: true });
-
-      if (!loadAllData) {
-        // Calculate date range centered on the provided date
-        const today = centerDate;
-        const weeksBack = Math.floor(weeksWindow / 2);
-        const weeksForward = Math.ceil(weeksWindow / 2);
-        
-        const startDate = new Date(today);
-        startDate.setDate(today.getDate() - (weeksBack * 7));
-        const endDate = new Date(today);
-        endDate.setDate(today.getDate() + (weeksForward * 7));
-        
-        const startDateStr = startDate.toISOString().split('T')[0];
-        const endDateStr = endDate.toISOString().split('T')[0];
-        
-        console.log(`📅 Loading availability from ${startDateStr} to ${endDateStr} (${weeksWindow} weeks window, centered on ${centerDate.toISOString().split('T')[0]})`);
-        
-        availabilityQuery = availabilityQuery
-          .gte('date', startDateStr)
-          .lte('date', endDateStr);
-      } else {
-        console.log(`📅 Loading ALL availability data (no date restrictions)`);
-      }
-
-      const { data: availabilityData, error: availError } = await availabilityQuery;
 
       if (availError) {
         console.error("❌ Availability query error:", availError);
         throw availError;
       }
 
-      console.log(`✅ Fetched ${availabilityData?.length || 0} availability records${loadAllData ? ' (all data)' : ` (${weeksWindow}-week window)`}`);
+      console.log(`✅ Fetched ${availabilityData?.length || 0} availability records (12-week window)`);
 
       if (!availabilityData || availabilityData.length === 0) {
         console.warn("⚠️ No availability data in date range");
@@ -125,16 +110,25 @@ export function useTaskConfig() {
   return useQuery({
     queryKey: ["taskConfig"],
     queryFn: async () => {
+      console.log("🔍 Starting task config query...");
+      
       const { data, error } = await supabase
         .from("task_config")
         .select("*");
 
+      console.log("📊 Task config query result:", {
+        rowCount: data?.length || 0,
+        error: error?.message,
+        tasks: data?.map(d => d.task) || []
+      });
+
       if (error) {
-        console.error("Error fetching task config:", error);
+        console.error("❌ Task config query error:", error);
         throw error;
       }
 
       if (!data || data.length === 0) {
+        console.warn("⚠️ No task config data returned from database");
         return null;
       }
 
@@ -151,6 +145,7 @@ export function useTaskConfig() {
         ];
       });
 
+      console.log("✅ Task config mapped:", Object.keys(config));
       return config;
     },
     retry: 1,
