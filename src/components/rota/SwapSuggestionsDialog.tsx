@@ -2,17 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, Check } from "lucide-react";
-
-interface SwapSuggestion {
-  fromStaffId: string;
-  fromStaffName: string;
-  toStaffId: string;
-  toStaffName: string;
-  task: string;
-  date: string;
-  reason: string;
-  impact: number;
-}
+import type { SwapSuggestion } from "@/lib/swapSuggester";
 
 interface SwapSuggestionsDialogProps {
   open: boolean;
@@ -60,7 +50,7 @@ export function SwapSuggestionsDialog({
           {/* Individual Suggestions */}
           {suggestions.map((swap, idx) => (
             <div
-              key={`${swap.fromStaffId}-${swap.toStaffId}-${swap.task}-${swap.date}-${idx}`}
+              key={`${swap.id || idx}`}
               className="p-4 border rounded-lg bg-muted/30 space-y-3"
             >
               <div className="flex items-center justify-between">
@@ -90,7 +80,7 @@ export function SwapSuggestionsDialog({
 
               <div className="flex items-center justify-between">
                 <div className="text-xs font-mono text-muted-foreground">
-                  Impact: +{swap.impact.toFixed(1)}% fairness
+                  Impact: +{swap.improvement.toFixed(1)}% fairness
                 </div>
                 <Button
                   variant="outline"
