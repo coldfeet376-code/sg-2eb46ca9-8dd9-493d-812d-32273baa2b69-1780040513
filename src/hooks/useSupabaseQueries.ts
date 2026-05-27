@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { staffService } from "@/services/staffService";
 import type { StaffMember, Task, ShiftStart, ShiftPattern, AvailabilityType } from "@/types";
 
 interface TaskConfig {
@@ -10,8 +11,9 @@ interface TaskConfig {
 // Staff Query Hook - Emergency cache bypass
 export function useStaff() {
   return useQuery({
-    queryKey: ["staff"],
+    queryKey: ["staff", "full"],
     queryFn: async () => {
+      console.log("🔄 FETCHING STAFF DATA from Supabase...");
       // Fetch all staff
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -80,41 +82,14 @@ export function useStaff() {
         };
       });
 
+      console.log(`✅ LOADED ${mappedStaff.length} staff members`);
       return mappedStaff;
     },
-    staleTime: 1000 * 30, // 30 seconds cache
-  });
-}
-
-// Staff Query Hook - Full availability join
-export const useStaff = () => {
-  return useQuery({
-    queryKey: ["staff", "full"],
-    queryFn: async () => {
-      console.log("🔄 FETCHING STAFF DATA from Supabase...");
-      const staff = await staffService.getAllStaff();
-      
-      console.log(`✅ LOADED ${staff.length} staff members`);
-      
-      // Normalize availability data
-      const normalized = staff.map(s => ({
-        ...s,
-        availability: Array.isArray(s.availability) ? s.availability : [],
-      }));
-      
-      console.log("📊 Sample availability data:");
-      const brian = normalized.find(s => s.name.includes('BRIAN'));
-      const abbo = normalized.find(s => s.name.includes('ABBO'));
-      if (brian) console.log(`   BRIAN: ${brian.availability?.length || 0} entries`);
-      if (abbo) console.log(`   ABBO: ${abbo.availability?.length || 0} entries`);
-      
-      return normalized;
-    },
-    staleTime: 30000,
+    staleTime: 30000, // 30 seconds cache
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
-};
+}
 
 // Task Config Query Hook
 export function useTaskConfig() {
@@ -256,7 +231,10 @@ export function useAddAvailability() {
       type: string;
       notes?: string;
     }) => {
-      const { error } = await supabase.from("availability").insert(availability);
+      const { error } = await supabase.from("availability").upsert(
+        { ...availability },
+        { onConflict: 'staff_id,date' }
+      );
       if (error) throw error;
     },
     onSuccess: () => {
