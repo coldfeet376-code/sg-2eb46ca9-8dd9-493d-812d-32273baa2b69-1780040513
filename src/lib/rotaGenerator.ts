@@ -142,13 +142,24 @@ export function generateWeeklyRota({
         // Match EXACT date string format (YYYY-MM-DD)
         const availability = staffMember.availability?.find(a => a.date === dateStr);
         
-        if (availability && availability.type !== "available") {
-          log(`      ⛔ ${staffMember.name}: ${availability.type.toUpperCase()} on ${dateStr}`);
+        // Normalize availability type to handle case variations
+        let normalizedType: string | null = null;
+        if (availability) {
+          const rawType = availability.type.toString().toLowerCase().trim();
+          if (rawType.includes('rest')) normalizedType = 'rest';
+          else if (rawType.includes('holiday') || rawType.includes('hol')) normalizedType = 'holiday';
+          else if (rawType.includes('sick')) normalizedType = 'sick';
+          else if (rawType.includes('available') || rawType.includes('avail')) normalizedType = 'available';
+        }
+        
+        // Skip if staff has a rest day, holiday, or sick leave entry
+        if (normalizedType && ['rest', 'holiday', 'sick'].includes(normalizedType)) {
+          log(`      ⛔ ${staffMember.name}: ${normalizedType.toUpperCase()} on ${dateStr}`);
           continue;
         }
         
-        // If no availability record exists, assume AVAILABLE (default working)
-        log(`      ✓ ${staffMember.name}: Available`);
+        // If no availability record OR explicitly marked "available", they can work
+        log(`      ✓ ${staffMember.name}: ${normalizedType || 'working (no entry)'}`);
         availableStaff.push(staffMember);
       }
 
