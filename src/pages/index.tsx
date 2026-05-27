@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
 import { generateStaffRotaPDF } from "@/lib/pdfGenerator";
@@ -930,17 +930,6 @@ export default function IndexPage() {
     );
   };
 
-  const handleImplementAllSwaps = (suggestions: SwapSuggestion[]) => {
-    suggestions.forEach((suggestion) => {
-      handleSwapAssignment(suggestion);
-    });
-    setSwapDialogOpen(false);
-    toast({
-      title: "Swaps Implemented",
-      description: `Applied ${suggestions.length} optimization swaps`,
-    });
-  };
-
   const handleDebugWeek = () => {
     const weekStartStr = getLocalDateString(weekStart);
     const weekDates = [];
@@ -970,7 +959,7 @@ export default function IndexPage() {
       days: DAYS.map((day, idx) => ({
         day,
         date: weekDates[idx].date,
-        assignments: assignments.filter(a => a.task === task && a.dayIndex === idx)
+        assignments: assignments.filter(a => a.task === task && a.date === weekDates[idx].date)
       }))
     }));
 
@@ -1751,11 +1740,11 @@ export default function IndexPage() {
         )}
 
         <SwapSuggestionsDialog
-          open={swapDialogOpen}
-          onClose={() => setSwapDialogOpen(false)}
+          open={showSwapSuggestions}
+          onClose={() => setShowSwapSuggestions(false)}
           suggestions={swapSuggestions}
-          onApplySwap={handleSwapAssignment}
-          onImplementAll={handleImplementAllSwaps}
+          onApplySwap={(swap) => handleSwapApply(swap.fromStaffId, swap.toStaffId, swap.task, swap.date)}
+          onImplementAll={implementAllSwaps}
         />
 
         {/* Debug Panel Dialog */}
