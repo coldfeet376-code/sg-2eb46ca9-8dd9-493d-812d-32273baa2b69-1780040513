@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -72,9 +72,14 @@ export default function StaffPage() {
   const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
+  const [expandedStaff, setExpandedStaff] = useState<Set<string>>(new Set());
   const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
-  const [batchDate, setBatchDate] = useState<string>("");
+  const [batchDate, setBatchDate] = useState("");
   const [batchAvailability, setBatchAvailability] = useState<AvailabilityType>("rest");
+  const [openDayDropdown, setOpenDayDropdown] = useState<{ staffId: string; date: string } | null>(null);
+  const [loadingCell, setLoadingCell] = useState<{ staffId: string; date: string } | null>(null);
   
   const [editAvailabilityStaff, setEditAvailabilityStaff] = useState<{ id: string; name: string } | null>(null);
   const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
@@ -106,9 +111,6 @@ export default function StaffPage() {
   // Expanded staff IDs for collapsible sections
   const [expandedStaffIds, setExpandedStaffIds] = useState<Set<string>>(new Set());
   
-  // Dropdown state for day selection
-  const [openDayDropdown, setOpenDayDropdown] = useState<{ staffId: string; date: string } | null>(null);
-  
   // Loading state for specific cell being updated
   const [loadingCell, setLoadingCell] = useState<{ staffId: string; date: string } | null>(null);
   
@@ -118,8 +120,8 @@ export default function StaffPage() {
   // Consistent date string formatting
   const getLocalDateString = (date: Date): string => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
   };
 
@@ -182,7 +184,31 @@ export default function StaffPage() {
   }
 
   // Derived selected staff
-  const selectedStaff = staff.filter(s => selectedStaffIds.has(s.id));
+  const selectedStaff = staff.filter((s) => selectedStaffIds.has(s.id));
+
+  const stats = useMemo(() => {
+    const availability = staffMember.availability || [];
+    
+    // DEBUG: Log for first few staff
+    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
+      console.log(`📊 getAvailabilityStats: ${staffMember.name}`);
+      console.log(`   Raw availability array:`, availability);
+      console.log(`   Array length: ${availability.length}`);
+      console.log(`   Array is array? ${Array.isArray(availability)}`);
+    }
+    
+    const stats = {
+      rest: availability.filter((a) => a.type === "rest").length,
+      holiday: availability.filter((a) => a.type === "holiday").length,
+      sick: availability.filter((a) => a.type === "sick").length,
+    };
+    
+    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
+      console.log(`   Calculated stats:`, stats);
+    }
+    
+    return stats;
+  }, [staffMember]);
 
   // Get week dates (Saturday to Sunday)
   const getWeekDates = (weekStart: Date): Date[] => {
@@ -195,7 +221,16 @@ export default function StaffPage() {
     return dates;
   };
 
-  const weekDates = getWeekDates(currentWeekStart);
+  const weekDates = useMemo(() => {
+    const dates: Date[] = [];
+    const start = new Date(weekStart);
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  }, [weekStart]);
 
   const navigateWeek = (direction: "prev" | "next") => {
     const newStart = new Date(currentWeekStart);
@@ -394,135 +429,71 @@ export default function StaffPage() {
   };
 
   const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
-    setOpenDayDropdown(null);
     setLoadingCell({ staffId, date: dateStr });
-    
+    setOpenDayDropdown(null);
+
     try {
-      const staffMember = staff.find(s => s.id === staffId);
-      const staffName = staffMember?.name || "Staff";
-      
-      // Parse date for display
-      const [year, month, day] = dateStr.split('-').map(Number);
-      const dateObj = new Date(year, month - 1, day);
-      const dateDisplay = dateObj.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
-      
       if (type === "clear") {
-        await staffService.deleteAvailability(staffId, dateStr);
+        // Delete the availability entry
+        await deleteAvailabilityMutation.mutateAsync({ staffId, date: dateStr });
+        toast({ title: "Availability cleared", description: "Day marked as working" });
       } else {
-        await staffService.addAvailability(staffId, [{
+        // Upsert the availability entry
+        await createAvailabilityMutation.mutateAsync({
+          staff_id: staffId,
           date: dateStr,
-          type: type,
-          notes: `Set as ${type}`,
-        }]);
-      }
-      
-      // Immediate refresh
-      await queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "full"] });
-      setRenderKey(prev => prev + 1);
-      
-      // Success feedback
-      if (type === "clear") {
-        toast({
-          title: "✓ Cleared",
-          description: `${staffName} - ${dateDisplay} marked as WORKING`,
+          type,
         });
-      } else {
-        toast({
-          title: `✓ ${type.toUpperCase()}`,
-          description: `${staffName} - ${dateDisplay}`,
-        });
+        toast({ title: "Availability updated", description: `Day marked as ${type}` });
       }
-      
-    } catch (error) {
-      console.error("Error updating availability:", error);
-      toast({
-        title: "❌ Error",
-        description: error instanceof Error ? error.message : "Failed to save",
-        variant: "destructive",
+    } catch (error: any) {
+      toast({ 
+        title: "Error updating availability", 
+        description: error.message,
+        variant: "destructive" 
       });
     } finally {
       setLoadingCell(null);
     }
   };
 
-  const getAvailabilityForDate = (staffMember: StaffMember, date: Date): AvailabilityType | null => {
-    // Format date as YYYY-MM-DD
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const dateStr = `${year}-${month}-${day}`;
-    
-    // DEBUG: Log for first staff member only to avoid spam
-    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
-      console.log(`🔍 getAvailabilityForDate: ${staffMember.name} on ${dateStr}`);
-      console.log(`   Total availability entries: ${staffMember.availability?.length || 0}`);
-      if (staffMember.availability && staffMember.availability.length > 0) {
-        console.log(`   First 3 entries:`, staffMember.availability.slice(0, 3));
-        console.log(`   Looking for exact match: ${dateStr}`);
-      }
-    }
-    
-    const entry = staffMember.availability?.find(a => a.date === dateStr);
-    
-    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
-      console.log(`   Match found:`, entry || 'NONE');
-    }
-    
-    if (!entry) return null;
-    
-    // Normalize type
-    const type = entry.type.toString().toLowerCase().trim();
-    if (type.includes('rest')) return 'rest';
-    if (type.includes('holiday')) return 'holiday';
-    if (type.includes('sick')) return 'sick';
-    if (type.includes('available')) return 'available';
-    
-    return entry.type;
+  const getAvailabilityForDate = (member: StaffMember, date: Date): AvailabilityType | null => {
+    const dateStr = getLocalDateString(date);
+    const entry = member.availability?.find((a) => a.date === dateStr);
+    return entry ? entry.type : null;
   };
 
-  const getAvailabilityStats = (staffMember: StaffMember) => {
-    const availability = staffMember.availability || [];
+  const getDayColor = (availabilityType: AvailabilityType | null): string => {
+    if (!availabilityType) return "bg-background border-muted-foreground/20 text-foreground";
     
-    // DEBUG: Log for first few staff
-    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
-      console.log(`📊 getAvailabilityStats: ${staffMember.name}`);
-      console.log(`   Raw availability array:`, availability);
-      console.log(`   Array length: ${availability.length}`);
-      console.log(`   Array is array? ${Array.isArray(availability)}`);
-    }
-    
-    const stats = {
-      rest: availability.filter((a) => a.type === "rest").length,
-      holiday: availability.filter((a) => a.type === "holiday").length,
-      sick: availability.filter((a) => a.type === "sick").length,
-    };
-    
-    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
-      console.log(`   Calculated stats:`, stats);
-    }
-    
-    return stats;
-  };
-
-  const getDayColor = (type: AvailabilityType | null) => {
-    if (!type) return "bg-muted/40 hover:bg-muted/60 border-border text-muted-foreground";
-    switch (type) {
-      case "rest": return "bg-blue-500 hover:bg-blue-600 border-blue-600 text-white";
-      case "holiday": return "bg-purple-500 hover:bg-purple-600 border-purple-600 text-white";
-      case "sick": return "bg-red-500 hover:bg-red-600 border-red-600 text-white";
-      case "available": return "bg-green-500 hover:bg-green-600 border-green-600 text-white";
-      default: return "bg-muted/40 hover:bg-muted/60 border-border text-muted-foreground";
+    switch (availabilityType) {
+      case "rest":
+        return "bg-blue-500 border-blue-600 text-white";
+      case "holiday":
+        return "bg-purple-500 border-purple-600 text-white";
+      case "sick":
+        return "bg-red-500 border-red-600 text-white";
+      case "available":
+        return "bg-green-500 border-green-600 text-white";
+      default:
+        return "bg-background border-muted-foreground/20 text-foreground";
     }
   };
 
-  const getDayLabel = (type: AvailabilityType | null) => {
-    if (!type) return "—";
-    switch (type) {
-      case "rest": return "R";
-      case "holiday": return "H";
-      case "sick": return "S";
-      default: return "A";
+  const getDayLabel = (availabilityType: AvailabilityType | null): string => {
+    if (!availabilityType) return "—";
+    
+    switch (availabilityType) {
+      case "rest":
+        return "R";
+      case "holiday":
+        return "H";
+      case "sick":
+        return "S";
+      case "available":
+        return "A";
+      default:
+        return "—";
     }
   };
 
@@ -578,7 +549,7 @@ export default function StaffPage() {
     }
   };
 
-  const handleBatchAvailability = () => {
+  const handleBatchAvailability = async () => {
     if (!batchDate) {
       toast({ title: "Please select a date", variant: "destructive" });
       return;
