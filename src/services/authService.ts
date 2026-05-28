@@ -285,8 +285,7 @@ export const authService = {
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + 5); // 5 minute expiry
 
-    // @ts-ignore - Table will be created dynamically
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from("two_factor_codes")
       .upsert({
         email: email.toLowerCase(),
@@ -304,8 +303,7 @@ export const authService = {
    * Verify 2FA code
    */
   async verify2FACode(email: string, code: string): Promise<boolean> {
-    // @ts-ignore - Table will be created dynamically
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("two_factor_codes")
       .select("*")
       .eq("email", email.toLowerCase())
@@ -320,8 +318,7 @@ export const authService = {
     
     if (now > expiresAt) {
       // Code expired, delete it
-      // @ts-ignore
-      await supabase
+      await (supabase as any)
         .from("two_factor_codes")
         .delete()
         .eq("email", email.toLowerCase());
@@ -329,8 +326,7 @@ export const authService = {
     }
 
     // Code is valid, delete it (one-time use)
-    // @ts-ignore
-    await supabase
+    await (supabase as any)
       .from("two_factor_codes")
       .delete()
       .eq("email", email.toLowerCase());
