@@ -20,8 +20,12 @@ export default async function handler(
     }
 
     // Check if Resend API key is configured
-    if (!process.env.RESEND_API_KEY) {
-      console.error("RESEND_API_KEY not configured");
+    const apiKey = process.env.RESEND_API_KEY;
+    console.log("🔍 API Key present:", !!apiKey);
+    console.log("🔍 API Key starts with 're_':", apiKey?.startsWith("re_"));
+    
+    if (!apiKey) {
+      console.error("❌ RESEND_API_KEY not configured");
       return res.status(500).json({ 
         error: "Email service not configured"
       });
@@ -123,31 +127,39 @@ export default async function handler(
     `;
 
     // Send email via Resend
-    const { data, error } = await resend.emails.send({
-      from: "GIST Rota Security <onboarding@resend.dev>",
-      to: email,
-      subject: `Your verification code: ${code}`,
-      html: emailHtml,
-    });
-
-    if (error) {
-      console.error("Resend error:", error);
-      return res.status(500).json({ 
-        error: "Failed to send email",
-        details: error.message
+    console.log("📧 Attempting to send 2FA code to:", email);
+    
+    try {
+      const { data, error } = await resend.emails.send({
+        from: "GIST Rota Security <onboarding@resend.dev>",
+        to: email,
+        subject: `Your verification code: ${code}`,
+        html: emailHtml,
       });
+
+      if (error) {
+        console.error("❌ Resend API error:", JSON.stringify(error, null, 2));
+        return res.status(500).json({ 
+          error: "Failed to send email",
+          details: error.message || JSON.stringify(error)
+        });
+      }
+
+      console.log(`✅ 2FA code sent successfully to ${email} (ID: ${data?.id})`);
+
+      res.status(200).json({ 
+        success: true, 
+        message: "Verification code sent",
+        emailId: data?.id
+      });
+      
+    } catch (sendError) {
+      console.error("❌ Resend send exception:", sendError);
+      throw sendError;
     }
 
-    console.log(`✅ 2FA code sent to ${email} (ID: ${data?.id})`);
-
-    res.status(200).json({ 
-      success: true, 
-      message: "Verification code sent",
-      emailId: data?.id
-    });
-
   } catch (error) {
-    console.error("2FA email error:", error);
+    console.error("❌ 2FA email error:", error);
     res.status(500).json({ 
       error: "Failed to send verification code",
       details: error instanceof Error ? error.message : "Unknown error"
