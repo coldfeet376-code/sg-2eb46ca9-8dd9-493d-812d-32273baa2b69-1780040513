@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Download, TrendingUp, Users, Target, Calendar, BarChart3, PieChart, Activity } from "lucide-react";
 import type { StaffMember, Assignment } from "@/types";
 
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
 
 // Task weights for fairness calculation - matches fairnessCalculator.ts
 const TASK_WEIGHTS: Record<string, number> = {
@@ -23,6 +23,7 @@ const TASK_WEIGHTS: Record<string, number> = {
   "Outbound": 1.0,
   "Marshaling": 1.0,
   "Housekeeping": 1.0,
+  "Equipment": 1.0,
 };
 
 function getLocalDateString(date: Date): string {

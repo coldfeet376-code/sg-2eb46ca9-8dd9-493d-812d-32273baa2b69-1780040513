@@ -44,7 +44,7 @@ const OnboardingTour = dynamic(
 );
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping", "Equipment"];
 
 function getLocalDateString(date: Date): string {
   if (!date) return "";
@@ -1965,7 +1965,7 @@ export default function IndexPage() {
             <CardContent>
               {taskConfigData && (
                 <div className="space-y-6">
-                  {["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"].map((task) => (
+                  {["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping", "Equipment"].map((task) => (
                     <div key={task} className="space-y-2">
                       <h3 className="font-condensed font-semibold">{task}</h3>
                       <div className="grid grid-cols-7 gap-2">

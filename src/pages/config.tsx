@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, RefreshCw, CheckCircle, Save } from "lucide-react";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"];
 
 interface TaskConfig {
   [task: string]: number[];

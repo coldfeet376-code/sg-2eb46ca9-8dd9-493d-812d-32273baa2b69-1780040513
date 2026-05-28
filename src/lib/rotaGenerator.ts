@@ -14,6 +14,7 @@ const TASK_WEIGHTS: Record<Task, number> = {
   "Outbound": 1.0,
   "Marshaling": 1.0,
   "Housekeeping": 1.0,
+  "Equipment": 1.0,
 };
 
 // Centralized date handling - use local components only

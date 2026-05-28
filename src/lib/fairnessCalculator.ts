@@ -10,6 +10,7 @@ const TASK_WEIGHTS: Record<Task, number> = {
   "Outbound": 1.0,
   "Marshaling": 1.0,
   "Housekeeping": 1.0,
+  "Equipment": 1.0,
 };
 
 export function calculateFairnessMetrics(
@@ -45,6 +46,7 @@ export function calculateFairnessMetrics(
       "Outbound": 0,
       "Marshaling": 0,
       "Housekeeping": 0,
+      "Equipment": 0,
     };
 
     staffAssignments.forEach((a) => {

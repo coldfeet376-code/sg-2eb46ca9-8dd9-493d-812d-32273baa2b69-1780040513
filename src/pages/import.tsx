@@ -380,7 +380,7 @@ export default function ImportPage() {
             // Create new staff member
             const staffData = {
               name: staff.name,
-              trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"],
+              trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"],
               shift_start: staff.startTime,
               shift_pattern: "All",
             };
