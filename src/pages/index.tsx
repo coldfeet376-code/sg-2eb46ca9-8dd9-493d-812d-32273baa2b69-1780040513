@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
-import { generateStaffRotaPDF } from "@/lib/pdfGenerator";
+import { generateRotaPDF } from "@/lib/pdfGenerator";
 import { rotaService } from "@/services/rotaService";
 import { staffService } from "@/services/staffService";
 import { rotaRealtimeService, type StoredRota } from "@/services/rotaRealtimeService";
@@ -23,7 +23,7 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useStaff, useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
-import { Info, Calendar, Download, Eye, RefreshCw, Lock, Unlock, Shuffle, TrendingUp, Users, Target, Settings, HelpCircle, AlertCircle, Zap, History, RotateCcw, Printer, Bug, Sparkles, Wand2, ArrowRight, ArrowLeftRight } from "lucide-react";
+import { Info, Calendar, Download, Eye, RefreshCw, Lock, Unlock, Shuffle, TrendingUp, Users, Target, Settings, HelpCircle, AlertCircle, Zap, History, RotateCcw, Printer, Bug, Sparkles, Wand2, ArrowRight, ArrowLeftRight, FileDown } from "lucide-react";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { FairnessMeter } from "@/components/rota/FairnessMeter";
 import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
@@ -1226,13 +1226,17 @@ export default function IndexPage() {
                 </Button>
 
                 <Button
-                  onClick={exportWeekPDF}
-                  disabled={assignments.length === 0}
                   variant="outline"
                   className="gap-2 font-sans font-medium"
                   size="lg"
+                  onClick={() => {
+                    const weekEnd = new Date(weekStart);
+                    weekEnd.setDate(weekEnd.getDate() + 6);
+                    generateRotaPDF(assignments, weekStart, weekEnd);
+                  }}
+                  disabled={assignments.length === 0}
                 >
-                  <Download className="h-4 w-4" />
+                  <FileDown className="h-4 w-4" />
                   Export PDF
                 </Button>
               </div>

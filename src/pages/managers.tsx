@@ -15,7 +15,7 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import { generateManagerDutiesPDF } from "@/lib/pdfGenerator";
 import { ManagerDutiesPrintPreview } from "@/components/ManagerDutiesPrintPreview";
 import type { ManagerAssignment, ManagerDuty, ManagerShiftStart } from "@/types";
-import { Plus, Lock, Unlock, Download, Calendar, RefreshCw, X, Printer, Users, Zap, ChevronLeft, ChevronRight, Pencil, Trash2, AlertCircle } from "lucide-react";
+import { Plus, Lock, Unlock, Download, Calendar, RefreshCw, X, Printer, Users, Zap, ChevronLeft, ChevronRight, Pencil, Trash2, AlertCircle, FileDown } from "lucide-react";
 import { getAllManagers, createManager, updateManager, deleteManager, getManagersForDuty, type Manager, getManagerAvailability, setManagerAvailability, getAvailabilityForDate, type ManagerAvailability } from "@/services/managerService";
 import { ManagerForm } from "@/components/managers/ManagerForm";
 import { ManagerAvailabilityDialog } from "@/components/managers/ManagerAvailabilityDialog";
@@ -842,11 +842,11 @@ export default function Managers() {
                     onClick={exportPDF}
                     disabled={assignments.length === 0}
                     variant="outline"
-                    className="gap-2 font-sans font-medium"
+                    className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
                     size="lg"
                   >
-                    <Download className="h-4 w-4" />
-                    Export PDF
+                    <FileDown className="h-4 w-4" />
+                    Export Duties PDF
                   </Button>
                 </div>
               </>
