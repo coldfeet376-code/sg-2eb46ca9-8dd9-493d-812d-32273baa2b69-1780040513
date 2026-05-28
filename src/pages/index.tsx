@@ -1170,6 +1170,55 @@ export default function IndexPage() {
                 Lock All
               </Button>
 
+              <Button
+                onClick={() => setShowUnlockConfirm(true)}
+                disabled={lockedAssignments.length === 0}
+                variant="outline"
+                className="gap-2 font-sans font-medium"
+                size="lg"
+              >
+                <Unlock className="h-4 w-4" />
+                Unlock All
+              </Button>
+
+              <Button
+                onClick={async () => {
+                  setAssignments([]);
+                  setLockedAssignments([]);
+                  setFairnessMetrics(null);
+                  
+                  try {
+                    await rotaRealtimeService.saveRota(
+                      weekStart,
+                      [],
+                      null,
+                      0
+                    );
+                    
+                    await rotaRealtimeService.logAction(
+                      "cleared",
+                      "rota",
+                      getLocalDateString(weekStart),
+                      "Cleared all assignments"
+                    );
+                    
+                    toast({
+                      title: "✅ Rota Cleared",
+                      description: "All assignments removed",
+                    });
+                  } catch (error) {
+                    console.error("Error clearing rota:", error);
+                  }
+                }}
+                disabled={assignments.length === 0}
+                variant="outline"
+                className="gap-2 font-sans font-medium text-destructive hover:text-destructive"
+                size="lg"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Clear All
+              </Button>
+
               <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
                 <SheetTrigger asChild>
                   <Button
