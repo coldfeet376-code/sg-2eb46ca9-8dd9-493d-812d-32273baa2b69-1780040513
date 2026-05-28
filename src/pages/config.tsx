@@ -42,7 +42,7 @@ export default function ConfigPage() {
     try {
       // Load task requirements
       const { data: requirements } = await supabase
-        .from("task_requirements")
+        .from("task_config")
         .select("*");
 
       if (requirements) {
@@ -83,9 +83,9 @@ export default function ConfigPage() {
       }
 
       // Delete existing and insert new
-      await supabase.from("task_requirements").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      await supabase.from("task_config").delete().neq("id", "00000000-0000-0000-0000-000000000000");
       if (requirementsToSave.length > 0) {
-        await supabase.from("task_requirements").insert(requirementsToSave);
+        await supabase.from("task_config").insert(requirementsToSave);
       }
 
       toast({
