@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { Resend } from "resend";
+import { supabase } from "@/integrations/supabase/client";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -12,9 +13,9 @@ export default async function handler(
   }
 
   try {
-    const { email, inviteUrl, invitedByName } = req.body;
+    const { email, code, userName } = req.body;
 
-    if (!email || !inviteUrl) {
+    if (!email || !code) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -22,8 +23,7 @@ export default async function handler(
     if (!process.env.RESEND_API_KEY) {
       console.error("RESEND_API_KEY not configured");
       return res.status(500).json({ 
-        error: "Email service not configured",
-        details: "RESEND_API_KEY environment variable is missing"
+        error: "Email service not configured"
       });
     }
 
@@ -46,16 +46,14 @@ export default async function handler(
               border: 1px solid #e5e5e5;
               border-radius: 8px;
               padding: 40px;
-            }
-            .header {
               text-align: center;
-              margin-bottom: 30px;
             }
             .logo {
               font-size: 24px;
               font-weight: 700;
               color: #2d5c84;
               letter-spacing: -0.5px;
+              margin-bottom: 30px;
             }
             .title {
               font-size: 20px;
@@ -63,19 +61,26 @@ export default async function handler(
               margin: 20px 0;
               color: #1a1a1a;
             }
-            .content {
-              color: #4a4a4a;
-              margin: 20px 0;
+            .code-box {
+              background: #f5f5f5;
+              border: 2px dashed #2d5c84;
+              border-radius: 8px;
+              padding: 30px;
+              margin: 30px 0;
             }
-            .button {
-              display: inline-block;
-              background: #2d5c84;
-              color: #ffffff;
-              text-decoration: none;
-              padding: 14px 32px;
-              border-radius: 6px;
-              font-weight: 600;
-              margin: 24px 0;
+            .code {
+              font-size: 36px;
+              font-weight: 700;
+              color: #2d5c84;
+              letter-spacing: 8px;
+              font-family: 'Courier New', monospace;
+            }
+            .warning {
+              background: #fff4e5;
+              border-left: 4px solid #ff9800;
+              padding: 12px 16px;
+              margin: 20px 0;
+              text-align: left;
             }
             .footer {
               margin-top: 40px;
@@ -83,42 +88,34 @@ export default async function handler(
               border-top: 1px solid #e5e5e5;
               font-size: 12px;
               color: #999;
-              text-align: center;
-            }
-            .link {
-              color: #2d5c84;
-              word-break: break-all;
             }
           </style>
         </head>
         <body>
           <div class="container">
-            <div class="header">
-              <div class="logo">GIST WAREHOUSE ROTA</div>
+            <div class="logo">GIST WAREHOUSE ROTA</div>
+            
+            <div class="title">Your Login Verification Code</div>
+            
+            <p>Hi ${userName || "there"},</p>
+            
+            <p>Use this code to complete your login:</p>
+            
+            <div class="code-box">
+              <div class="code">${code}</div>
             </div>
             
-            <div class="title">You've been invited!</div>
-            
-            <div class="content">
-              <p>Hi there,</p>
-              
-              <p>${invitedByName || "Your manager"} has invited you to join the GIST Warehouse Rota System.</p>
-              
-              <p>Click the button below to create your account and get started:</p>
-              
-              <div style="text-align: center;">
-                <a href="${inviteUrl}" class="button">Accept Invitation</a>
-              </div>
-              
-              <p>Or copy and paste this link into your browser:</p>
-              <p class="link">${inviteUrl}</p>
-              
-              <p><strong>Note:</strong> This invitation link will expire in 7 days.</p>
+            <div class="warning">
+              <strong>⏱️ This code expires in 5 minutes</strong><br>
+              For security, don't share this code with anyone.
             </div>
+            
+            <p style="color: #666; font-size: 14px;">
+              If you didn't try to log in, please ignore this email or contact your administrator.
+            </p>
             
             <div class="footer">
-              <p>This is an automated message from GIST Warehouse Rota System.</p>
-              <p>If you didn't expect this email, you can safely ignore it.</p>
+              <p>This is an automated security message from GIST Warehouse Rota System.</p>
             </div>
           </div>
         </body>
@@ -127,9 +124,9 @@ export default async function handler(
 
     // Send email via Resend
     const { data, error } = await resend.emails.send({
-      from: "GIST Rota <onboarding@resend.dev>", // Will be customized once domain is verified
+      from: "GIST Rota Security <onboarding@resend.dev>",
       to: email,
-      subject: "You've been invited to GIST Warehouse Rota",
+      subject: `Your verification code: ${code}`,
       html: emailHtml,
     });
 
@@ -137,22 +134,22 @@ export default async function handler(
       console.error("Resend error:", error);
       return res.status(500).json({ 
         error: "Failed to send email",
-        details: error.message || "Unknown error from Resend"
+        details: error.message
       });
     }
 
-    console.log(`✅ Email sent successfully to ${email} (ID: ${data?.id})`);
+    console.log(`✅ 2FA code sent to ${email} (ID: ${data?.id})`);
 
     res.status(200).json({ 
       success: true, 
-      message: "Email sent successfully",
+      message: "Verification code sent",
       emailId: data?.id
     });
 
   } catch (error) {
-    console.error("Email send error:", error);
+    console.error("2FA email error:", error);
     res.status(500).json({ 
-      error: "Failed to send email",
+      error: "Failed to send verification code",
       details: error instanceof Error ? error.message : "Unknown error"
     });
   }
