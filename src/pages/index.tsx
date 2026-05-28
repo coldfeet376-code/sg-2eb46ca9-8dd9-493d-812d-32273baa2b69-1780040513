@@ -23,7 +23,7 @@ import { useNotifications } from "@/contexts/NotificationContext";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useStaff, useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
-import { Info, Calendar, Download, Eye, RefreshCw, Lock, Unlock, Shuffle, TrendingUp, Users, Target, Settings, HelpCircle, AlertCircle, Zap, History, RotateCcw, Printer, Bug, Sparkles, Wand2 } from "lucide-react";
+import { Info, Calendar, Download, Eye, RefreshCw, Lock, Unlock, Shuffle, TrendingUp, Users, Target, Settings, HelpCircle, AlertCircle, Zap, History, RotateCcw, Printer, Bug, Sparkles, Wand2, ArrowRight, ArrowLeftRight } from "lucide-react";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { FairnessMeter } from "@/components/rota/FairnessMeter";
 import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
@@ -35,6 +35,7 @@ import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
 import { RecentChangesPanel } from "@/components/RecentChangesPanel";
 import { useTour } from "@/contexts/TourContext";
 import { useQueryClient } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -114,6 +115,10 @@ export default function IndexPage() {
     task: Task | null;
     date: string;
   }>({ open: false, task: null, date: "" });
+  const [manualSwapDialog, setManualSwapDialog] = useState<{
+    open: boolean;
+    assignment: Assignment | null;
+  }>({ open: false, assignment: null });
 
   // React Query hooks - cached data with error handling
   const { data: staff = [], isLoading: staffLoading, error: staffError } = useStaff();
@@ -846,65 +851,65 @@ export default function IndexPage() {
     }
   };
 
-  const handleSwapApply = async (fromStaffId: string, toStaffId: string, task: string, date: string) => {
-    // Find the assignment to swap from
-    const assignmentIndex = assignments.findIndex(
-      a => a.staffId === fromStaffId && a.task === task && a.date === date
+  const handleSwapApply = (fromStaffId: string, toStaffId: string, task: Task, date: string) => {
+    const updatedAssignments = assignments.map((a) =>
+      a.staffId === fromStaffId && a.task === task && a.date === date
+        ? { ...a, staffId: toStaffId, staffName: staff.find(s => s.id === toStaffId)?.name || "" }
+        : a
     );
 
-    if (assignmentIndex === -1) {
-      toast({
-        title: "⚠️ Swap Failed",
-        description: "Assignment not found",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Find the staff member to swap to
-    const toStaff = staff.find(s => s.id === toStaffId);
-    if (!toStaff) {
-      toast({
-        title: "⚠️ Swap Failed",
-        description: "Staff member not found",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Create new assignments array with the swap
-    const newAssignments = [...assignments];
-    newAssignments[assignmentIndex] = {
-      ...newAssignments[assignmentIndex],
-      staffId: toStaffId,
-      staffName: toStaff.name
-    };
-
-    setAssignments(newAssignments);
-
-    // Also update locked assignments if this was locked
-    const wasLocked = isAssignmentLocked(task, weekDates.findIndex(d => d.toISOString().split("T")[0] === date), assignments[assignmentIndex].staffName);
-    if (wasLocked) {
-      const newLocked = lockedAssignments.map(la => {
-        if (la.staffId === fromStaffId && la.task === task && la.date === date) {
-          return { ...la, staffId: toStaffId, staffName: toStaff.name };
-        }
-        return la;
-      });
-      setLockedAssignments(newLocked);
-    }
-
-    await rotaRealtimeService.logAction(
-      "swapped",
-      "assignment",
-      `${date}-${task}`,
-      `Swapped ${assignments[assignmentIndex].staffName} → ${toStaff.name} for ${task}`
+    const updatedLocked = lockedAssignments.map((a) =>
+      a.staffId === fromStaffId && a.task === task && a.date === date
+        ? { ...a, staffId: toStaffId, staffName: staff.find(s => s.id === toStaffId)?.name || "" }
+        : a
     );
 
-    toast({
-      title: "✅ Swap Applied",
-      description: `${assignments[assignmentIndex].staffName} → ${toStaff.name} for ${task}`,
-    });
+    const newMetrics = calculateFairnessMetrics(updatedAssignments, staff);
+    
+    setAssignments(updatedAssignments);
+    setLockedAssignments(updatedLocked);
+    setFairnessMetrics(newMetrics);
+
+    toast({ title: "✅ Swap Applied", description: `Assignment updated successfully` });
+  };
+
+  const handleManualSwap = async (newStaffId: string) => {
+    if (!manualSwapDialog.assignment) return;
+
+    const { assignment } = manualSwapDialog;
+    const newStaff = staff.find(s => s.id === newStaffId);
+    if (!newStaff) return;
+
+    handleSwapApply(assignment.staffId, newStaffId, assignment.task, assignment.date);
+
+    // Save immediately
+    const updatedAssignments = assignments.map((a) =>
+      a.staffId === assignment.staffId && a.task === assignment.task && a.date === assignment.date
+        ? { ...a, staffId: newStaffId, staffName: newStaff.name }
+        : a
+    );
+
+    const newMetrics = calculateFairnessMetrics(updatedAssignments, staff);
+
+    try {
+      await rotaRealtimeService.saveRota(
+        weekStart,
+        updatedAssignments,
+        newMetrics,
+        lockedAssignments.length
+      );
+
+      await rotaRealtimeService.logAction(
+        "updated",
+        "assignment",
+        `${assignment.date}-${assignment.task}`,
+        `Manual swap: ${assignment.staffName} → ${newStaff.name}`
+      );
+    } catch (error) {
+      console.error("Error saving swap:", error);
+    }
+
+    setManualSwapDialog({ open: false, assignment: null });
   };
 
   const getTaskColor = (task: string): string => {
@@ -1685,37 +1690,125 @@ export default function IndexPage() {
         {/* Recent Changes Panel */}
         <RecentChangesPanel />
         
-        {smartAssignDialog.task && (
-          <SmartAssignmentDialog
-            open={smartAssignDialog.open}
-            onClose={() => setSmartAssignDialog({ open: false, task: null, date: "" })}
-            task={smartAssignDialog.task}
-            date={smartAssignDialog.date}
-            staff={staff}
-            assignments={assignments}
-            onAssign={async (staffId) => {
-              const staffMember = staff.find(s => s.id === staffId);
-              if (!staffMember) return;
-              
-              const newAssignment = {
-                staffId: staffMember.id,
-                staffName: staffMember.name,
-                task: smartAssignDialog.task!,
-                date: smartAssignDialog.date
-              };
-              
-              setAssignments([...assignments, newAssignment]);
-              setSmartAssignDialog({ open: false, task: null, date: "" });
-              
-              await rotaRealtimeService.logAction(
-                "assigned",
-                "assignment",
-                `${smartAssignDialog.date}-${smartAssignDialog.task}`,
-                `Smart assigned ${staffMember.name} to ${smartAssignDialog.task}`
-              );
-            }}
-          />
-        )}
+        {/* Manual Swap Dialog */}
+        <Dialog open={manualSwapDialog.open} onOpenChange={(open) => setManualSwapDialog({ open, assignment: null })}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="font-condensed text-2xl">Manual Swap Assignment</DialogTitle>
+              <DialogDescription className="font-mono text-xs">
+                {manualSwapDialog.assignment && (
+                  <>
+                    {manualSwapDialog.assignment.task} on {new Date(manualSwapDialog.assignment.date).toLocaleDateString("en-GB", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            {manualSwapDialog.assignment && (
+              <div className="space-y-4 py-4">
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="text-sm font-mono">
+                    <span className="text-muted-foreground">Current: </span>
+                    <span className="font-bold">{manualSwapDialog.assignment.staffName}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-sm font-medium font-mono">Select replacement staff:</div>
+                  <div className="grid gap-2 max-h-[400px] overflow-y-auto">
+                    {staff
+                      .filter(s => {
+                        // Must be trained for this task
+                        if (!s.trainedTasks.includes(manualSwapDialog.assignment!.task as Task)) return false;
+                        
+                        // Can't swap to same person
+                        if (s.id === manualSwapDialog.assignment!.staffId) return false;
+                        
+                        // Check if already assigned to another task on same day
+                        const alreadyAssignedToday = assignments.some(
+                          a => a.date === manualSwapDialog.assignment!.date && a.staffId === s.id
+                        );
+                        if (alreadyAssignedToday) return false;
+
+                        // Check availability
+                        const dateStr = manualSwapDialog.assignment!.date;
+                        const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest');
+                        const hasHoliday = s.availability?.some(a => a.date === dateStr && a.type === 'holiday');
+                        const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'sick');
+                        
+                        return !hasRestDay && !hasHoliday && !hasSickLeave;
+                      })
+                      .sort((a, b) => {
+                        // Sort by fewest assignments this week
+                        const aCount = assignments.filter(asn => asn.staffId === a.id).length;
+                        const bCount = assignments.filter(asn => asn.staffId === b.id).length;
+                        return aCount - bCount;
+                      })
+                      .map(s => {
+                        const weekAssignments = assignments.filter(a => a.staffId === s.id).length;
+                        const taskAssignments = assignments.filter(
+                          a => a.staffId === s.id && a.task === manualSwapDialog.assignment!.task
+                        ).length;
+
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => handleManualSwap(s.id)}
+                            className="p-3 border rounded-lg hover:bg-muted transition-colors text-left"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <div className="font-mono font-semibold">{s.name}</div>
+                                <div className="text-xs text-muted-foreground font-mono mt-1">
+                                  Week: {weekAssignments} total • {taskAssignments}x {manualSwapDialog.assignment!.task}
+                                </div>
+                              </div>
+                              <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Smart Assignment Dialog */}
+        <SmartAssignmentDialog
+          open={smartAssignDialog.open}
+          onClose={() => setSmartAssignDialog({ open: false, task: null, date: "" })}
+          task={smartAssignDialog.task}
+          date={smartAssignDialog.date}
+          staff={staff}
+          assignments={assignments}
+          onAssign={async (staffId) => {
+            const staffMember = staff.find(s => s.id === staffId);
+            if (!staffMember) return;
+            
+            const newAssignment = {
+              staffId: staffMember.id,
+              staffName: staffMember.name,
+              task: smartAssignDialog.task!,
+              date: smartAssignDialog.date
+            };
+            
+            setAssignments([...assignments, newAssignment]);
+            setSmartAssignDialog({ open: false, task: null, date: "" });
+            
+            await rotaRealtimeService.logAction(
+              "assigned",
+              "assignment",
+              `${smartAssignDialog.date}-${smartAssignDialog.task}`,
+              `Smart assigned ${staffMember.name} to ${smartAssignDialog.task}`
+            );
+          }}
+        />
 
         <SwapSuggestionsDialog
           open={showSwapSuggestions}

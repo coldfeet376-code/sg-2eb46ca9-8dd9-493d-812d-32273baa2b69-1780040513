@@ -111,6 +111,15 @@ export function generateWeeklyRota({
           return false;
         }
 
+        // NEW: Check if already assigned to ANY task on this date
+        const alreadyAssignedToday = assignments.some(
+          a => a.date === dateStr && a.staffId === s.id
+        );
+        if (alreadyAssignedToday) {
+          log(`   ❌ ${s.name} - already assigned to another task today`);
+          return false;
+        }
+
         // Check availability for this specific date
         const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest');
         const hasHoliday = s.availability?.some(a => a.date === dateStr && a.type === 'holiday');
