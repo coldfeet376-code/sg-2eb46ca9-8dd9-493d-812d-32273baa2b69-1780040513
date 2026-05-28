@@ -64,9 +64,17 @@ export const generateRotaPDF = (
     dates.forEach((date) => {
       const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
       const dayAssignments = assignmentsByDate.get(dateStr) || [];
-      const taskAssignment = dayAssignments.find(a => a.task === task);
       
-      row.push(taskAssignment ? taskAssignment.staffName : "-");
+      // Get ALL assignments for this task on this day (not just first one)
+      const taskAssignments = dayAssignments.filter(a => a.task === task);
+      
+      if (taskAssignments.length === 0) {
+        row.push("-");
+      } else {
+        // Join multiple staff names with line breaks for readability
+        const staffNames = taskAssignments.map(a => a.staffName).join("\n");
+        row.push(staffNames);
+      }
     });
     
     tableData.push(row);
@@ -175,9 +183,17 @@ export const generateManagerDutiesPDF = (
     dates.forEach((date) => {
       const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
       const dayDuties = duties.filter(d => d.date === dateStr);
-      const dutyAssignment = dayDuties.find(d => d.duty === duty);
       
-      row.push(dutyAssignment ? dutyAssignment.managerName : "-");
+      // Get ALL assignments for this duty on this day
+      const dutyAssignments = dayDuties.filter(d => d.duty === duty);
+      
+      if (dutyAssignments.length === 0) {
+        row.push("-");
+      } else {
+        // Join multiple manager names with line breaks
+        const managerNames = dutyAssignments.map(d => d.managerName).join("\n");
+        row.push(managerNames);
+      }
     });
     
     tableData.push(row);
