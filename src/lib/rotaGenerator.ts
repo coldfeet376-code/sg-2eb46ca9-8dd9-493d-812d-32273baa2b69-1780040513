@@ -4,6 +4,18 @@ interface TaskConfig {
   [task: string]: number[]; // 7 numbers for Sun-Sat
 }
 
+// Task weights for fairness - Inbound Late is half a shift
+const TASK_WEIGHTS: Record<Task, number> = {
+  "Frozen": 1.0,
+  "Milk": 1.0,
+  "TWI": 1.0,
+  "Inbound": 1.0,
+  "Inbound Late": 0.5, // Half-day shift
+  "Outbound": 1.0,
+  "Marshaling": 1.0,
+  "Housekeeping": 1.0,
+};
+
 // Centralized date handling - use local components only
 function getLocalDateString(date: Date): string {
   const year = date.getFullYear();
@@ -52,23 +64,24 @@ export function generateWeeklyRota({
 
   const assignments: Assignment[] = [...lockedAssignments];
   
-  // Track how many times each person has been assigned
-  const assignmentCounts: Record<string, number> = {};
+  // Track weighted assignment counts (Inbound Late = 0.5, others = 1.0)
+  const assignmentCounts: Record<string, number> = {}; // Raw counts for display
+  const weightedCounts: Record<string, number> = {}; // Weighted for fairness
   const taskCounts: Record<string, Record<Task, number>> = {};
   const lastTaskAssigned: Record<string, Task | null> = {};
-  const inboundCounts: Record<string, number> = {}; // NEW: Track inbound assignments per person
+  const inboundCounts: Record<string, number> = {};
 
   // Initialize tracking
   staff.forEach((s) => {
     assignmentCounts[s.id] = 0;
+    weightedCounts[s.id] = 0;
     taskCounts[s.id] = {} as Record<Task, number>;
     lastTaskAssigned[s.id] = null;
-    inboundCounts[s.id] = 0; // NEW: Initialize inbound counter
+    inboundCounts[s.id] = 0;
   });
 
   // Generate assignments for each day (Sun-Sat)
   for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-    // Create date using local time - NO timezone conversion
     const currentDate = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
     const dateStr = getLocalDateString(currentDate);
     const dayName = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][currentDate.getDay()];
@@ -78,7 +91,6 @@ export function generateWeeklyRota({
     log(`${"=".repeat(60)}`);
 
     // Process each task for this day
-    // taskConfig[task][dayIndex] maps correctly: [0]=Sunday, [1]=Monday, ..., [6]=Saturday
     for (const taskName of Object.keys(taskConfig)) {
       const task = taskName as Task;
       const required = taskConfig[task][dayOffset];
@@ -111,7 +123,7 @@ export function generateWeeklyRota({
           return false;
         }
 
-        // NEW: Check if already assigned to ANY task on this date
+        // Check if already assigned to ANY task on this date
         const alreadyAssignedToday = assignments.some(
           a => a.date === dateStr && a.staffId === s.id
         );
@@ -124,8 +136,6 @@ export function generateWeeklyRota({
         const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest');
         const hasHoliday = s.availability?.some(a => a.date === dateStr && a.type === 'holiday');
         const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'sick');
-        
-        // NEW: Check recurring rest days
         const isRecurringRestDay = s.restDays?.includes(currentDate.getDay());
         
         // DEBUG: Log Brian Murray's availability check
@@ -148,12 +158,11 @@ export function generateWeeklyRota({
           return false;
         }
 
-        // NEW: Inbound constraint for part-time staff
+        // Inbound constraint for part-time staff
         if (task === "Inbound") {
           const totalShiftsThisWeek = assignmentCounts[s.id];
           const inboundShiftsThisWeek = inboundCounts[s.id];
           
-          // If staff member is working ≤3 shifts and already has 1 inbound, skip them
           if (totalShiftsThisWeek <= 3 && inboundShiftsThisWeek >= 1) {
             log(`   ⚠️ ${s.name} - inbound constraint (part-time with ${inboundShiftsThisWeek} inbound already)`);
             return false;
@@ -170,15 +179,17 @@ export function generateWeeklyRota({
         continue;
       }
 
-      // Sort by fairness: fewest times doing THIS task, then fewest overall
+      // Sort by WEIGHTED fairness: fewest weighted shifts, then fewest of THIS task
       availableStaff.sort((a, b) => {
+        // Primary: lowest weighted total gets priority
+        const aWeighted = weightedCounts[a.id] || 0;
+        const bWeighted = weightedCounts[b.id] || 0;
+        if (aWeighted !== bWeighted) return aWeighted - bWeighted;
+        
+        // Secondary: fewest times doing THIS specific task
         const aTaskCount = (taskCounts[a.id] && taskCounts[a.id][task]) || 0;
         const bTaskCount = (taskCounts[b.id] && taskCounts[b.id][task]) || 0;
-        if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
-        
-        const aTotal = assignmentCounts[a.id] || 0;
-        const bTotal = assignmentCounts[b.id] || 0;
-        return aTotal - bTotal;
+        return aTaskCount - bTaskCount;
       });
 
       // Assign staff
@@ -190,18 +201,24 @@ export function generateWeeklyRota({
         
         // Create assignment
         const assignment: Assignment = {
-          date: dateStr, // Already in YYYY-MM-DD format from getLocalDateString
+          date: dateStr,
           task,
           staffId: staffMember.id,
           staffName: staffMember.name,
         };
         assignments.push(assignment);
 
+        // Update counts
         assignmentCounts[staffMember.id]++;
+        
+        // Update WEIGHTED count
+        const taskWeight = TASK_WEIGHTS[task] || 1.0;
+        weightedCounts[staffMember.id] = (weightedCounts[staffMember.id] || 0) + taskWeight;
+        
         taskCounts[staffMember.id] = taskCounts[staffMember.id] || ({} as Record<Task, number>);
         taskCounts[staffMember.id][task] = (taskCounts[staffMember.id][task] || 0) + 1;
         
-        // NEW: Track inbound assignments
+        // Track inbound assignments
         if (task === "Inbound") {
           inboundCounts[staffMember.id]++;
           log(`      📊 Inbound count for ${staffMember.name}: ${inboundCounts[staffMember.id]}`);
@@ -209,7 +226,8 @@ export function generateWeeklyRota({
 
         const taskCount = taskCounts[staffMember.id][task];
         const totalCount = assignmentCounts[staffMember.id];
-        log(`      ✅ ${staffMember.name} → ${task} (${taskCount}x this task, ${totalCount} total)`);
+        const weightedTotal = weightedCounts[staffMember.id].toFixed(1);
+        log(`      ✅ ${staffMember.name} → ${task} (${taskCount}x this task, ${totalCount} raw, ${weightedTotal} weighted)`);
       }
 
       if (toAssign < needed) {
@@ -223,11 +241,12 @@ export function generateWeeklyRota({
   log("=".repeat(60));
   staff.forEach(s => {
     const count = assignmentCounts[s.id] || 0;
+    const weighted = (weightedCounts[s.id] || 0).toFixed(1);
     const tasks = Object.entries(taskCounts[s.id] || {})
       .filter(([_, count]) => count > 0)
       .map(([task, count]) => `${task}:${count}`)
       .join(", ");
-    log(`   ${s.name}: ${count} assignments ${tasks ? `(${tasks})` : ''}`);
+    log(`   ${s.name}: ${count} raw / ${weighted} weighted ${tasks ? `(${tasks})` : ''}`);
   });
 
   const unassigned = staff.filter(s => (assignmentCounts[s.id] || 0) === 0);
