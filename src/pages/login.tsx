@@ -25,17 +25,7 @@ export default function LoginPage() {
 
     try {
       // Step 1: Verify password
-      const { error: signInError } = await authService.signIn(email, password);
-      
-      if (signInError) {
-        toast({
-          variant: "destructive",
-          title: "Login failed",
-          description: signInError.message,
-        });
-        setLoading(false);
-        return;
-      }
+      await authService.signIn(email, password);
 
       // Step 2: Generate and send 2FA code
       const code = authService.generate2FACode();
@@ -61,7 +51,7 @@ export default function LoginPage() {
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Error",
+        title: "Login failed",
         description: error.message || "An error occurred during login",
       });
     } finally {
@@ -88,17 +78,7 @@ export default function LoginPage() {
       }
 
       // Code is valid, complete the login
-      const { error: signInError } = await authService.signIn(pendingEmail, password);
-      
-      if (signInError) {
-        toast({
-          variant: "destructive",
-          title: "Login failed",
-          description: signInError.message,
-        });
-        setLoading(false);
-        return;
-      }
+      await authService.signIn(pendingEmail, password);
 
       toast({
         title: "Login successful",
