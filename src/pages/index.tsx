@@ -185,14 +185,20 @@ export default function IndexPage() {
           if (rota.fairness_metrics) {
             setFairnessMetrics(rota.fairness_metrics as any);
           }
+          // Restore locked assignments - all assignments are auto-locked after generation
+          if (rota.assignments && rota.assignments.length > 0) {
+            setLockedAssignments(rota.assignments);
+          }
         } else {
           setAssignments([]);
           setFairnessMetrics(null);
+          setLockedAssignments([]);
         }
       } catch (error) {
         console.error("Error loading rota:", error);
         setAssignments([]);
         setFairnessMetrics(null);
+        setLockedAssignments([]);
       }
     };
 
@@ -209,6 +215,10 @@ export default function IndexPage() {
           setAssignments(payload.new.assignments);
           if (payload.new.fairness_metrics) {
             setFairnessMetrics(payload.new.fairness_metrics as any);
+          }
+          // Restore locked state on real-time updates
+          if (payload.new.assignments && payload.new.assignments.length > 0) {
+            setLockedAssignments(payload.new.assignments);
           }
           
           addNotification({
@@ -417,10 +427,28 @@ export default function IndexPage() {
     setWeekStart(new Date(snapshot.weekStart));
     setHistoryOpen(false);
     
-    addNotification({
-      staffName: "System",
-      message: `Restored rota from ${new Date(snapshot.timestamp).toLocaleString()}`,
-      type: "info",
+    // Save to Supabase immediately
+    const weekStartDate = new Date(snapshot.weekStart);
+    const metrics = calculateFairnessMetrics(snapshot.assignments, staff);
+    
+    rotaRealtimeService.saveRota(
+      weekStartDate,
+      snapshot.assignments,
+      metrics,
+      snapshot.lockedAssignments.length
+    ).then(() => {
+      addNotification({
+        staffName: "System",
+        message: `Restored rota from ${new Date(snapshot.timestamp).toLocaleString()}`,
+        type: "info",
+      });
+    }).catch(error => {
+      console.error("Error saving restored rota:", error);
+      toast({
+        title: "⚠️ Restore Warning",
+        description: "Rota restored locally but failed to save to database",
+        variant: "destructive",
+      });
     });
   };
 
@@ -498,7 +526,20 @@ export default function IndexPage() {
         `Locked ${staffName} for ${task} on ${DAYS[dayIndex]}`
       );
     }
+    
     setLockedAssignments(newLocked);
+    
+    // Save to Supabase immediately
+    try {
+      await rotaRealtimeService.saveRota(
+        weekStart,
+        assignments,
+        fairnessMetrics,
+        newLocked.length
+      );
+    } catch (error) {
+      console.error("Error saving lock state:", error);
+    }
   };
 
   const isAssignmentLocked = (task: string, dayIndex: number, staffName: string) => {
@@ -509,24 +550,51 @@ export default function IndexPage() {
   };
 
   const lockAll = async () => {
-    setLockedAssignments([...assignments]);
-    await rotaRealtimeService.logAction(
-      "locked",
-      "rota",
-      getLocalDateString(weekStart),
-      "Locked all assignments"
-    );
+    const newLocked = [...assignments];
+    setLockedAssignments(newLocked);
+    
+    // Save to Supabase immediately
+    try {
+      await rotaRealtimeService.saveRota(
+        weekStart,
+        assignments,
+        fairnessMetrics,
+        newLocked.length
+      );
+      
+      await rotaRealtimeService.logAction(
+        "locked",
+        "rota",
+        getLocalDateString(weekStart),
+        "Locked all assignments"
+      );
+    } catch (error) {
+      console.error("Error saving lock all:", error);
+    }
   };
 
   const unlockAll = async () => {
     setLockedAssignments([]);
-    await rotaRealtimeService.logAction(
-      "unlocked_all",
-      "rota",
-      getLocalDateString(weekStart),
-      "Unlocked all assignments"
-    );
     setShowUnlockConfirm(false);
+    
+    // Save to Supabase immediately
+    try {
+      await rotaRealtimeService.saveRota(
+        weekStart,
+        assignments,
+        fairnessMetrics,
+        0
+      );
+      
+      await rotaRealtimeService.logAction(
+        "unlocked_all",
+        "rota",
+        getLocalDateString(weekStart),
+        "Unlocked all assignments"
+      );
+    } catch (error) {
+      console.error("Error saving unlock all:", error);
+    }
   };
 
   const exportPDF = () => {
