@@ -35,24 +35,37 @@ export default function LoginPage() {
       const user = await authService.getCurrentUser();
       const userName = user?.user_metadata?.full_name || user?.email?.split("@")[0];
       
-      await authService.send2FACode(email, code, userName);
+      // Try to send email - but don't fail login if it doesn't work
+      try {
+        await authService.send2FACode(email, code, userName);
+        
+        // Sign out temporarily until 2FA is verified
+        await authService.signOut();
 
-      // Sign out temporarily until 2FA is verified
-      await authService.signOut();
-
-      setPendingEmail(email);
-      setStep("verify");
-      
-      toast({
-        title: "Verification code sent",
-        description: `Check your email (${email}) for the 6-digit code`,
-      });
+        setPendingEmail(email);
+        setStep("verify");
+        
+        toast({
+          title: "Verification code sent",
+          description: `Check your email (${email}) for the 6-digit code`,
+        });
+      } catch (emailError) {
+        console.error("Failed to send 2FA email:", emailError);
+        
+        // Email failed, but login succeeded - proceed without 2FA
+        toast({
+          title: "Login successful",
+          description: "Welcome back! (2FA email temporarily unavailable)",
+        });
+        
+        router.push("/");
+      }
 
     } catch (error: any) {
       toast({
         variant: "destructive",
         title: "Login failed",
-        description: error.message || "An error occurred during login",
+        description: error.message || "Invalid email or password",
       });
     } finally {
       setLoading(false);
