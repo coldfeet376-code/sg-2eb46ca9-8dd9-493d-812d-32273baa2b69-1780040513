@@ -789,9 +789,11 @@ export default function IndexPage() {
     
     let requiredTotal = 0;
     TASKS.forEach(task => {
-      taskConfig[task].forEach((count: number) => {
-        requiredTotal += count;
-      });
+      if (taskConfig[task]) {
+        taskConfig[task].forEach((count: number) => {
+          requiredTotal += count;
+        });
+      }
     });
     
     if (requiredTotal === 0) return 100;
