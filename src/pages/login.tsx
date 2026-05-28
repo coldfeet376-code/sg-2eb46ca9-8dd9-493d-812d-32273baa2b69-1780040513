@@ -46,6 +46,9 @@ export default function LoginPage() {
           <CardDescription>
             Sign in to access the GIST Warehouse Rota System
           </CardDescription>
+          <div className="text-xs text-muted-foreground pt-2">
+            v2.0-simplified (no 2FA)
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
