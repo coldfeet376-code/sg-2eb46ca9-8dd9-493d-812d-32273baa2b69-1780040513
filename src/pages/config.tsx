@@ -1,185 +1,238 @@
-import { useState, useEffect, useMemo } from "react";
-import { Layout } from "@/components/Layout";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Alert } from "@/components/ui/alert";
-import { SEO } from "@/components/SEO";
-import { useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle, RefreshCw, CheckCircle, Save } from "lucide-react";
-
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"];
-
-interface TaskConfig {
-  [task: string]: number[];
-}
+import { Settings, Save } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function ConfigPage() {
+  const router = useRouter();
   const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  // React Query hooks - cached data
-  const { data: taskConfig, isLoading, error } = useTaskConfig();
-  const updateConfigMutation = useUpdateTaskConfig();
-  
-  // Local editable state
-  const [editableConfig, setEditableConfig] = useState<TaskConfig>({
-    Frozen: [0, 0, 0, 0, 0, 0, 0],
-    Milk: [0, 0, 0, 0, 0, 0, 0],
-    TWI: [0, 0, 0, 0, 0, 0, 0],
-    Inbound: [0, 0, 0, 0, 0, 0, 0],
-    Outbound: [0, 0, 0, 0, 0, 0, 0],
-    Marshaling: [0, 0, 0, 0, 0, 0, 0],
+  // Task requirements
+  const [taskRequirements, setTaskRequirements] = useState<Record<string, Record<string, number>>>({});
+
+  // Shift settings
+  const [shiftSettings, setShiftSettings] = useState({
+    startTime: "06:00",
+    endTime: "14:00",
+    breakDuration: 30,
   });
 
-  // Sync taskConfig from React Query to local editable state
   useEffect(() => {
-    if (taskConfig) {
-      setEditableConfig(taskConfig);
+    checkAuth();
+    loadConfig();
+  }, []);
+
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      router.push("/login");
     }
-  }, [taskConfig]);
-
-  const handleConfigChange = (task: string, dayIndex: number, value: string) => {
-    const newConfig = { ...editableConfig };
-    newConfig[task] = [...(newConfig[task] || [0, 0, 0, 0, 0, 0, 0])];
-    newConfig[task][dayIndex] = parseInt(value) || 0;
-    setEditableConfig(newConfig);
   };
 
-  const handleSaveConfig = async () => {
-    updateConfigMutation.mutate(editableConfig, {
-      onSuccess: () => {
-        toast({
-          title: "Configuration saved",
-          description: "Task requirements updated successfully",
+  const loadConfig = async () => {
+    try {
+      // Load task requirements
+      const { data: requirements } = await supabase
+        .from("task_requirements")
+        .select("*");
+
+      if (requirements) {
+        const formatted: Record<string, Record<string, number>> = {};
+        requirements.forEach((req: any) => {
+          if (!formatted[req.day]) {
+            formatted[req.day] = {};
+          }
+          formatted[req.day][req.task] = req.required_count;
         });
-      },
-      onError: (err) => {
-        console.error("Error saving task config:", err);
-        toast({
-          title: "Error",
-          description: "Failed to save configuration",
-          variant: "destructive",
-        });
-      },
-    });
+        setTaskRequirements(formatted);
+      }
+    } catch (error) {
+      console.error("Error loading config:", error);
+      toast({
+        variant: "destructive",
+        title: "Error loading configuration",
+        description: "Could not load system settings",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const hasChanges = useMemo(() => {
-    if (!taskConfig) return false;
-    return JSON.stringify(editableConfig) !== JSON.stringify(taskConfig);
-  }, [editableConfig, taskConfig]);
+  const saveConfig = async () => {
+    setSaving(true);
+    try {
+      // Save task requirements
+      const requirementsToSave = [];
+      for (const day in taskRequirements) {
+        for (const task in taskRequirements[day]) {
+          requirementsToSave.push({
+            day,
+            task,
+            required_count: taskRequirements[day][task],
+          });
+        }
+      }
 
-  const saving = updateConfigMutation.isPending;
+      // Delete existing and insert new
+      await supabase.from("task_requirements").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+      if (requirementsToSave.length > 0) {
+        await supabase.from("task_requirements").insert(requirementsToSave);
+      }
 
-  return (
-    <Layout>
-      <SEO
-        title="Task Configuration - Warehouse Rota"
-        description="Configure daily task requirements for warehouse operations"
-      />
-      
-      <div className="space-y-8 pb-20">
-        <div className="space-y-3">
-          <h1 className="font-condensed text-3xl font-bold tracking-tight">
-            Task Configuration
-          </h1>
-          <p className="text-base text-muted-foreground font-mono">
-            Set how many staff you need for each task on each day of the week
-          </p>
-          <div className="flex flex-wrap gap-2 text-xs font-mono text-muted-foreground">
-            <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
-              <div className="w-2 h-2 rounded-full bg-primary"></div>
-              Enter 0 if task not needed that day
-            </span>
-            <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded-md">
-              <div className="w-2 h-2 rounded-full bg-accent"></div>
-              Numbers show staff count required
-            </span>
-          </div>
-        </div>
+      toast({
+        title: "Configuration saved",
+        description: "Settings have been updated successfully",
+      });
+    } catch (error) {
+      console.error("Error saving config:", error);
+      toast({
+        variant: "destructive",
+        title: "Error saving configuration",
+        description: "Could not save settings",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
 
-        {error && (
-          <Alert className="bg-destructive/10 border-destructive">
-            <AlertCircle className="h-5 w-5 text-destructive" />
-            <div className="flex-1">
-              <h3 className="font-condensed font-semibold text-destructive mb-2">
-                Error Loading Configuration
-              </h3>
-              <p className="text-sm text-destructive/90 font-mono">
-                {error instanceof Error ? error.message : "Unknown error occurred"}
-              </p>
-            </div>
-          </Alert>
-        )}
+  const updateTaskRequirement = (day: string, task: string, value: number) => {
+    setTaskRequirements(prev => ({
+      ...prev,
+      [day]: {
+        ...prev[day],
+        [task]: value,
+      },
+    }));
+  };
 
-        <div className="space-y-6">
-          {TASKS.map((task) => (
-            <Card key={task} className="border-l-4 border-l-primary/30 shadow-sm hover:shadow-md transition-all hover:border-l-primary">
-              <CardHeader className="pb-4">
-                <h3 className="font-condensed text-lg font-bold text-foreground flex items-center gap-2">
-                  <div className="w-1.5 h-6 rounded-full bg-primary"></div>
-                  {task}
-                </h3>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4">
-                  {DAYS.map((day, dayIndex) => (
-                    <div key={dayIndex} className="space-y-2">
-                      <label className="text-sm font-mono font-semibold text-muted-foreground flex items-center justify-center">
-                        {day}
-                      </label>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="20"
-                        value={editableConfig[task]?.[dayIndex] ?? 0}
-                        onChange={(e) => handleConfigChange(task, dayIndex, e.target.value)}
-                        className="font-mono text-base text-center tabular-nums h-12 border-2 focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-sm bg-background"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        <div className="fixed bottom-0 left-0 right-0 md:pl-64 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-4 border-t flex flex-col sm:flex-row justify-between items-center gap-4 z-50">
-          <div className="text-sm font-mono text-muted-foreground w-full sm:w-auto text-center sm:text-left">
-            {hasChanges ? (
-              <span className="text-warning flex items-center justify-center sm:justify-start gap-2">
-                <AlertCircle className="h-4 w-4" />
-                You have unsaved changes
-              </span>
-            ) : (
-              <span className="text-success flex items-center justify-center sm:justify-start gap-2">
-                <CheckCircle className="h-4 w-4" />
-                All changes saved
-              </span>
-            )}
-          </div>
-          <Button
-            onClick={handleSaveConfig}
-            disabled={saving || !hasChanges}
-            size="lg"
-            className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base px-8 w-full sm:w-auto"
-          >
-            {saving ? (
-              <>
-                <RefreshCw className="h-5 w-5 animate-spin" />
-                <span>Saving...</span>
-              </>
-            ) : (
-              <>
-                <Save className="h-5 w-5" />
-                <span>Save Configuration</span>
-              </>
-            )}
-          </Button>
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Settings className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading configuration...</p>
         </div>
       </div>
-    </Layout>
+    );
+  }
+
+  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const tasks = ["frozen", "milk", "twi", "inbound", "outbound", "marshaling"];
+
+  return (
+    <div className="container mx-auto py-8 px-4 max-w-6xl">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">System Configuration</h1>
+          <p className="text-muted-foreground">Configure task requirements and system settings</p>
+        </div>
+        <Button onClick={saveConfig} disabled={saving}>
+          <Save className="w-4 h-4 mr-2" />
+          {saving ? "Saving..." : "Save Changes"}
+        </Button>
+      </div>
+
+      <Tabs defaultValue="tasks" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="tasks">Task Requirements</TabsTrigger>
+          <TabsTrigger value="shifts">Shift Settings</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="tasks" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Daily Task Requirements</CardTitle>
+              <CardDescription>
+                Set how many staff members are required for each task on each day
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {days.map(day => (
+                  <div key={day} className="space-y-3">
+                    <h3 className="font-semibold text-lg">{day}</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {tasks.map(task => (
+                        <div key={`${day}-${task}`} className="space-y-2">
+                          <Label htmlFor={`${day}-${task}`} className="capitalize">
+                            {task}
+                          </Label>
+                          <Input
+                            id={`${day}-${task}`}
+                            type="number"
+                            min="0"
+                            value={taskRequirements[day]?.[task] || 0}
+                            onChange={(e) => updateTaskRequirement(day, task, parseInt(e.target.value) || 0)}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="shifts" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Shift Time Settings</CardTitle>
+              <CardDescription>
+                Configure default shift times and break durations
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="startTime">Shift Start Time</Label>
+                  <Input
+                    id="startTime"
+                    type="time"
+                    value={shiftSettings.startTime}
+                    onChange={(e) => setShiftSettings(prev => ({ ...prev, startTime: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="endTime">Shift End Time</Label>
+                  <Input
+                    id="endTime"
+                    type="time"
+                    value={shiftSettings.endTime}
+                    onChange={(e) => setShiftSettings(prev => ({ ...prev, endTime: e.target.value }))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="breakDuration">Break Duration (minutes)</Label>
+                  <Input
+                    id="breakDuration"
+                    type="number"
+                    min="0"
+                    value={shiftSettings.breakDuration}
+                    onChange={(e) => setShiftSettings(prev => ({ ...prev, breakDuration: parseInt(e.target.value) || 0 }))}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
   );
+}
+
+// Disable static generation for this page since it requires authentication
+export async function getServerSideProps() {
+  return {
+    props: {},
+  };
 }
