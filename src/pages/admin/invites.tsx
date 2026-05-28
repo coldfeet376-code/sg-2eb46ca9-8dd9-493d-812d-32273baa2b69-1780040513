@@ -112,13 +112,9 @@ export default function AdminInvitesPage() {
 
       const invitation = await authService.sendInvitation(newEmail);
       
-      // Copy invite link to clipboard
-      const inviteUrl = `${window.location.origin}/signup?token=${invitation.token}`;
-      await navigator.clipboard.writeText(inviteUrl);
-      
       toast({
         title: "Invitation sent",
-        description: "Invite link copied to clipboard",
+        description: `Email sent to ${newEmail}`,
       });
       
       setNewEmail("");

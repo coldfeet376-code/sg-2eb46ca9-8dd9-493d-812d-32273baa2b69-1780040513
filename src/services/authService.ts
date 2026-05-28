@@ -52,9 +52,29 @@ export const authService = {
       throw error;
     }
 
-    // TODO: Send email with invite link via Supabase Edge Function or external service
-    // For now, we'll just return the invitation with the URL
-    console.log(`Invitation URL: ${inviteUrl}`);
+    // Send email with invite link
+    try {
+      const displayName = this.getUserDisplayName(user);
+      const response = await fetch("/api/send-invite-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.toLowerCase(),
+          inviteUrl,
+          invitedByName: displayName,
+        }),
+      });
+
+      if (!response.ok) {
+        console.warn("Failed to send invite email:", await response.text());
+        // Don't throw - invitation record is created, email is optional
+      }
+    } catch (emailError) {
+      console.warn("Email send failed:", emailError);
+      // Continue - invitation record exists even if email fails
+    }
 
     return data as Invitation;
   },
