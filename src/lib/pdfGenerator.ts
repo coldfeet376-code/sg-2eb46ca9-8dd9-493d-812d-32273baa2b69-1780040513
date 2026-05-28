@@ -70,10 +70,20 @@ export const generateRotaPDF = (
       
       if (taskAssignments.length === 0) {
         row.push("-");
+      } else if (taskAssignments.length === 1) {
+        // Single staff member
+        row.push(taskAssignments[0].staffName);
       } else {
-        // Join multiple staff names with line breaks for readability
-        const staffNames = taskAssignments.map(a => a.staffName).join("\n");
-        row.push(staffNames);
+        // Multiple staff - use comma separation for better PDF rendering
+        const staffNames = taskAssignments.map(a => a.staffName).join(", ");
+        row.push({ 
+          content: staffNames,
+          styles: { 
+            fontSize: 7,
+            cellPadding: 1.5,
+            minCellHeight: 8
+          }
+        });
       }
     });
     
@@ -189,10 +199,20 @@ export const generateManagerDutiesPDF = (
       
       if (dutyAssignments.length === 0) {
         row.push("-");
+      } else if (dutyAssignments.length === 1) {
+        // Single manager
+        row.push(dutyAssignments[0].managerName);
       } else {
-        // Join multiple manager names with line breaks
-        const managerNames = dutyAssignments.map(d => d.managerName).join("\n");
-        row.push(managerNames);
+        // Multiple managers - use comma separation
+        const managerNames = dutyAssignments.map(d => d.managerName).join(", ");
+        row.push({
+          content: managerNames,
+          styles: {
+            fontSize: 7,
+            cellPadding: 1.5,
+            minCellHeight: 8
+          }
+        });
       }
     });
     
