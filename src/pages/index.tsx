@@ -320,6 +320,13 @@ export default function IndexPage() {
     // Keep only last 50 snapshots to prevent storage bloat
     const updatedHistory = [snapshot, ...history].slice(0, 50);
     setHistory(updatedHistory);
+    
+    // Persist to localStorage
+    try {
+      localStorage.setItem("warehouse-rota-history", JSON.stringify(updatedHistory));
+    } catch (e) {
+      console.error("Error saving history to localStorage:", e);
+    }
   };
 
   const generateRota = async () => {
@@ -349,6 +356,9 @@ export default function IndexPage() {
       setAssignments(newAssignments);
       setFairnessMetrics(metrics);
       setLockedAssignments(newLocked);
+      
+      // Save to history
+      saveSnapshot(newAssignments);
       
       await rotaRealtimeService.logAction(
         "generated",
@@ -443,8 +453,11 @@ export default function IndexPage() {
   };
 
   const getCurrentWeekHistory = (): RotaSnapshot[] => {
-    const weekStartStr = weekStart.toISOString();
-    return history.filter(h => h.weekStart === weekStartStr);
+    const weekStartStr = weekStart.toISOString().split('T')[0]; // Get just the date part
+    return history.filter(h => {
+      const historyDate = new Date(h.weekStart).toISOString().split('T')[0];
+      return historyDate === weekStartStr;
+    });
   };
 
   const toggleLockAssignment = async (task: string, dayIndex: number, staffName: string) => {
