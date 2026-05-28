@@ -924,34 +924,51 @@ export default function IndexPage() {
     const updatedAssignments = [...assignments];
     const updatedLocked = [...lockedAssignments];
     let successCount = 0;
+    let skippedCount = 0;
 
-    swaps.forEach(swap => {
+    // Apply swaps one by one, validating each doesn't create conflicts
+    for (const swap of swaps) {
       const fromIndex = updatedAssignments.findIndex(
         a => a.staffId === swap.fromStaffId && a.task === swap.task && a.date === swap.date
       );
       
-      if (fromIndex !== -1) {
-        const lockedIndex = updatedLocked.findIndex(
-          la => la.staffId === swap.fromStaffId && la.task === swap.task && la.date === swap.date
-        );
+      if (fromIndex === -1) {
+        skippedCount++;
+        continue;
+      }
 
-        updatedAssignments[fromIndex] = {
-          ...updatedAssignments[fromIndex],
+      // Validate: toStaff must not already be assigned to ANY task on this date
+      const wouldCreateDoubleBooking = updatedAssignments.some(
+        a => a.staffId === swap.toStaffId && a.date === swap.date
+      );
+
+      if (wouldCreateDoubleBooking) {
+        console.log(`⚠️ Skipping swap: ${swap.toStaffName} already assigned on ${swap.date}`);
+        skippedCount++;
+        continue;
+      }
+
+      // Apply the swap
+      const lockedIndex = updatedLocked.findIndex(
+        la => la.staffId === swap.fromStaffId && la.task === swap.task && la.date === swap.date
+      );
+
+      updatedAssignments[fromIndex] = {
+        ...updatedAssignments[fromIndex],
+        staffId: swap.toStaffId,
+        staffName: swap.toStaffName
+      };
+
+      if (lockedIndex !== -1) {
+        updatedLocked[lockedIndex] = {
+          ...updatedLocked[lockedIndex],
           staffId: swap.toStaffId,
           staffName: swap.toStaffName
         };
-
-        if (lockedIndex !== -1) {
-          updatedLocked[lockedIndex] = {
-            ...updatedLocked[lockedIndex],
-            staffId: swap.toStaffId,
-            staffName: swap.toStaffName
-          };
-        }
-
-        successCount++;
       }
-    });
+
+      successCount++;
+    }
 
     // Recalculate fairness metrics with updated assignments
     const newMetrics = calculateFairnessMetrics(updatedAssignments, staff);
@@ -975,14 +992,14 @@ export default function IndexPage() {
 
     toast({
       title: "✅ Swaps Implemented",
-      description: `Applied ${successCount} swaps. New fairness score: ${newMetrics.overallScore}`,
+      description: `Applied ${successCount} of ${swaps.length} swaps. New fairness: ${newMetrics.overallScore}${skippedCount > 0 ? ` (${skippedCount} skipped due to conflicts)` : ''}`,
     });
 
     await rotaRealtimeService.logAction(
       "updated",
       "rota",
       getLocalDateString(weekStart),
-      `Implemented ${successCount} smart swaps - Fairness: ${newMetrics.overallScore}`
+      `Implemented ${successCount}/${swaps.length} smart swaps - Fairness: ${newMetrics.overallScore}`
     );
   };
 
