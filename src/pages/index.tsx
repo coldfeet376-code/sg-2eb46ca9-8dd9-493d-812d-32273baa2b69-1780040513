@@ -694,13 +694,9 @@ export default function IndexPage() {
   };
 
   const exportWeekPDF = () => {
-    generateStaffRotaPDF({
-      weekStart,
-      assignments,
-      staff,
-      fairnessMetrics,
-      lockedCount: lockedAssignments.length,
-    });
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    generateRotaPDF(assignments, weekStart, weekEnd);
     
     addNotification({
       staffName: "System",

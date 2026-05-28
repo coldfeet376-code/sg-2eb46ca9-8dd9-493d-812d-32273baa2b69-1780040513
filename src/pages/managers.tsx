@@ -630,11 +630,9 @@ export default function Managers() {
   };
 
   const exportPDF = () => {
-    generateManagerDutiesPDF({
-      weekStart,
-      assignments,
-      managers: managers.map(m => ({ id: m.id, name: m.name })),
-    });
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    generateManagerDutiesPDF(assignments, weekStart, weekEnd);
     
     addNotification({
       staffName: "System",
