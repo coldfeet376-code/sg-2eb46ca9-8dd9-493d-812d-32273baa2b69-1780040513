@@ -9,7 +9,7 @@ import { TourProvider } from "@/contexts/TourContext";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 import { AuditProvider } from "@/contexts/AuditContext";
 import Layout from "@/components/Layout";
-import InstallPrompt from "@/components/InstallPrompt";
+import { InstallPrompt } from "@/components/InstallPrompt";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
