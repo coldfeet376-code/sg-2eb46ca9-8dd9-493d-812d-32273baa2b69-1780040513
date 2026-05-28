@@ -1,38 +1,60 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import Head from "next/head";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
+import { LogIn } from "lucide-react";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  useEffect(() => {
+    // Check if user is already logged in
+    const checkAuth = async () => {
+      const session = await authService.getSession();
+      if (session) {
+        router.push("/");
+      }
+    };
+    checkAuth();
+  }, [router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      await authService.signIn(email, password);
+      // Sign in
+      const user = await authService.signIn(email, password);
+      
+      // Store remember me preference
+      if (rememberMe) {
+        localStorage.setItem("warehouse_remember_me", "true");
+      } else {
+        localStorage.removeItem("warehouse_remember_me");
+      }
       
       toast({
-        title: "Login successful",
-        description: "Welcome back!",
+        title: "Welcome back!",
+        description: `Logged in as ${user.email}`,
       });
       
       router.push("/");
     } catch (error: any) {
       toast({
-        variant: "destructive",
         title: "Login failed",
-        description: error.message || "Invalid email or password",
+        description: error.message || "Please try again",
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -40,78 +62,97 @@ export default function LoginPage() {
   };
 
   return (
-    <>
-      <Head>
-        <meta httpEquiv="cache-control" content="no-cache, no-store, must-revalidate, max-age=0" />
-        <meta httpEquiv="pragma" content="no-cache" />
-        <meta httpEquiv="expires" content="0" />
-        <meta name="cache-timestamp" content={Date.now().toString()} />
-      </Head>
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1 text-center">
-            <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-            <CardDescription>
-              Sign in to access the GIST Warehouse Rota System
-            </CardDescription>
-            <div className="text-xs text-muted-foreground pt-2 font-mono">
-              v2.0-simplified-20260528-2002
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/30 p-4">
+      <Card className="w-full max-w-md shadow-lg">
+        <CardHeader className="space-y-1 text-center">
+          <CardTitle className="text-3xl font-condensed font-bold tracking-tight">
+            GIST Warehouse Rota
+          </CardTitle>
+          <CardDescription className="font-sans">
+            Sign in to access the rota system
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="font-sans font-medium">
+                Email
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your.email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="font-sans"
+              />
             </div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="email" className="text-sm font-medium">
-                  Email
-                </label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your.email@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="text-sm font-medium">
-                    Password
-                  </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-sm text-primary hover:underline"
+            
+            <div className="space-y-2">
+              <Label htmlFor="password" className="font-sans font-medium">
+                Password
+              </Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="font-sans"
+              />
+              <div className="flex justify-end">
+                <Link href="/forgot-password">
+                  <button
+                    type="button"
+                    className="text-xs font-sans text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
                   >
                     Forgot password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  disabled={loading}
-                />
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Signing in..." : "Sign In"}
-              </Button>
-
-              <div className="text-center text-sm text-muted-foreground">
-                Don't have an account?{" "}
-                <Link href="/signup" className="text-primary hover:underline font-medium">
-                  Sign up
+                  </button>
                 </Link>
               </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="remember"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+              />
+              <Label
+                htmlFor="remember"
+                className="text-sm font-sans font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+              >
+                Remember me
+              </Label>
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full font-sans font-medium gap-2"
+              disabled={loading}
+              size="lg"
+            >
+              {loading ? (
+                "Please wait..."
+              ) : (
+                <>
+                  <LogIn className="h-4 w-4" />
+                  Sign In
+                </>
+              )}
+            </Button>
+
+            <div className="text-center pt-2">
+              <p className="text-xs font-sans text-muted-foreground">
+                Don't have an account? Contact your administrator for an invitation
+              </p>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
