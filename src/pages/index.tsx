@@ -106,11 +106,6 @@ export default function IndexPage() {
   const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const [fairnessMetrics, setFairnessMetrics] = useState<ReturnType<typeof calculateFairnessMetrics> | null>(null);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
-  const [diagnostics, setDiagnostics] = useState<string[]>([]);
-  const [showSundayDebug, setShowSundayDebug] = useState(false);
-  const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
   const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<any>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -354,7 +349,6 @@ export default function IndexPage() {
       setAssignments(newAssignments);
       setFairnessMetrics(metrics);
       setLockedAssignments(newLocked);
-      setDiagnostics(result.diagnostics);
       
       await rotaRealtimeService.logAction(
         "generated",
@@ -389,7 +383,6 @@ export default function IndexPage() {
     });
     const newAssignments = result.assignments;
     setAssignments(newAssignments);
-    setDiagnostics(result.diagnostics);
     
     // Auto-lock all assignments after forced generation
     setLockedAssignments([...newAssignments]);
@@ -946,67 +939,37 @@ export default function IndexPage() {
       }
     });
 
+    // Recalculate fairness metrics with updated assignments
+    const newMetrics = calculateFairnessMetrics(updatedAssignments, staff);
+
     setAssignments(updatedAssignments);
     setLockedAssignments(updatedLocked);
+    setFairnessMetrics(newMetrics);
     setShowSwapSuggestions(false);
 
+    // Save to Supabase immediately
+    try {
+      await rotaRealtimeService.saveRota(
+        weekStart,
+        updatedAssignments,
+        newMetrics,
+        updatedLocked.length
+      );
+    } catch (error) {
+      console.error("Error saving swapped rota:", error);
+    }
+
     toast({
-      title: "Swaps Implemented",
-      description: `Successfully applied ${successCount} swaps to improve fairness`,
+      title: "✅ Swaps Implemented",
+      description: `Applied ${successCount} swaps. New fairness score: ${newMetrics.overallScore}`,
     });
 
     await rotaRealtimeService.logAction(
       "updated",
       "rota",
       getLocalDateString(weekStart),
-      `Implemented ${successCount} smart swaps`
+      `Implemented ${successCount} smart swaps - Fairness: ${newMetrics.overallScore}`
     );
-  };
-
-  const handleDebugWeek = () => {
-    const weekStartStr = getLocalDateString(weekStart);
-    const weekDates = [];
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(weekStart);
-      date.setDate(date.getDate() + i);
-      weekDates.push({
-        date: getLocalDateString(date),
-        dayName: DAYS[i],
-        dayOfWeek: date.getDay()
-      });
-    }
-
-    const staffWithAvailability = staff.map(s => ({
-      name: s.name,
-      shiftPattern: s.shiftPattern,
-      shiftStart: s.shiftStart,
-      trainedTasks: s.trainedTasks,
-      availabilityThisWeek: s.availability?.filter(a => {
-        const availDate = a.date;
-        return weekDates.some(wd => wd.date === availDate);
-      }) || []
-    }));
-
-    const assignmentsByTask = TASKS.map(task => ({
-      task,
-      days: DAYS.map((day, idx) => ({
-        day,
-        date: weekDates[idx].date,
-        assignments: assignments.filter(a => a.task === task && a.date === weekDates[idx].date)
-      }))
-    }));
-
-    setDebugInfo({
-      weekStart: weekStartStr,
-      weekEnd: getLocalDateString(new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)),
-      weekDates,
-      totalStaff: staff.length,
-      totalAssignments: assignments.length,
-      staffWithAvailability,
-      assignmentsByTask,
-      taskConfig: taskConfigData
-    });
-    setShowDebugPanel(true);
   };
 
   return (
@@ -1143,18 +1106,6 @@ export default function IndexPage() {
                 Generate Rota
               </Button>
 
-              {getLocalDateString(weekStart) === "2026-05-24" && (
-                <Button
-                  onClick={handleDebugWeek}
-                  size="lg"
-                  variant="outline"
-                  className="gap-2 border-warning text-warning hover:bg-warning/10"
-                >
-                  <Bug className="h-5 w-5" />
-                  Debug This Week
-                </Button>
-              )}
-
               <Button
                 onClick={() => {
                   const suggestions = suggestSwaps(assignments, staff, 10);
@@ -1178,26 +1129,6 @@ export default function IndexPage() {
               </Button>
 
               <Button
-                onClick={() => setShowDiagnostics(true)}
-                disabled={diagnostics.length === 0}
-                variant="outline"
-                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
-                size="lg"
-              >
-                <AlertCircle className="h-5 w-5" />
-                Diagnostics
-              </Button>
-
-              <Button
-                onClick={() => setShowSundayDebug(true)}
-                variant="secondary"
-                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
-                size="lg"
-              >
-                🔍 Debug Sunday
-              </Button>
-
-              <Button
                 onClick={lockAll}
                 disabled={assignments.length === 0}
                 variant="outline"
@@ -1206,17 +1137,6 @@ export default function IndexPage() {
               >
                 <Lock className="h-4 w-4" />
                 Lock All
-              </Button>
-
-              <Button
-                onClick={() => setShowUnlockConfirm(true)}
-                disabled={lockedAssignments.length === 0}
-                variant="outline"
-                className="gap-2 font-sans font-medium"
-                size="lg"
-              >
-                <Unlock className="h-4 w-4" />
-                Unlock All ({getLockedCount()})
               </Button>
 
               <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
@@ -1791,107 +1711,6 @@ export default function IndexPage() {
           onImplementSwap={(swap) => handleSwapApply(swap.fromStaffId, swap.toStaffId, swap.task, swap.date)}
           onImplementAll={implementAllSwaps}
         />
-
-        {/* Debug Panel Dialog */}
-        <Dialog open={showDebugPanel} onOpenChange={setShowDebugPanel}>
-          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="font-condensed text-2xl flex items-center gap-2">
-                <Bug className="h-6 w-6 text-warning" />
-                Week Debug Info: {debugInfo?.weekStart}
-              </DialogTitle>
-              <DialogDescription>
-                Diagnostic information for troubleshooting
-              </DialogDescription>
-            </DialogHeader>
-            
-            <ScrollArea className="flex-1 pr-4">
-              {debugInfo && (
-                <div className="space-y-6 font-mono text-sm">
-                  {/* Week Info */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-base">Week Range</h3>
-                    <div className="bg-muted p-3 rounded">
-                      <div>Start: {debugInfo.weekStart}</div>
-                      <div>End: {debugInfo.weekEnd}</div>
-                    </div>
-                  </div>
-
-                  {/* Week Dates */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-base">Week Dates</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {debugInfo.weekDates.map((wd: any, i: number) => (
-                        <div key={i} className="bg-muted p-2 rounded text-xs">
-                          {wd.dayName} {wd.date} (Day {wd.dayOfWeek})
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Staff Count */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-base">Staff Overview</h3>
-                    <div className="bg-muted p-3 rounded">
-                      <div>Total Staff: {debugInfo.totalStaff}</div>
-                      <div>Total Assignments: {debugInfo.totalAssignments}</div>
-                    </div>
-                  </div>
-
-                  {/* Staff Availability This Week */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-base">Staff Availability This Week</h3>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {debugInfo.staffWithAvailability.map((s: any, i: number) => (
-                        <div key={i} className="bg-muted p-2 rounded text-xs">
-                          <div className="font-semibold">{s.name}</div>
-                          <div className="text-muted-foreground">
-                            {s.shiftPattern} · {s.shiftStart}
-                          </div>
-                          <div className="mt-1">
-                            Trained: {s.trainedTasks.join(", ") || "None"}
-                          </div>
-                          {s.availabilityThisWeek.length > 0 ? (
-                            <div className="mt-1 text-warning">
-                              Unavailable: {s.availabilityThisWeek.map((a: any) => `${a.date} (${a.type})`).join(", ")}
-                            </div>
-                          ) : (
-                            <div className="mt-1 text-primary">Available all week</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Assignments by Task */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-base">Current Assignments</h3>
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
-                      {debugInfo.assignmentsByTask.map((taskData: any, i: number) => (
-                        <div key={i} className="bg-muted p-2 rounded text-xs">
-                          <div className="font-semibold mb-2">{taskData.task}</div>
-                          <div className="grid grid-cols-2 gap-1">
-                            {taskData.days.map((dayData: any, j: number) => (
-                              <div key={j} className={dayData.assignments.length === 0 ? "text-muted-foreground" : ""}>
-                                {dayData.day}: {dayData.assignments.length > 0 
-                                  ? dayData.assignments.map((a: any) => a.staffName).join(", ")
-                                  : "None"}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </ScrollArea>
-
-            <DialogFooter>
-              <Button onClick={() => setShowDebugPanel(false)}>Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </TabsContent>
 
         {/* Settings Tab - Task Requirements Configuration */}
