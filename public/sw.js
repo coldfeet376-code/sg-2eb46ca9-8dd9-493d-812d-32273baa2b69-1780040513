@@ -1,19 +1,21 @@
-// SERVICE WORKER DISABLED
-// This file is kept for compatibility but does nothing
-// The aggressive caching was preventing mobile browsers from getting updated code
+// Service Worker with force update - v2.0
+const CACHE_VERSION = 'v2.0-20260528-2002';
 
 self.addEventListener('install', (event) => {
-  // Skip waiting to activate immediately
+  // Force the waiting service worker to become the active service worker
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  // Delete all caches
+  // Clear all old caches
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          return caches.delete(cacheName);
+          if (cacheName !== CACHE_VERSION) {
+            console.log('Deleting old cache:', cacheName);
+            return caches.delete(cacheName);
+          }
         })
       );
     }).then(() => {
@@ -23,8 +25,16 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// Don't intercept any fetch requests - let browser handle everything
 self.addEventListener('fetch', (event) => {
-  // Pass through - no caching
-  return;
+  // Network-first strategy - always try network first to get fresh content
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        return response;
+      })
+      .catch(() => {
+        // Only use cache as fallback if network fails
+        return caches.match(event.request);
+      })
+  );
 });
