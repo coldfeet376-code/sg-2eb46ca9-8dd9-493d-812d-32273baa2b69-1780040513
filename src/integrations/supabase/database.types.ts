@@ -302,34 +302,34 @@ export type Database = {
       }
       rotas: {
         Row: {
+          assignments: Json
           created_at: string | null
           created_by: string | null
           fairness_metrics: Json | null
           id: string
           locked_count: number | null
-          rota_data: Json | null
           updated_at: string | null
           version: number | null
           week_start: string
         }
         Insert: {
+          assignments: Json
           created_at?: string | null
           created_by?: string | null
           fairness_metrics?: Json | null
           id?: string
           locked_count?: number | null
-          rota_data?: Json | null
           updated_at?: string | null
           version?: number | null
           week_start: string
         }
         Update: {
+          assignments?: Json
           created_at?: string | null
           created_by?: string | null
           fairness_metrics?: Json | null
           id?: string
           locked_count?: number | null
-          rota_data?: Json | null
           updated_at?: string | null
           version?: number | null
           week_start?: string
@@ -411,27 +411,6 @@ export type Database = {
           tuesday?: number
           updated_at?: string | null
           wednesday?: number
-        }
-        Relationships: []
-      }
-      two_factor_codes: {
-        Row: {
-          code: string
-          created_at: string | null
-          email: string
-          expires_at: string
-        }
-        Insert: {
-          code: string
-          created_at?: string | null
-          email: string
-          expires_at: string
-        }
-        Update: {
-          code?: string
-          created_at?: string | null
-          email?: string
-          expires_at?: string
         }
         Relationships: []
       }

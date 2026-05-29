@@ -29,7 +29,7 @@ export function BulkOperationsPanel({
   onCopyWeek,
   weekStart,
 }: BulkOperationsPanelProps) {
-  const [bulkAvailType, setBulkAvailType] = useState<AvailabilityType>("rest_day");
+  const [bulkAvailType, setBulkAvailType] = useState<AvailabilityType>("rest");
   const [bulkDayIndex, setBulkDayIndex] = useState<number>(0);
   const [copyToWeekOffset, setCopyToWeekOffset] = useState<number>(1);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -138,43 +138,11 @@ export function BulkOperationsPanel({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="rest_day" className="font-mono text-xs">Rest Day</SelectItem>
+                  <SelectItem value="rest" className="font-mono text-xs">Rest Day</SelectItem>
                   <SelectItem value="holiday" className="font-mono text-xs">Holiday</SelectItem>
-                  <SelectItem value="absent" className="font-mono text-xs">Sick Leave</SelectItem>
+                  <SelectItem value="sick" className="font-mono text-xs">Sick Leave</SelectItem>
                 </SelectContent>
               </Select>
-              <Button
-                variant="outline"
-                size="sm"
-                className={`font-mono text-xs ${bulkAvailType === "available" ? "bg-primary text-primary-foreground" : ""}`}
-                onClick={() => setBulkAvailType("available")}
-              >
-                Available
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className={`font-mono text-xs ${bulkAvailType === "rest_day" ? "bg-primary text-primary-foreground" : ""}`}
-                onClick={() => setBulkAvailType("rest_day")}
-              >
-                Rest Day
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className={`font-mono text-xs ${bulkAvailType === "holiday" ? "bg-primary text-primary-foreground" : ""}`}
-                onClick={() => setBulkAvailType("holiday")}
-              >
-                Holiday
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className={`font-mono text-xs ${bulkAvailType === "absent" ? "bg-primary text-primary-foreground" : ""}`}
-                onClick={() => setBulkAvailType("absent")}
-              >
-                Absent
-              </Button>
             </div>
           </div>
           <Button

@@ -61,12 +61,12 @@ export default function StaffManagement() {
   const [expandedStaff, setExpandedStaff] = useState<Set<string>>(new Set());
   const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
   const [batchDate, setBatchDate] = useState("");
-  const [batchAvailability, setBatchAvailability] = useState<AvailabilityType>("rest_day");
+  const [batchAvailability, setBatchAvailability] = useState<AvailabilityType>("rest");
   const [openDayDropdown, setOpenDayDropdown] = useState<{ staffId: string; date: string } | null>(null);
   
   const [editAvailabilityStaff, setEditAvailabilityStaff] = useState<{ id: string; name: string } | null>(null);
   const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
-  const [editAvailabilityType, setEditAvailabilityType] = useState<AvailabilityType | "clear">("rest_day");
+  const [editAvailabilityType, setEditAvailabilityType] = useState<AvailabilityType | "clear">("rest");
   
   // Week navigation - Start on SUNDAY of the current week
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
@@ -186,9 +186,9 @@ export default function StaffManagement() {
     const availability = member.availability || [];
     
     const stats = {
-      rest: availability.filter((a) => a.type === "rest_day").length,
+      rest: availability.filter((a) => a.type === "rest").length,
       holiday: availability.filter((a) => a.type === "holiday").length,
-      sick: availability.filter((a) => a.type === "absent").length,
+      sick: availability.filter((a) => a.type === "sick").length,
     };
     
     return stats;
@@ -396,27 +396,18 @@ export default function StaffManagement() {
   const getAvailabilityForDate = (member: StaffMember, date: Date): AvailabilityType | null => {
     const dateStr = getLocalDateString(date);
     const entry = member.availability?.find((a) => a.date === dateStr);
-    
-    if (entry) {
-      return entry.type;
-    }
-    
-    if (member.restDays && member.restDays.includes(date.getDay())) {
-      return "rest_day";
-    }
-    
-    return null;
+    return entry ? entry.type : null;
   };
 
   const getDayColor = (availabilityType: AvailabilityType | null): string => {
     if (!availabilityType) return "bg-background border-muted-foreground/20 text-foreground";
     
     switch (availabilityType) {
-      case "rest_day":
+      case "rest":
         return "bg-blue-500 border-blue-600 text-white";
       case "holiday":
         return "bg-purple-500 border-purple-600 text-white";
-      case "absent":
+      case "sick":
         return "bg-red-500 border-red-600 text-white";
       case "available":
         return "bg-green-500 border-green-600 text-white";
@@ -429,11 +420,11 @@ export default function StaffManagement() {
     if (!availabilityType) return "—";
     
     switch (availabilityType) {
-      case "rest_day":
+      case "rest":
         return "R";
       case "holiday":
         return "H";
-      case "absent":
+      case "sick":
         return "S";
       case "available":
         return "A";
@@ -580,13 +571,13 @@ export default function StaffManagement() {
     // Set default date to today
     const today = new Date().toISOString().split("T")[0];
     setEditAvailabilityDate(today);
-    setEditAvailabilityType("rest_day");
+    setEditAvailabilityType("rest");
   };
 
   const closeEditAvailabilityDialog = () => {
     setEditAvailabilityStaff(null);
     setEditAvailabilityDate("");
-    setEditAvailabilityType("rest_day");
+    setEditAvailabilityType("rest");
   };
 
   const handleSaveEditAvailability = async () => {
@@ -801,9 +792,9 @@ export default function StaffManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="rest_day">Rest Day</SelectItem>
+                      <SelectItem value="rest">Rest Day</SelectItem>
                       <SelectItem value="holiday">Holiday</SelectItem>
-                      <SelectItem value="absent">Sick Leave</SelectItem>
+                      <SelectItem value="sick">Sick Leave</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -909,7 +900,7 @@ export default function StaffManagement() {
                     
                     return (
                       <Collapsible key={member.id} open={isExpanded} onOpenChange={() => toggleStaffExpanded(member.id)}>
-                        <Card className="shadow-sm border-l-4 border-l-primary/20 overflow-hidden mb-2">
+                        <Card className="shadow-sm border-l-4 border-l-primary/20">
                           <CardHeader className="pb-4 px-6 pt-5">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 flex-1">
@@ -1155,7 +1146,7 @@ export default function StaffManagement() {
                                                 {date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
                                               </div>
                                               <button
-                                                onClick={() => setDayAvailability(member.id, dateStr, "rest_day")}
+                                                onClick={() => setDayAvailability(member.id, dateStr, "rest")}
                                                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-500/10 transition-colors"
                                               >
                                                 <span className="w-6 h-6 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center">R</span>
@@ -1169,7 +1160,7 @@ export default function StaffManagement() {
                                                 <span className="text-xs font-mono">Holiday</span>
                                               </button>
                                               <button
-                                                onClick={() => setDayAvailability(member.id, dateStr, "absent")}
+                                                onClick={() => setDayAvailability(member.id, dateStr, "sick")}
                                                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-red-500/10 transition-colors"
                                               >
                                                 <span className="w-6 h-6 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center">S</span>
@@ -1297,10 +1288,10 @@ export default function StaffManagement() {
               <Label className="font-mono text-sm font-semibold">Status</Label>
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={() => setEditAvailabilityType("rest_day")}
+                  onClick={() => setEditAvailabilityType("rest")}
                   className={cn(
                     "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105",
-                    editAvailabilityType === "rest_day"
+                    editAvailabilityType === "rest"
                       ? "border-blue-500 bg-blue-500/20 shadow-md"
                       : "border-border hover:border-blue-500/50 hover:bg-blue-500/5"
                   )}
@@ -1327,10 +1318,10 @@ export default function StaffManagement() {
                 </button>
 
                 <button
-                  onClick={() => setEditAvailabilityType("absent")}
+                  onClick={() => setEditAvailabilityType("sick")}
                   className={cn(
                     "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105",
-                    editAvailabilityType === "absent"
+                    editAvailabilityType === "sick"
                       ? "border-red-500 bg-red-500/20 shadow-md"
                       : "border-border hover:border-red-500/50 hover:bg-red-500/5"
                   )}

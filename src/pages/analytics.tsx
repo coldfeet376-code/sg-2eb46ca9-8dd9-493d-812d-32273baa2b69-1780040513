@@ -62,7 +62,7 @@ export default function AnalyticsPage() {
       
       const { data, error } = await supabase
         .from("rotas")
-        .select("week_start, rota_data")
+        .select("week_start, assignments")
         .gte("week_start", start.toISOString().split('T')[0])
         .lte("week_start", end.toISOString().split('T')[0]);
 
@@ -70,7 +70,7 @@ export default function AnalyticsPage() {
 
       return (data || []).map(r => ({
         weekStart: r.week_start,
-        assignments: (r.rota_data as unknown as Assignment[]) || []
+        assignments: (r.assignments as unknown as Assignment[]) || []
       }));
     },
   });
@@ -137,7 +137,7 @@ export default function AnalyticsPage() {
     let compliantRestDays = 0;
     
     staff.forEach(s => {
-      const restDays = s.availability?.filter(a => a.type === "rest_day") || [];
+      const restDays = s.availability?.filter(a => a.type === "rest") || [];
       totalRestDays += restDays.length;
       
       restDays.forEach(rest => {

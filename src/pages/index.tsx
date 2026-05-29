@@ -36,7 +36,6 @@ import { RecentChangesPanel } from "@/components/RecentChangesPanel";
 import { useTour } from "@/contexts/TourContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -89,25 +88,8 @@ interface TaskConfig {
   [task: string]: number[];
 }
 
-export default function HomePage() {
-  const router = useRouter();
-  const { toast } = useToast();
-  const { addNotification } = useNotifications();
-
-  // Remove auth check - app works without login now
-  const [currentUser, setCurrentUser] = useState<any>(null);
-
-  // Week navigation state
-  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
-    const today = new Date();
-    const day = today.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() + diff);
-    weekStart.setHours(0, 0, 0, 0);
-    return weekStart;
-  });
-
+export default function IndexPage() {
+  
   // Safe date initialization with fallback - always start on Sunday
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -125,6 +107,7 @@ export default function HomePage() {
   const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const [fairnessMetrics, setFairnessMetrics] = useState<ReturnType<typeof calculateFairnessMetrics> | null>(null);
+  const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<any>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [smartAssignDialog, setSmartAssignDialog] = useState<{
@@ -144,6 +127,7 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<string>("rota");
   const [taskConfigData, setTaskConfigData] = useState<TaskConfig | null>(null);
   const updateTaskConfig = useUpdateTaskConfig();
+  const { toast } = useToast();
   const queryClient = useQueryClient();
   
   // Calculate week dates early - needed by multiple functions
@@ -805,11 +789,9 @@ export default function HomePage() {
     
     let requiredTotal = 0;
     TASKS.forEach(task => {
-      if (taskConfig[task]) {
-        taskConfig[task].forEach((count: number) => {
-          requiredTotal += count;
-        });
-      }
+      taskConfig[task].forEach((count: number) => {
+        requiredTotal += count;
+      });
     });
     
     if (requiredTotal === 0) return 100;
@@ -830,22 +812,17 @@ export default function HomePage() {
     
     const availability = staffMember.availability?.find(a => a.date === dateStr);
     
-    // If no availability record, check recurring rest days
-    if (!availability) {
-      if (staffMember.restDays && staffMember.restDays.includes(date.getDay())) {
-        return { type: 'rest_day', color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Rest Day' };
-      }
-      return null;
-    }
+    // If no availability record, assume working/available (no special status)
+    if (!availability) return null;
     
     // Normalize the type value to handle case variations, whitespace, and full phrases
     const normalizedType = availability.type.toString().toLowerCase().trim();
     
     if (normalizedType.includes('rest')) {
-      return { type: 'rest_day', color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Rest Day' };
+      return { type: 'rest', color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Rest Day' };
     }
-    if (normalizedType.includes('sick') || normalizedType.includes('absent')) {
-      return { type: 'absent', color: 'bg-red-50 text-red-700 border-red-200', label: 'Sick' };
+    if (normalizedType.includes('sick')) {
+      return { type: 'sick', color: 'bg-red-50 text-red-700 border-red-200', label: 'Sick' };
     }
     if (normalizedType.includes('holiday') || normalizedType.includes('hol')) {
       return { type: 'holiday', color: 'bg-purple-50 text-purple-700 border-purple-200', label: 'Holiday' };
@@ -861,20 +838,18 @@ export default function HomePage() {
   const getAllUnavailableStaff = (task: string, dateIndex: number): { name: string; reason: string; color: string }[] => {
     const date = weekDates[dateIndex];
     const dateStr = getLocalDateString(date);
-    const dayOfWeek = date.getDay();
     
     return staff
       .filter(s => {
         // Must be trained for the task
         if (!s.trainedTasks.includes(task as Task)) return false;
         
-        // Must have unavailability or recurring rest day
+        // Must have unavailability
         const availability = s.availability?.find(a => a.date === dateStr);
-        if (availability && availability.type !== 'available') return true;
-        if (!availability && s.restDays && s.restDays.includes(dayOfWeek)) return true;
-        return false;
+        return availability && availability.type !== 'available';
       })
       .map(s => {
+        const availability = s.availability?.find(a => a.date === dateStr);
         const status = getStaffAvailability(s.name, dateIndex);
         return {
           name: s.name,
@@ -1590,7 +1565,7 @@ export default function HomePage() {
                             key={dayIdx} 
                             className="p-3 text-center align-top w-auto min-w-[120px]"
                           >
-                            <div className="flex flex-col gap-2">
+                            <div className="space-y-2">
                               {/* Assigned staff */}
                               {dayAssignments.length > 0 && dayAssignments.map((assignment, idx) => {
                                 const locked = isAssignmentLocked(task, dayIdx, assignment.staffName);
@@ -1895,9 +1870,9 @@ export default function HomePage() {
 
                         // Check availability
                         const dateStr = manualSwapDialog.assignment!.date;
-                        const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest_day');
+                        const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest');
                         const hasHoliday = s.availability?.some(a => a.date === dateStr && a.type === 'holiday');
-                        const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'absent');
+                        const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'sick');
                         
                         return !hasRestDay && !hasHoliday && !hasSickLeave;
                       })

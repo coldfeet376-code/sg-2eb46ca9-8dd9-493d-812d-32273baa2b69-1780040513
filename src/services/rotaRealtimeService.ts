@@ -27,7 +27,7 @@ export interface AuditLogEntry {
 
 export const rotaRealtimeService = {
   /**
-   * Save using assignments table only - rotas table has cache issues
+   * Save or update a rota for a specific week
    */
   async saveRota(
     weekStart: Date,
@@ -37,120 +37,93 @@ export const rotaRealtimeService = {
   ): Promise<StoredRota> {
     const weekStartStr = weekStart.toISOString().split("T")[0];
     
-    // Delete existing
-    await supabase.from("assignments").delete().eq("week_start", weekStartStr);
-    
-    // Insert new
-    if (assignments.length > 0) {
-      await supabase.from("assignments").insert(
-        assignments.map(a => ({
-          week_start: weekStartStr,
-          staff_id: a.staffId,
-          staff_name: a.staffName,
-          task: a.task,
-          date: a.date,
-          shift_pattern: a.shiftPattern || "All"
-        }))
-      );
-    }
+    const { data: session } = await supabase.auth.getSession();
+    const userId = session.session?.user?.id;
 
-    // Return mock stored rota
-    return {
-      id: weekStartStr,
-      week_start: weekStartStr,
-      assignments,
-      fairness_metrics: fairnessMetrics,
-      locked_count: lockedCount,
-      created_by: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    // Upsert (insert or update)
+    const { data, error } = await supabase
+      .from("rotas")
+      .upsert(
+        {
+          week_start: weekStartStr,
+          assignments: assignments as any,
+          fairness_metrics: fairnessMetrics as any,
+          locked_count: lockedCount,
+          created_by: userId,
+        },
+        { onConflict: "week_start" }
+      )
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as unknown as StoredRota;
   },
 
   /**
-   * Get rota for a specific week from assignments table
+   * Get rota for a specific week
    */
   async getRotaForWeek(weekStart: Date): Promise<StoredRota | null> {
     const weekStartStr = weekStart.toISOString().split("T")[0];
 
     const { data, error } = await supabase
-      .from("assignments")
+      .from("rotas")
       .select("*")
-      .eq("week_start", weekStartStr);
+      .eq("week_start", weekStartStr)
+      .maybeSingle();
 
     if (error) throw error;
-    if (!data || data.length === 0) return null;
-
-    const assignments: Assignment[] = data.map(a => ({
-      staffId: a.staff_id,
-      staffName: a.staff_name,
-      task: a.task as any,
-      date: a.date,
-      shiftPattern: a.shift_pattern as any
-    }));
-
-    return {
-      id: weekStartStr,
-      week_start: weekStartStr,
-      assignments,
-      fairness_metrics: null,
-      locked_count: 0,
-      created_by: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
+    if (!data) return null;
+    return data as unknown as StoredRota;
   },
 
   /**
-   * Get all rotas
+   * Get all rotas (for analytics)
    */
   async getAllRotas(): Promise<StoredRota[]> {
     const { data, error } = await supabase
-      .from("assignments")
-      .select("week_start")
+      .from("rotas")
+      .select("*")
       .order("week_start", { ascending: false });
 
     if (error) throw error;
-    
-    // Get unique weeks
-    const weeks = [...new Set((data || []).map(d => d.week_start))];
-    
-    // Get rotas for each week
-    const rotas = await Promise.all(
-      weeks.map(week => this.getRotaForWeek(new Date(week)))
-    );
-    
-    return rotas.filter(r => r !== null) as StoredRota[];
+    return (data as unknown as StoredRota[]) || [];
   },
 
   /**
-   * Delete a rota
+   * Delete a rota for a specific week
    */
   async deleteRota(weekStart: Date): Promise<void> {
     const weekStartStr = weekStart.toISOString().split("T")[0];
-    await supabase.from("assignments").delete().eq("week_start", weekStartStr);
+
+    const { error } = await supabase
+      .from("rotas")
+      .delete()
+      .eq("week_start", weekStartStr);
+
+    if (error) throw error;
   },
 
   /**
-   * Subscribe to assignments table changes
+   * Subscribe to real-time changes on rotas table
    */
   subscribeToRotas(
     callback: (payload: { eventType: string; new: StoredRota; old: StoredRota }) => void
   ): RealtimeChannel {
     const channel = supabase
-      .channel("assignments-changes")
+      .channel("rotas-changes")
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
-          table: "assignments",
+          table: "rotas",
         },
         (payload: any) => {
           callback({
             eventType: payload.eventType,
-            new: payload.new as any,
-            old: payload.old as any,
+            new: payload.new as StoredRota,
+            old: payload.old as StoredRota,
           });
         }
       )
@@ -171,6 +144,7 @@ export const rotaRealtimeService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Get display name from user metadata or email
     const displayName = user.user_metadata?.display_name || user.email?.split("@")[0] || "Unknown";
 
     const { error } = await supabase.from("audit_log").insert({
@@ -203,7 +177,7 @@ export const rotaRealtimeService = {
   },
 
   /**
-   * Subscribe to audit log
+   * Subscribe to real-time audit log changes
    */
   subscribeToAuditLog(
     callback: (entry: AuditLogEntry) => void
@@ -227,7 +201,7 @@ export const rotaRealtimeService = {
   },
 
   /**
-   * Unsubscribe
+   * Unsubscribe from a channel
    */
   async unsubscribe(channel: RealtimeChannel): Promise<void> {
     await supabase.removeChannel(channel);

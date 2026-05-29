@@ -2,7 +2,7 @@ export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Inbound Late" | "Out
 
 export type ManagerDuty = "Intake" | "Out-loading" | "Admin" | "Floor";
 
-export type AvailabilityType = "available" | "rest_day" | "holiday" | "absent";
+export type AvailabilityType = "available" | "rest" | "holiday" | "sick";
 
 export type ShiftStart = 
   | "06:00" 

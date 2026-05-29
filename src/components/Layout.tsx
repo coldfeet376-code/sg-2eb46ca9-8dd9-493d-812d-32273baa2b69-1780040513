@@ -1,10 +1,11 @@
-import { ReactNode, useEffect, useState } from "react";
-import { useRouter } from "next/router";
+import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { NotificationCenter } from "@/components/NotificationCenter";
-import { Home, Users, UserCog, Settings, BarChart3, ArrowLeftRight, Upload, User } from "lucide-react";
+import { Home, Users, Calendar, RefreshCw, BarChart3, ShieldCheck } from "lucide-react";
+import { ThemeToggle } from "./ThemeToggle";
+import { UserProfileDropdown } from "./UserProfileDropdown";
+import { authService } from "@/services/authService";
 
 interface LayoutProps {
   children: ReactNode;
@@ -12,84 +13,92 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Optional: Try to get current user, but don't require it
   useEffect(() => {
-    const loadUser = async () => {
-      try {
-        const { authService } = await import("@/services/authService");
-        const user = await authService.getCurrentUser();
-        setCurrentUser(user);
-      } catch (error) {
-        // Ignore - app works without auth
-        console.log("No user logged in");
-      }
+    const checkAdmin = async () => {
+      const admin = await authService.isAdmin();
+      setIsAdmin(admin);
     };
-    loadUser();
+    checkAdmin();
   }, []);
 
   const navItems = [
-    { href: "/", icon: Home, label: "Rota" },
-    { href: "/staff", icon: Users, label: "Staff" },
-    { href: "/managers", icon: UserCog, label: "Managers" },
-    { href: "/config", icon: Settings, label: "Config" },
-    { href: "/analytics", icon: BarChart3, label: "Analytics" },
-    { href: "/swaps", icon: ArrowLeftRight, label: "Swaps" },
-    { href: "/import", icon: Upload, label: "Import" },
+    { href: "/", label: "Rota", icon: Home },
+    { href: "/staff", label: "Staff", icon: Users },
+    { href: "/managers", label: "Managers", icon: Calendar },
+    { href: "/swaps", label: "Swaps", icon: RefreshCw },
+    { href: "/analytics", label: "Analytics", icon: BarChart3 },
   ];
+
+  // Add Admin tab only for admin users
+  if (isAdmin) {
+    navItems.push({
+      href: "/admin/invites",
+      label: "Admin",
+      icon: ShieldCheck,
+    });
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-          <div className="mr-4 flex">
-            <Link href="/" className="mr-6 flex items-center space-x-2">
-              <span className="font-condensed text-lg font-bold tracking-tight">
-                GIST ROTA
-              </span>
-            </Link>
+      {/* Header */}
+      <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="container flex h-16 items-center justify-between px-4">
+          <div className="flex items-center gap-6">
+            <h1 className="text-xl font-condensed font-bold tracking-tight">
+              GIST WAREHOUSE ROTA
+            </h1>
+            <nav className="hidden md:flex items-center gap-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = router.pathname === item.href;
+                return (
+                  <Link key={item.href} href={item.href}>
+                    <Button
+                      variant={isActive ? "default" : "ghost"}
+                      size="sm"
+                      className="gap-2 font-sans"
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </Button>
+                  </Link>
+                );
+              })}
+            </nav>
           </div>
-
-          <nav className="flex items-center space-x-1 text-sm font-sans flex-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = router.pathname === item.href;
-              return (
-                <Link key={item.href} href={item.href}>
-                  <Button
-                    variant={isActive ? "secondary" : "ghost"}
-                    size="sm"
-                    className="gap-2"
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="hidden sm:inline">{item.label}</span>
-                  </Button>
-                </Link>
-              );
-            })}
-          </nav>
-
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <NotificationCenter />
-            {currentUser ? (
-              <Button variant="ghost" size="sm" className="gap-2">
-                <User className="h-4 w-4" />
-                <span className="hidden sm:inline">{currentUser?.email || "Admin"}</span>
-              </Button>
-            ) : (
-              <Link href="/login">
-                <Button variant="ghost" size="sm">
-                  Login
-                </Button>
-              </Link>
-            )}
+            <UserProfileDropdown />
           </div>
         </div>
       </header>
 
-      <main className="container py-6">{children}</main>
+      {/* Mobile Navigation */}
+      <div className="md:hidden border-b border-border/50 bg-background">
+        <nav className="container px-4 py-2 flex gap-1 overflow-x-auto">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = router.pathname === item.href;
+            return (
+              <Link key={item.href} href={item.href}>
+                <Button
+                  variant={isActive ? "default" : "ghost"}
+                  size="sm"
+                  className="gap-2 font-sans whitespace-nowrap"
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </Button>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">{children}</main>
     </div>
   );
 }

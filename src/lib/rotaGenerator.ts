@@ -134,9 +134,9 @@ export function generateWeeklyRota({
         }
 
         // Check availability for this specific date
-        const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest_day');
+        const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest');
         const hasHoliday = s.availability?.some(a => a.date === dateStr && a.type === 'holiday');
-        const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'absent');
+        const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'sick');
         const isRecurringRestDay = s.restDays?.includes(currentDate.getDay());
         
         // DEBUG: Log Brian Murray's availability check
@@ -155,7 +155,7 @@ export function generateWeeklyRota({
         }
         
         if (hasRestDay || hasHoliday || hasSickLeave || isRecurringRestDay) {
-          log(`   ❌ ${s.name} - unavailable (${hasRestDay ? 'rest_day' : hasHoliday ? 'holiday' : hasSickLeave ? 'absent' : 'recurring rest'})`);
+          log(`   ❌ ${s.name} - unavailable (${hasRestDay ? 'rest' : hasHoliday ? 'holiday' : hasSickLeave ? 'sick' : 'recurring rest'})`);
           return false;
         }
 

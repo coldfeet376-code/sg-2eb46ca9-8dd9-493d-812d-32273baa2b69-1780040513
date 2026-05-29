@@ -4,6 +4,25 @@ import type { Assignment, RotaBackup } from "@/types";
 export const rotaService = {
   async saveWeeklyAssignments(weekStart: string, assignments: Assignment[], expectedVersion?: number): Promise<{ success: boolean; error?: string }> {
     try {
+      // Start a transaction-like operation using Supabase's .rpc() for atomic operations
+      // Since Supabase doesn't support transactions in the client, we'll use optimistic locking
+      
+      // If version checking is needed, verify current version first
+      if (expectedVersion !== undefined) {
+        const { data: currentRota } = await supabase
+          .from("rotas")
+          .select("version")
+          .eq("week_start", weekStart)
+          .maybeSingle();
+        
+        if (currentRota && currentRota.version !== expectedVersion) {
+          return { 
+            success: false, 
+            error: `Rota was modified by another user. Please refresh and try again. (Expected v${expectedVersion}, got v${currentRota.version})` 
+          };
+        }
+      }
+
       // Delete existing assignments for this week
       const { error: deleteError } = await supabase
         .from("assignments")
@@ -15,7 +34,7 @@ export const rotaService = {
         return { success: false, error: `Failed to clear old assignments: ${deleteError.message}` };
       }
 
-      // Insert new assignments
+      // Insert new assignments (all at once for atomicity)
       if (assignments.length > 0) {
         const { error: insertError } = await supabase
           .from("assignments")
@@ -34,7 +53,21 @@ export const rotaService = {
         }
       }
 
-      console.log("✅ Successfully saved", assignments.length, "assignments for week", weekStart);
+      // Update rota version (increment)
+      const { error: versionError } = await supabase
+        .from("rotas")
+        .upsert({
+          week_start: weekStart,
+          assignments: assignments as any,
+          version: (expectedVersion !== undefined ? expectedVersion + 1 : 1),
+          updated_at: new Date().toISOString()
+        }, { onConflict: "week_start" });
+
+      if (versionError) {
+        console.error("Error updating rota version:", versionError);
+        // Non-critical error, don't fail the whole save
+      }
+
       return { success: true };
     } catch (error: any) {
       console.error("Unexpected error saving rota:", error);
@@ -48,6 +81,7 @@ export const rotaService = {
       .select("*");
 
     if (includeAdjacentWeeks) {
+      // Load 3 weeks: current week + 1 week before + 1 week after
       const weekStartDate = new Date(weekStart);
       const prevWeekDate = new Date(weekStartDate);
       prevWeekDate.setDate(weekStartDate.getDate() - 7);
@@ -81,7 +115,13 @@ export const rotaService = {
   },
 
   async getCurrentRotaVersion(weekStart: string): Promise<number> {
-    return 1; // Simple version tracking removed
+    const { data } = await supabase
+      .from("rotas")
+      .select("version")
+      .eq("week_start", weekStart)
+      .maybeSingle();
+    
+    return data?.version || 0;
   },
 
   async createBackup(weekStart: string, assignments: Assignment[], lockedAssignments: Assignment[]): Promise<void> {
