@@ -434,7 +434,7 @@ export default function StaffManagement() {
       case "holiday":
         return "H";
       case "absent":
-        return "A";
+        return "S";
       case "available":
         return "A";
       default:
@@ -803,7 +803,7 @@ export default function StaffManagement() {
                     <SelectContent>
                       <SelectItem value="rest_day">Rest Day</SelectItem>
                       <SelectItem value="holiday">Holiday</SelectItem>
-                      <SelectItem value="absent">Absent</SelectItem>
+                      <SelectItem value="absent">Sick Leave</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1172,8 +1172,8 @@ export default function StaffManagement() {
                                                 onClick={() => setDayAvailability(member.id, dateStr, "absent")}
                                                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-red-500/10 transition-colors"
                                               >
-                                                <span className="w-6 h-6 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center">A</span>
-                                                <span className="text-xs font-mono">Absent</span>
+                                                <span className="w-6 h-6 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center">S</span>
+                                                <span className="text-xs font-mono">Sick Leave</span>
                                               </button>
                                               <button
                                                 onClick={() => setDayAvailability(member.id, dateStr, "available")}
@@ -1336,9 +1336,9 @@ export default function StaffManagement() {
                   )}
                 >
                   <span className="w-12 h-12 rounded-lg bg-red-500 text-white text-lg font-bold flex items-center justify-center">
-                    A
+                    S
                   </span>
-                  <span className="font-mono font-semibold text-sm">Absent</span>
+                  <span className="font-mono font-semibold text-sm">Sick Leave</span>
                 </button>
 
                 <button
