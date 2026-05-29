@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { ManagerDuty } from "@/types";
+import type { ManagerDuty, AvailabilityType } from "@/types";
 
 export interface Manager {
   id: string;
@@ -164,7 +164,7 @@ export interface ManagerAvailability {
   id: string;
   manager_id: string;
   date: string;
-  type: "rest" | "holiday" | "sick" | "available";
+  type: AvailabilityType;
   notes?: string;
   created_at: string;
 }
@@ -195,7 +195,7 @@ export async function getManagerAvailability(
 export async function setManagerAvailability(
   managerId: string,
   date: string,
-  type: "rest" | "holiday" | "sick" | "available",
+  type: AvailabilityType,
   notes?: string
 ): Promise<void> {
   const { error } = await supabase.from("manager_availability").upsert(
