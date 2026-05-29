@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { Toaster } from "@/components/ui/toaster";
-import { ThemeProvider } from "@/components/ThemeProvider";
+import { ThemeProvider } from "@/contexts/ThemeProvider";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 import { AuditProvider } from "@/contexts/AuditContext";

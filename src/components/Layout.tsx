@@ -4,8 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificationCenter } from "@/components/NotificationCenter";
-import { UserProfileDropdown } from "@/components/UserProfileDropdown";
-import { Home, Users, UserCog, Settings, BarChart3, ArrowLeftRight, Upload } from "lucide-react";
+import { Home, Users, UserCog, Settings, BarChart3, ArrowLeftRight, Upload, User } from "lucide-react";
 
 interface LayoutProps {
   children: ReactNode;
@@ -75,7 +74,10 @@ export function Layout({ children }: LayoutProps) {
             <ThemeToggle />
             <NotificationCenter />
             {currentUser ? (
-              <UserProfileDropdown user={currentUser} />
+              <Button variant="ghost" size="sm" className="gap-2">
+                <User className="h-4 w-4" />
+                <span className="hidden sm:inline">{currentUser?.email || "Admin"}</span>
+              </Button>
             ) : (
               <Link href="/login">
                 <Button variant="ghost" size="sm">

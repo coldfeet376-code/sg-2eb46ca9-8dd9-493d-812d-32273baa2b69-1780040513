@@ -144,7 +144,6 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<string>("rota");
   const [taskConfigData, setTaskConfigData] = useState<TaskConfig | null>(null);
   const updateTaskConfig = useUpdateTaskConfig();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   
   // Calculate week dates early - needed by multiple functions
