@@ -26,8 +26,21 @@ export default function AdminSetupPage() {
         // Ignore sign out errors - user might not be logged in
       });
 
-      // Try to create the account
-      await authService.signUp(ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME);
+      // Create the account with email confirmation disabled
+      const { data, error } = await authService.supabase.auth.signUp({
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
+        options: {
+          data: {
+            name: ADMIN_NAME,
+          },
+          emailRedirectTo: undefined, // No email confirmation needed
+        }
+      });
+
+      if (error) {
+        throw error;
+      }
       
       setStatus("success");
       toast({
