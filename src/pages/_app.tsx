@@ -44,7 +44,10 @@ export default function App({ Component, pageProps }: AppProps) {
 
     // Subscribe to auth changes
     const { data: authListener } = authService.onAuthStateChange((session) => {
-      if (!session && router.pathname !== "/login") {
+      const publicRoutes = ["/login", "/signup", "/forgot-password", "/reset-password", "/admin/setup"];
+      const isPublicRoute = publicRoutes.includes(router.pathname);
+      
+      if (!session && !isPublicRoute) {
         router.push("/login");
       }
     });
