@@ -143,6 +143,38 @@ export function BulkOperationsPanel({
                   <SelectItem value="sick" className="font-mono text-xs">Sick Leave</SelectItem>
                 </SelectContent>
               </Select>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`font-mono text-xs ${bulkAvailType === "available" ? "bg-primary text-primary-foreground" : ""}`}
+                onClick={() => setBulkAvailType("available")}
+              >
+                Available
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`font-mono text-xs ${bulkAvailType === "rest_day" ? "bg-primary text-primary-foreground" : ""}`}
+                onClick={() => setBulkAvailType("rest_day")}
+              >
+                Rest Day
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`font-mono text-xs ${bulkAvailType === "holiday" ? "bg-primary text-primary-foreground" : ""}`}
+                onClick={() => setBulkAvailType("holiday")}
+              >
+                Holiday
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`font-mono text-xs ${bulkAvailType === "absent" ? "bg-primary text-primary-foreground" : ""}`}
+                onClick={() => setBulkAvailType("absent")}
+              >
+                Absent
+              </Button>
             </div>
           </div>
           <Button
