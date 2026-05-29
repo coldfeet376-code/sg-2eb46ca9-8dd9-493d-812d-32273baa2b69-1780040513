@@ -16,7 +16,7 @@ NEXT_PUBLIC_SUPABASE_URL
 
 **Value:**
 ```
-https://neucyhpwwnokykafuldi.supabase.co
+https://neucyhpwwnokykafuldj.supabase.co
 ```
 
 ---
@@ -63,7 +63,7 @@ eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldWN5aHB
 ## Quick Copy Format (all in one):
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://neucyhpwwnokykafuldi.supabase.co
+NEXT_PUBLIC_SUPABASE_URL=https://neucyhpwwnokykafuldj.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldWN5aHB3d25va3lrYWZ1bGRqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5OTM5MTYsImV4cCI6MjA5NTU2OTkxNn0.mVUZE_JoKAENc97_aZXPguJCMiEPdWLmT1deFvaqUSY
 SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ldWN5aHB3d25va3lrYWZ1bGRqIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTk5MzkxNiwiZXhwIjoyMDk1NTY5OTE2fQ.PHOWJPfPezs9KY-2npMSgbKA78KLIcv4c8qj6U_Xhug
 ```
