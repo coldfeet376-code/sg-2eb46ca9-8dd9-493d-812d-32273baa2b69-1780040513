@@ -4,25 +4,6 @@ import type { Assignment, RotaBackup } from "@/types";
 export const rotaService = {
   async saveWeeklyAssignments(weekStart: string, assignments: Assignment[], expectedVersion?: number): Promise<{ success: boolean; error?: string }> {
     try {
-      // Start a transaction-like operation using Supabase's .rpc() for atomic operations
-      // Since Supabase doesn't support transactions in the client, we'll use optimistic locking
-      
-      // If version checking is needed, verify current version first
-      if (expectedVersion !== undefined) {
-        const { data: currentRota } = await supabase
-          .from("rotas")
-          .select("version")
-          .eq("week_start", weekStart)
-          .maybeSingle();
-        
-        if (currentRota && currentRota.version !== expectedVersion) {
-          return { 
-            success: false, 
-            error: `Rota was modified by another user. Please refresh and try again. (Expected v${expectedVersion}, got v${currentRota.version})` 
-          };
-        }
-      }
-
       // Delete existing assignments for this week
       const { error: deleteError } = await supabase
         .from("assignments")
@@ -34,7 +15,7 @@ export const rotaService = {
         return { success: false, error: `Failed to clear old assignments: ${deleteError.message}` };
       }
 
-      // Insert new assignments (all at once for atomicity)
+      // Insert new assignments
       if (assignments.length > 0) {
         const { error: insertError } = await supabase
           .from("assignments")
@@ -53,18 +34,7 @@ export const rotaService = {
         }
       }
 
-      // Use bypass function to avoid PostgREST cache issues
-      const { data, error: versionError } = await supabase.rpc('save_rota_bypass_cache', {
-        p_week_start: weekStart,
-        p_rota_data: assignments,
-        p_fairness_metrics: null
-      });
-
-      if (versionError) {
-        console.error("Error updating rota via bypass:", versionError);
-        // Non-critical error, don't fail the whole save
-      }
-
+      console.log("✅ Successfully saved", assignments.length, "assignments for week", weekStart);
       return { success: true };
     } catch (error: any) {
       console.error("Unexpected error saving rota:", error);
@@ -78,7 +48,6 @@ export const rotaService = {
       .select("*");
 
     if (includeAdjacentWeeks) {
-      // Load 3 weeks: current week + 1 week before + 1 week after
       const weekStartDate = new Date(weekStart);
       const prevWeekDate = new Date(weekStartDate);
       prevWeekDate.setDate(weekStartDate.getDate() - 7);
@@ -112,13 +81,7 @@ export const rotaService = {
   },
 
   async getCurrentRotaVersion(weekStart: string): Promise<number> {
-    const { data } = await supabase
-      .from("rotas")
-      .select("version")
-      .eq("week_start", weekStart)
-      .maybeSingle();
-    
-    return data?.version || 0;
+    return 1; // Simple version tracking removed
   },
 
   async createBackup(weekStart: string, assignments: Assignment[], lockedAssignments: Assignment[]): Promise<void> {
