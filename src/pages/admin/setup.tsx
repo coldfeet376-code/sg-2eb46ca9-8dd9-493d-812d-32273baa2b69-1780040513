@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,14 +12,22 @@ import { CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 export default function AdminSetupPage() {
   const [status, setStatus] = useState<"idle" | "creating" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [email, setEmail] = useState("admin@gist-rota.com");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("Admin");
   const router = useRouter();
   const { toast } = useToast();
 
-  const ADMIN_EMAIL = "coldfeet376@gmail.com";
-  const ADMIN_PASSWORD = "Pass456word";
-  const ADMIN_NAME = "Admin";
-
   const createAdminAccount = async () => {
+    if (!email || !password || password.length < 6) {
+      toast({
+        title: "Invalid input",
+        description: "Email and password (min 6 chars) are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setStatus("creating");
     setErrorMessage("");
 
@@ -29,11 +39,11 @@ export default function AdminSetupPage() {
 
       // Create the account with email confirmation disabled
       const { data, error } = await supabase.auth.signUp({
-        email: ADMIN_EMAIL,
-        password: ADMIN_PASSWORD,
+        email: email,
+        password: password,
         options: {
           data: {
-            name: ADMIN_NAME,
+            name: name || "Admin",
           },
           emailRedirectTo: undefined, // No email confirmation needed
         }
@@ -59,7 +69,7 @@ export default function AdminSetupPage() {
         setStatus("success");
         toast({
           title: "Account already exists",
-          description: "Redirecting to login...",
+          description: "You can login with this email",
         });
         setTimeout(() => {
           router.push("/login");
@@ -84,22 +94,57 @@ export default function AdminSetupPage() {
             Admin Account Setup
           </CardTitle>
           <CardDescription className="font-sans">
-            One-click setup for administrator access
+            Create your administrator account
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {status === "idle" && (
             <div className="space-y-4">
-              <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                <p className="text-sm font-sans font-medium">
-                  This will create your admin account with:
-                </p>
-                <ul className="text-sm font-mono space-y-1 text-muted-foreground">
-                  <li>• Email: {ADMIN_EMAIL}</li>
-                  <li>• Password: {ADMIN_PASSWORD}</li>
-                  <li>• Full admin privileges</li>
-                </ul>
+              <div className="space-y-2">
+                <Label htmlFor="name" className="font-sans">Full Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Admin"
+                  className="font-sans"
+                />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email" className="font-sans">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  className="font-sans"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password" className="font-sans">Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Minimum 6 characters"
+                  className="font-sans"
+                  required
+                  minLength={6}
+                />
+              </div>
+
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <p className="text-xs font-sans text-muted-foreground">
+                  This account will have full administrator privileges including staff management, rota generation, and system settings.
+                </p>
+              </div>
+
               <Button
                 onClick={createAdminAccount}
                 className="w-full font-sans font-medium gap-2"

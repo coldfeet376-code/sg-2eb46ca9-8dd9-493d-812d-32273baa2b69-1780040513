@@ -1,9 +1,11 @@
 import { Html, Head, Main, NextScript } from "next/document";
 
+import { SEOElements } from "@/components/SEO";
 export default function Document() {
   return (
     <Html lang="en" suppressHydrationWarning>
       <Head>
+        <SEOElements />
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/favicon.ico" />
         <meta name="application-name" content="Warehouse Rota" />
