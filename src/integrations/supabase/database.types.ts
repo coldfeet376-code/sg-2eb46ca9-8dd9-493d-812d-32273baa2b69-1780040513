@@ -1,4 +1,4 @@
- 
+/* eslint-disable @typescript-eslint/no-empty-object-type */
 export type Json =
   | string
   | number
@@ -302,34 +302,34 @@ export type Database = {
       }
       rotas: {
         Row: {
-          assignments: Json
           created_at: string | null
           created_by: string | null
           fairness_metrics: Json | null
           id: string
           locked_count: number | null
+          rota_data: Json
           updated_at: string | null
           version: number | null
           week_start: string
         }
         Insert: {
-          assignments: Json
           created_at?: string | null
           created_by?: string | null
           fairness_metrics?: Json | null
           id?: string
           locked_count?: number | null
+          rota_data: Json
           updated_at?: string | null
           version?: number | null
           week_start: string
         }
         Update: {
-          assignments?: Json
           created_at?: string | null
           created_by?: string | null
           fairness_metrics?: Json | null
           id?: string
           locked_count?: number | null
+          rota_data?: Json
           updated_at?: string | null
           version?: number | null
           week_start?: string
