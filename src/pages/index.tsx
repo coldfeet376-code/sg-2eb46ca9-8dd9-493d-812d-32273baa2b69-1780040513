@@ -18,7 +18,7 @@ import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
 import { generateRotaPDF } from "@/lib/pdfGenerator";
 import { rotaService } from "@/services/rotaService";
 import { staffService } from "@/services/staffService";
-import { rotaRealtimeService, type StoredRota } from "@/services/rotaRealtimeService";
+import { rotaRealtimeService } from "@/services/rotaRealtimeService";
 import { useNotifications } from "@/contexts/NotificationContext";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useStaff, useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
@@ -181,13 +181,16 @@ export default function IndexPage() {
       try {
         const rota = await rotaRealtimeService.getRotaForWeek(weekStart);
         if (rota) {
-          setAssignments(rota.assignments);
-          if (rota.fairness_metrics) {
-            setFairnessMetrics(rota.fairness_metrics as any);
-          }
+          const loadedAssignments = rota.assignments || [];
+          setAssignments(loadedAssignments);
+          setFairnessMetrics(
+            loadedAssignments.length > 0 && staff.length > 0
+              ? calculateFairnessMetrics(loadedAssignments, staff)
+              : null
+          );
           // Restore locked assignments - all assignments are auto-locked after generation
-          if (rota.assignments && rota.assignments.length > 0) {
-            setLockedAssignments(rota.assignments);
+          if (loadedAssignments.length > 0) {
+            setLockedAssignments(loadedAssignments);
           }
         } else {
           setAssignments([]);
@@ -212,13 +215,16 @@ export default function IndexPage() {
       updateTimeout = setTimeout(() => {
         const changedWeek = new Date(payload.new.week_start);
         if (changedWeek.toISOString().split("T")[0] === weekStart.toISOString().split("T")[0]) {
-          setAssignments(payload.new.assignments);
-          if (payload.new.fairness_metrics) {
-            setFairnessMetrics(payload.new.fairness_metrics as any);
-          }
+          const updatedAssignments = payload.new.assignments || [];
+          setAssignments(updatedAssignments);
+          setFairnessMetrics(
+            updatedAssignments.length > 0 && staff.length > 0
+              ? calculateFairnessMetrics(updatedAssignments, staff)
+              : null
+          );
           // Restore locked state on real-time updates
-          if (payload.new.assignments && payload.new.assignments.length > 0) {
-            setLockedAssignments(payload.new.assignments);
+          if (updatedAssignments.length > 0) {
+            setLockedAssignments(updatedAssignments);
           }
           
           addNotification({
@@ -239,7 +245,7 @@ export default function IndexPage() {
         rotaRealtimeService.unsubscribe(channel);
       }
     };
-  }, [weekStart, addNotification]);
+  }, [weekStart, addNotification, staff]);
 
   // Save assignments to Supabase whenever they change (excluding initial load and generates)
   useEffect(() => {

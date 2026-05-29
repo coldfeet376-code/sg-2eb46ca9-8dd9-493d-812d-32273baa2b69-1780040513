@@ -61,16 +61,29 @@ export default function AnalyticsPage() {
       }
       
       const { data, error } = await supabase
-        .from("rotas")
-        .select("week_start, assignments")
+        .from("assignments")
+        .select("*")
         .gte("week_start", start.toISOString().split('T')[0])
         .lte("week_start", end.toISOString().split('T')[0]);
 
       if (error) throw error;
 
-      return (data || []).map(r => ({
-        weekStart: r.week_start,
-        assignments: (r.assignments as unknown as Assignment[]) || []
+      const grouped = new Map<string, Assignment[]>();
+      (data || []).forEach((row: any) => {
+        const weekStart = row.week_start;
+        const assignment: Assignment = {
+          staffId: row.staff_id,
+          staffName: row.staff_name,
+          task: row.task,
+          date: row.date,
+          shiftPattern: row.shift_pattern || "All",
+        };
+        grouped.set(weekStart, [...(grouped.get(weekStart) || []), assignment]);
+      });
+
+      return Array.from(grouped.entries()).map(([weekStart, assignments]) => ({
+        weekStart,
+        assignments,
       }));
     },
   });

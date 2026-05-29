@@ -16,26 +16,16 @@ export default function AdminSetupPage() {
   const ADMIN_PASSWORD = "Pass456word";
   const ADMIN_NAME = "Admin";
 
-  useEffect(() => {
-    // Check if already logged in
-    const checkAuth = async () => {
-      const session = await authService.getSession();
-      if (session) {
-        toast({
-          title: "Already logged in",
-          description: "Redirecting to dashboard...",
-        });
-        router.push("/");
-      }
-    };
-    checkAuth();
-  }, []);
-
   const createAdminAccount = async () => {
     setStatus("creating");
     setErrorMessage("");
 
     try {
+      // Sign out any existing session first
+      await authService.signOut().catch(() => {
+        // Ignore sign out errors - user might not be logged in
+      });
+
       // Try to create the account
       await authService.signUp(ADMIN_EMAIL, ADMIN_PASSWORD, ADMIN_NAME);
       
