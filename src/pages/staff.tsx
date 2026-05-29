@@ -396,7 +396,16 @@ export default function StaffManagement() {
   const getAvailabilityForDate = (member: StaffMember, date: Date): AvailabilityType | null => {
     const dateStr = getLocalDateString(date);
     const entry = member.availability?.find((a) => a.date === dateStr);
-    return entry ? entry.type : null;
+    
+    if (entry) {
+      return entry.type;
+    }
+    
+    if (member.restDays && member.restDays.includes(date.getDay())) {
+      return "rest_day";
+    }
+    
+    return null;
   };
 
   const getDayColor = (availabilityType: AvailabilityType | null): string => {
@@ -900,7 +909,7 @@ export default function StaffManagement() {
                     
                     return (
                       <Collapsible key={member.id} open={isExpanded} onOpenChange={() => toggleStaffExpanded(member.id)}>
-                        <Card className="shadow-sm border-l-4 border-l-primary/20">
+                        <Card className="shadow-sm border-l-4 border-l-primary/20 overflow-hidden mb-2">
                           <CardHeader className="pb-4 px-6 pt-5">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3 flex-1">

@@ -830,8 +830,13 @@ export default function HomePage() {
     
     const availability = staffMember.availability?.find(a => a.date === dateStr);
     
-    // If no availability record, assume working/available (no special status)
-    if (!availability) return null;
+    // If no availability record, check recurring rest days
+    if (!availability) {
+      if (staffMember.restDays && staffMember.restDays.includes(date.getDay())) {
+        return { type: 'rest_day', color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Rest Day' };
+      }
+      return null;
+    }
     
     // Normalize the type value to handle case variations, whitespace, and full phrases
     const normalizedType = availability.type.toString().toLowerCase().trim();
@@ -840,7 +845,7 @@ export default function HomePage() {
       return { type: 'rest_day', color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Rest Day' };
     }
     if (normalizedType.includes('sick') || normalizedType.includes('absent')) {
-      return { type: 'absent', color: 'bg-red-50 text-red-700 border-red-200', label: 'Absent' };
+      return { type: 'absent', color: 'bg-red-50 text-red-700 border-red-200', label: 'Sick' };
     }
     if (normalizedType.includes('holiday') || normalizedType.includes('hol')) {
       return { type: 'holiday', color: 'bg-purple-50 text-purple-700 border-purple-200', label: 'Holiday' };
@@ -856,18 +861,20 @@ export default function HomePage() {
   const getAllUnavailableStaff = (task: string, dateIndex: number): { name: string; reason: string; color: string }[] => {
     const date = weekDates[dateIndex];
     const dateStr = getLocalDateString(date);
+    const dayOfWeek = date.getDay();
     
     return staff
       .filter(s => {
         // Must be trained for the task
         if (!s.trainedTasks.includes(task as Task)) return false;
         
-        // Must have unavailability
+        // Must have unavailability or recurring rest day
         const availability = s.availability?.find(a => a.date === dateStr);
-        return availability && availability.type !== 'available';
+        if (availability && availability.type !== 'available') return true;
+        if (!availability && s.restDays && s.restDays.includes(dayOfWeek)) return true;
+        return false;
       })
       .map(s => {
-        const availability = s.availability?.find(a => a.date === dateStr);
         const status = getStaffAvailability(s.name, dateIndex);
         return {
           name: s.name,
@@ -1583,7 +1590,7 @@ export default function HomePage() {
                             key={dayIdx} 
                             className="p-3 text-center align-top w-auto min-w-[120px]"
                           >
-                            <div className="space-y-2">
+                            <div className="flex flex-col gap-2">
                               {/* Assigned staff */}
                               {dayAssignments.length > 0 && dayAssignments.map((assignment, idx) => {
                                 const locked = isAssignmentLocked(task, dayIdx, assignment.staffName);

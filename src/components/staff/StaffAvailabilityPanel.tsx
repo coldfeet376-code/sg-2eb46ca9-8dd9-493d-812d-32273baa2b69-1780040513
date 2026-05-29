@@ -97,7 +97,7 @@ export function StaffAvailabilityPanel({
               <SelectContent>
                 <SelectItem value="rest_day">Rest Day</SelectItem>
                 <SelectItem value="holiday">Holiday</SelectItem>
-                <SelectItem value="absent">Absent</SelectItem>
+                <SelectItem value="absent">Sick Leave</SelectItem>
               </SelectContent>
             </Select>
           </div>

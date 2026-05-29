@@ -56,7 +56,7 @@ export function ManagerRotaTable({
       case "holiday":
         return <Badge variant="outline" className="text-xs font-mono bg-green-500/10 text-green-700">Holiday</Badge>;
       case "absent":
-        return <Badge variant="outline" className="text-xs font-mono bg-red-500/10 text-red-700">Absent</Badge>;
+        return <Badge variant="outline" className="text-xs font-mono bg-red-500/10 text-red-700">Sick</Badge>;
       default:
         return null;
     }
