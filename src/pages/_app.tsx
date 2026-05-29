@@ -1,84 +1,76 @@
 import "@/styles/globals.css";
 import type { AppProps } from "next/app";
-import { useEffect, useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { Toaster } from "@/components/ui/toaster";
-import { ThemeProvider } from "@/contexts/ThemeProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { NotificationProvider } from "@/contexts/NotificationContext";
-import { TourProvider } from "@/contexts/TourContext";
 import { UndoRedoProvider } from "@/contexts/UndoRedoContext";
 import { AuditProvider } from "@/contexts/AuditContext";
-import { authService } from "@/services/authService";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
-import { InstallPrompt } from "@/components/InstallPrompt";
+import { TourProvider } from "@/contexts/TourContext";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      retry: 1,
+    },
+  },
+});
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
-  const [isAuthChecking, setIsAuthChecking] = useState(true);
-  const [queryClient] = useState(() => new QueryClient());
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Check authentication on mount
-    const checkAuth = async () => {
-      try {
-        const session = await authService.getSession();
-        
-        // Public routes that don't require auth
-        const publicRoutes = ["/login", "/signup", "/forgot-password", "/reset-password", "/admin/setup"];
-        const isPublicRoute = publicRoutes.includes(router.pathname);
+    setMounted(true);
+  }, []);
 
-        if (!session && !isPublicRoute) {
-          router.push("/login");
-        } else if (session && router.pathname === "/login") {
-          router.push("/");
-        }
-      } catch (error) {
-        console.error("Auth check error:", error);
-      } finally {
-        setIsAuthChecking(false);
-      }
-    };
+  // Remove auth check - allow access without login
+  useEffect(() => {
+    // Public routes - no auth needed anymore
+    const publicRoutes = [
+      "/login",
+      "/signup",
+      "/forgot-password",
+      "/reset-password",
+      "/admin/setup",
+      "/", // Main page is now public
+      "/staff",
+      "/managers",
+      "/config",
+      "/analytics",
+      "/swaps",
+      "/import",
+    ];
+    
+    // All routes are now accessible
+    if (!mounted) return;
+    
+    // Optional: You can still redirect from login page if needed
+    if (router.pathname === "/login") {
+      router.push("/");
+    }
+  }, [router.pathname, mounted]);
 
-    checkAuth();
-
-    // Subscribe to auth changes
-    const { data: authListener } = authService.onAuthStateChange((session) => {
-      if (!session && router.pathname !== "/login") {
-        router.push("/login");
-      }
-    });
-
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
-  }, [router.pathname]);
-
-  // Show loading state while checking auth
-  if (isAuthChecking && router.pathname !== "/login") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="h-8 w-8 mx-auto border-4 border-primary border-t-transparent rounded-full animate-spin" />
-          <p className="text-sm text-muted-foreground font-sans">Loading...</p>
-        </div>
-      </div>
-    );
+  if (!mounted) {
+    return null;
   }
 
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <NotificationProvider>
-          <TourProvider>
-            <UndoRedoProvider>
-              <AuditProvider>
+          <UndoRedoProvider>
+            <AuditProvider>
+              <TourProvider>
                 <Component {...pageProps} />
                 <Toaster />
-                <InstallPrompt />
-              </AuditProvider>
-            </UndoRedoProvider>
-          </TourProvider>
+              </TourProvider>
+            </AuditProvider>
+          </UndoRedoProvider>
         </NotificationProvider>
       </ThemeProvider>
     </QueryClientProvider>

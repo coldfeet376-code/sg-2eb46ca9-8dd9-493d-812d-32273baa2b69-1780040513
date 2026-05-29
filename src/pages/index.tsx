@@ -36,6 +36,7 @@ import { RecentChangesPanel } from "@/components/RecentChangesPanel";
 import { useTour } from "@/contexts/TourContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -88,8 +89,25 @@ interface TaskConfig {
   [task: string]: number[];
 }
 
-export default function IndexPage() {
-  
+export default function HomePage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const { addNotification } = useNotifications();
+
+  // Remove auth check - app works without login now
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Week navigation state
+  const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
+    const today = new Date();
+    const day = today.getDay();
+    const diff = day === 0 ? -6 : 1 - day;
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() + diff);
+    weekStart.setHours(0, 0, 0, 0);
+    return weekStart;
+  });
+
   // Safe date initialization with fallback - always start on Sunday
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -107,7 +125,6 @@ export default function IndexPage() {
   const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const [fairnessMetrics, setFairnessMetrics] = useState<ReturnType<typeof calculateFairnessMetrics> | null>(null);
-  const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<any>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
   const [smartAssignDialog, setSmartAssignDialog] = useState<{
