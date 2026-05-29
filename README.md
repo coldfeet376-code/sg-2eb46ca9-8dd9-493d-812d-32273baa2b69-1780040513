@@ -22,5 +22,9 @@ A fair distribution work rotation system for warehouse operations managing staff
 - Tailwind CSS + shadcn/ui
 - React Query
 
+## Diagnostics
+
+Visit `/test` page to check Supabase connection status.
+
 ---
-*Deployment trigger: 2026-05-29*
+*Deployment: 2026-05-29 00:47 UTC*
