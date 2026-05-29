@@ -57,8 +57,11 @@ export default function App({ Component, pageProps }: AppProps) {
     };
   }, [router.pathname]);
 
-  // Show loading state while checking auth
-  if (isAuthChecking && router.pathname !== "/login") {
+  // Show loading state while checking auth (skip for public routes)
+  const publicRoutes = ["/login", "/signup", "/forgot-password", "/reset-password", "/admin/setup"];
+  const isPublicRoute = publicRoutes.includes(router.pathname);
+  
+  if (isAuthChecking && !isPublicRoute) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
