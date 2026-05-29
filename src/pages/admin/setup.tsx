@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
+import { supabase } from "@/integrations/supabase/client";
 import { CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 
 export default function AdminSetupPage() {
@@ -27,7 +28,7 @@ export default function AdminSetupPage() {
       });
 
       // Create the account with email confirmation disabled
-      const { data, error } = await authService.supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email: ADMIN_EMAIL,
         password: ADMIN_PASSWORD,
         options: {
