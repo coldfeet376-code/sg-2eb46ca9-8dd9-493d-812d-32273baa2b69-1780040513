@@ -222,7 +222,7 @@ export default function ImportPage() {
 
           // More robust pattern matching for statuses
           if (statusText === "REST" || statusText === "R" || statusText.startsWith("REST")) {
-            status = "rest";
+            status = "rest_day";
           } else if (statusText === "HOLIDAY" || statusText === "HOL" || statusText.startsWith("HOLIDAY")) {
             status = "holiday";
           } else if (
@@ -233,7 +233,7 @@ export default function ImportPage() {
             statusText.startsWith("SICK") ||
             statusText.startsWith("LEAVE")
           ) {
-            status = "sick";
+            status = "absent";
           } else if (statusText === "IN" || statusText === "WORK" || statusText === "") {
             status = "available";
           }
