@@ -62,7 +62,7 @@ export default function AnalyticsPage() {
       
       const { data, error } = await supabase
         .from("rotas")
-        .select("week_start, assignments")
+        .select("week_start, rota_data")
         .gte("week_start", start.toISOString().split('T')[0])
         .lte("week_start", end.toISOString().split('T')[0]);
 
@@ -70,7 +70,7 @@ export default function AnalyticsPage() {
 
       return (data || []).map(r => ({
         weekStart: r.week_start,
-        assignments: (r.assignments as unknown as Assignment[]) || []
+        assignments: (r.rota_data as unknown as Assignment[]) || []
       }));
     },
   });

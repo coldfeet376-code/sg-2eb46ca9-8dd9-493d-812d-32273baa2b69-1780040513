@@ -45,8 +45,6 @@ function getWeekNumber(d: Date): number {
   return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
-type AvailabilityType = "available" | "rest_day" | "holiday" | "absent";
-
 export default function Managers() {
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);

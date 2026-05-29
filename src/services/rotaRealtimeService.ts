@@ -46,7 +46,7 @@ export const rotaRealtimeService = {
       .upsert(
         {
           week_start: weekStartStr,
-          assignments: assignments as any,
+          rota_data: assignments as any,
           fairness_metrics: fairnessMetrics as any,
           locked_count: lockedCount,
           created_by: userId,
