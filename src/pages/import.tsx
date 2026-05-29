@@ -327,216 +327,122 @@ export default function ImportPage() {
     setImportStats({ success: 0, skipped: 0, errors: 0 });
     let successCount = 0;
     let skippedCount = 0;
+    let totalImportedAvail = 0;
+    let totalFailedAvail = 0;
     const errors: string[] = [];
-    const availabilityStats: { name: string; imported: number; failed: number }[] = [];
 
-    console.log("\n\n=== STARTING IMPORT PROCESS ===");
+    console.log("\n\n=== STARTING BULK IMPORT PROCESS ===");
     console.log(`Total staff to process: ${parsedStaff.length}`);
-    console.log(`Update mode: ${updateMode}`);
 
-    for (let i = 0; i < parsedStaff.length; i++) {
-      const staff = parsedStaff[i];
-      setCurrentProcessingStaff(staff.name);
-      let staffId: string | undefined;
+    // Process in batches to handle up to 15,000+ lines without crashing or rate limiting
+    const BATCH_SIZE = 50; 
+    
+    for (let batchStart = 0; batchStart < parsedStaff.length; batchStart += BATCH_SIZE) {
+      const batch = parsedStaff.slice(batchStart, batchStart + BATCH_SIZE);
+      const availabilityToInsert: any[] = [];
       
-      console.log(`\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      console.log(`PROCESSING STAFF ${i + 1}/${parsedStaff.length}: ${staff.name}`);
-      console.log(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
-      
-      try {
-        if (updateMode) {
-          staffId = matchedStaff.get(staff.name);
-          
-          console.log(`[UPDATE MODE] Looking for match: "${staff.name}"`);
-          console.log(`Matched ID: ${staffId || "NOT FOUND"}`);
-          
-          if (!staffId) {
-            console.log(`❌ SKIPPED: ${staff.name} (not found in database)`);
-            skippedCount++;
-            setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
-            setImportProgress(((i + 1) / parsedStaff.length) * 100);
-            continue;
-          }
-        } else {
-          // FRESH DATABASE QUERY - Check for duplicates in real-time
-          console.log(`[CREATE MODE] Checking database for existing staff: "${staff.name}"`);
-          
-          const { data: existingCheck, error: checkError } = await supabase
-            .from('staff')
-            .select('id, name')
-            .ilike('name', staff.name.trim())
-            .maybeSingle();
-          
-          if (checkError) {
-            console.error(`⚠️ Database check error:`, checkError);
-          }
-          
-          if (existingCheck) {
-            console.log(`✓ FOUND existing staff in database:`);
-            console.log(`  Name in DB: "${existingCheck.name}"`);
-            console.log(`  Staff ID: ${existingCheck.id}`);
-            staffId = existingCheck.id;
-          } else {
-            // Create new staff member
-            const staffData = {
-              name: staff.name,
-              trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"],
-              shift_start: staff.startTime,
-              shift_pattern: "All",
-            };
-            
-            console.log(`➕ CREATING NEW staff with data:`, staffData);
-            
-            try {
-              const newStaff = await createStaffMutation.mutateAsync(staffData as any);
-              staffId = newStaff.id;
-              console.log(`✓ Created staff successfully, ID: ${staffId}`);
-            } catch (createError: any) {
-              const errorMsg = `Failed to create ${staff.name}: ${createError.message || createError}`;
-              console.error(`❌ CREATE FAILED:`, createError);
-              errors.push(errorMsg);
-              setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
-              setImportProgress(((i + 1) / parsedStaff.length) * 100);
+      console.log(`Processing batch ${Math.floor(batchStart/BATCH_SIZE) + 1} of ${Math.ceil(parsedStaff.length/BATCH_SIZE)}...`);
+
+      // 1. Process staff records in this batch
+      for (const staff of batch) {
+        setCurrentProcessingStaff(staff.name);
+        let staffId: string | undefined;
+        
+        try {
+          if (updateMode) {
+            staffId = matchedStaff.get(staff.name);
+            if (!staffId) {
+              skippedCount++;
               continue;
             }
-          }
-        }
-        
-        // UPSERT availability entries (handles duplicates properly)
-        let importedAvailCount = 0;
-        let failedAvailCount = 0;
-        
-        const unavailableDays = staff.availability.filter(a => a.status !== "available");
-        
-        console.log(`\n--- AVAILABILITY IMPORT ---`);
-        console.log(`Staff ID being used: ${staffId}`);
-        console.log(`Total availability entries: ${staff.availability.length}`);
-        console.log(`Unavailable days (will import): ${unavailableDays.length}`);
-        console.log(`  Rest: ${unavailableDays.filter(a => a.status === "rest").length}`);
-        console.log(`  Holiday: ${unavailableDays.filter(a => a.status === "holiday").length}`);
-        console.log(`  Sick: ${unavailableDays.filter(a => a.status === "sick").length}`);
-        
-        // Show first 5 unavailable days for debugging
-        if (unavailableDays.length > 0) {
-          console.log(`\nFirst 5 unavailable days to import:`);
-          unavailableDays.slice(0, 5).forEach((avail, idx) => {
-            console.log(`  ${idx + 1}. ${avail.date} = ${avail.status.toUpperCase()}`);
-          });
-        }
-        
-        console.log(`\nStarting UPSERT operations...`);
-        
-        for (const avail of staff.availability) {
-          // Only import non-available days (REST/Holiday/Sick)
-          if (avail.status !== "available") {
-            try {
-              // UPSERT: Insert or update if duplicate
-              const { error: upsertError } = await supabase
-                .from('availability')
-                .upsert({
-                  staff_id: staffId,
-                  date: avail.date,
-                  type: avail.status,
-                }, {
-                  onConflict: 'staff_id,date'
-                });
-              
-              if (upsertError) {
-                throw upsertError;
-              }
-              
-              importedAvailCount++;
-              
-              // Log first 3 successful upserts for verification
-              if (importedAvailCount <= 3) {
-                console.log(`  ✓ Upserted: ${avail.date} = ${avail.status}`);
-              }
-            } catch (error: any) {
-              // Track real failures (not duplicates anymore)
-              failedAvailCount++;
-              console.error(`  ❌ FAILED: ${avail.date} = ${avail.status}`);
-              console.error(`     Error: ${error.message}`);
-              if (failedAvailCount <= 3) {
-                console.error(`     Full error:`, error);
-              }
+          } else {
+            // Check existing first
+            const { data: existingCheck } = await supabase
+              .from('staff')
+              .select('id')
+              .ilike('name', staff.name.trim())
+              .maybeSingle();
+            
+            if (existingCheck) {
+              staffId = existingCheck.id;
+            } else {
+              // Insert new staff member directly via Supabase client to bypass React Query batch limits
+              const { data: newStaff, error: createError } = await supabase
+                .from('staff')
+                .insert({
+                  name: staff.name,
+                  trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"],
+                  shift_start: staff.startTime,
+                  shift_pattern: "All",
+                })
+                .select('id')
+                .single();
+                
+              if (createError) throw createError;
+              staffId = newStaff.id;
             }
           }
+          
+          if (staffId) {
+            successCount++;
+            // Queue availability for bulk insert
+            const unavailableDays = staff.availability.filter(a => a.status !== "available");
+            for (const avail of unavailableDays) {
+              availabilityToInsert.push({
+                staff_id: staffId,
+                date: avail.date,
+                type: avail.status
+              });
+            }
+          }
+        } catch (error: any) {
+          console.error(`Error processing staff ${staff.name}:`, error);
+          errors.push(`Failed for ${staff.name}: ${error.message || error}`);
         }
-        
-        availabilityStats.push({
-          name: staff.name,
-          imported: importedAvailCount,
-          failed: failedAvailCount
-        });
-        
-        console.log(`\n✅ COMPLETED ${staff.name}:`);
-        console.log(`   Imported: ${importedAvailCount} days`);
-        console.log(`   Failed: ${failedAvailCount} days`);
-        
-        if (importedAvailCount === 0 && unavailableDays.length > 0) {
-          console.error(`\n⚠️⚠️⚠️ WARNING ⚠️⚠️⚠️`);
-          console.error(`${staff.name} has ${unavailableDays.length} unavailable days but ZERO were imported!`);
-          console.error(`Possible causes:`);
-          console.error(`  - Database connection issue`);
-          console.error(`  - RLS policy blocking inserts`);
-          console.error(`  - Invalid staff_id: ${staffId}`);
-          console.error(`  - Invalid date format in parsed data`);
-        }
-        
-        successCount++;
-        setImportedCount(successCount);
-        setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
-      } catch (error: any) {
-        const errorMsg = `Failed to import ${staff.name}: ${error.message || error}`;
-        console.error(`\n❌ EXCEPTION for ${staff.name}:`, error);
-        errors.push(errorMsg);
-        setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
       }
-
-      setImportProgress(((i + 1) / parsedStaff.length) * 100);
-      await new Promise(resolve => setTimeout(resolve, 100)); // Slightly longer delay for console readability
+      
+      // 2. Bulk insert all availability for this batch (1 network request per 50 staff instead of hundreds)
+      if (availabilityToInsert.length > 0) {
+        try {
+          const { error: upsertError } = await supabase
+            .from('availability')
+            .upsert(availabilityToInsert, { onConflict: 'staff_id,date' });
+            
+          if (upsertError) throw upsertError;
+          totalImportedAvail += availabilityToInsert.length;
+          console.log(`✓ Bulk inserted ${availabilityToInsert.length} availability records.`);
+        } catch (err: any) {
+          totalFailedAvail += availabilityToInsert.length;
+          errors.push(`Failed to bulk insert availability: ${err.message}`);
+          console.error(`❌ Bulk insert failed:`, err);
+        }
+      }
+      
+      // Update UI progress
+      setImportedCount(successCount);
+      setImportStats({ success: successCount, skipped: skippedCount, errors: errors.length });
+      setImportProgress((Math.min(batchStart + BATCH_SIZE, parsedStaff.length) / parsedStaff.length) * 100);
+      
+      // Yield to main thread so browser doesn't freeze during massive imports
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     setIsImporting(false);
     setImportComplete(true);
     setCurrentProcessingStaff("");
     
-    // Show detailed availability stats
-    console.log("\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("FINAL SUMMARY - AVAILABILITY IMPORT");
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    availabilityStats.forEach(stat => {
-      const status = stat.imported > 0 ? "✅" : stat.failed > 0 ? "❌" : "⚠️";
-      console.log(`${status} ${stat.name}: ${stat.imported} imported, ${stat.failed} failed`);
-    });
-    
-    const totalImported = availabilityStats.reduce((sum, s) => sum + s.imported, 0);
-    const totalFailed = availabilityStats.reduce((sum, s) => sum + s.failed, 0);
-    const zeroImported = availabilityStats.filter(s => s.imported === 0 && s.failed > 0).map(s => s.name);
-    
-    console.log(`\nTotals: ${totalImported} imported, ${totalFailed} failed`);
-    
-    if (zeroImported.length > 0) {
-      console.error("\n⚠️ STAFF WITH ZERO AVAILABILITY IMPORTED (but had failures):");
-      zeroImported.forEach(name => console.error(`  - ${name}`));
-    }
-    
-    // Show errors if any
-    if (errors.length > 0 || totalFailed > 0) {
-      console.error("\n=== IMPORT ERRORS ===");
-      errors.forEach(err => console.error(err));
-      
+    if (errors.length > 0 || totalFailedAvail > 0) {
       toast({
-        title: "Import completed with errors",
-        description: `${successCount} staff processed, ${totalImported} availability saved, ${totalFailed} failed. Check console (F12) for details.`,
+        title: "Import completed with some errors",
+        description: `${successCount} staff processed, ${totalImportedAvail} availability saved, ${totalFailedAvail} failed.`,
         variant: "destructive",
       });
     } else {
       toast({
-        title: "✅ Import complete",
+        title: "✅ Massive Import Complete",
         description: updateMode 
-          ? `Updated ${totalImported} availability entries for ${successCount} staff members`
-          : `Successfully imported ${successCount} staff with ${totalImported} availability entries`,
+          ? `Updated ${totalImportedAvail} availability entries for ${successCount} staff members`
+          : `Successfully imported ${successCount} staff with ${totalImportedAvail} availability entries`,
       });
     }
   };
