@@ -53,18 +53,15 @@ export const rotaService = {
         }
       }
 
-      // Update rota version (increment)
-      const { error: versionError } = await supabase
-        .from("rotas")
-        .upsert({
-          week_start: weekStart,
-          rota_data: assignments as any,
-          version: (expectedVersion !== undefined ? expectedVersion + 1 : 1),
-          updated_at: new Date().toISOString()
-        }, { onConflict: "week_start" });
+      // Use bypass function to avoid PostgREST cache issues
+      const { data, error: versionError } = await supabase.rpc('save_rota_bypass_cache', {
+        p_week_start: weekStart,
+        p_rota_data: assignments,
+        p_fairness_metrics: null
+      });
 
       if (versionError) {
-        console.error("Error updating rota version:", versionError);
+        console.error("Error updating rota via bypass:", versionError);
         // Non-critical error, don't fail the whole save
       }
 

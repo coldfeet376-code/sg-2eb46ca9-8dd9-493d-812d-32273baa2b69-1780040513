@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-empty-object-type */
+ 
 export type Json =
   | string
   | number
@@ -307,7 +307,7 @@ export type Database = {
           fairness_metrics: Json | null
           id: string
           locked_count: number | null
-          rota_data: Json
+          rota_data: Json | null
           updated_at: string | null
           version: number | null
           week_start: string
@@ -318,7 +318,7 @@ export type Database = {
           fairness_metrics?: Json | null
           id?: string
           locked_count?: number | null
-          rota_data: Json
+          rota_data?: Json | null
           updated_at?: string | null
           version?: number | null
           week_start: string
@@ -329,7 +329,7 @@ export type Database = {
           fairness_metrics?: Json | null
           id?: string
           locked_count?: number | null
-          rota_data?: Json
+          rota_data?: Json | null
           updated_at?: string | null
           version?: number | null
           week_start?: string
