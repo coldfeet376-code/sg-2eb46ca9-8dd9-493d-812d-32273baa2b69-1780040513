@@ -795,9 +795,12 @@ export default function IndexPage() {
     
     let requiredTotal = 0;
     TASKS.forEach(task => {
-      taskConfig[task].forEach((count: number) => {
-        requiredTotal += count;
-      });
+      const taskDays = taskConfig[task];
+      if (taskDays && Array.isArray(taskDays)) {
+        taskDays.forEach((count: number) => {
+          requiredTotal += count || 0;
+        });
+      }
     });
     
     if (requiredTotal === 0) return 100;
