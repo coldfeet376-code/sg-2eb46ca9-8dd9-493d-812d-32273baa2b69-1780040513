@@ -626,9 +626,9 @@ export default function ImportPage() {
                           const isMatched = matchedStaff.has(staff.name);
                           const willBeSkipped = updateMode && !isMatched;
                           const unavailableDays = staff.availability.filter(a => a.status !== "available");
-                          const restDays = unavailableDays.filter(a => a.status === "rest").length;
+                          const restDays = unavailableDays.filter(a => a.status === "rest_day").length;
                           const holidayDays = unavailableDays.filter(a => a.status === "holiday").length;
-                          const sickDays = unavailableDays.filter(a => a.status === "sick").length;
+                          const sickDays = unavailableDays.filter(a => a.status === "absent").length;
                           
                           return (
                             <div 

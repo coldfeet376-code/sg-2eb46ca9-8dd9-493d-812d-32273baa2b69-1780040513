@@ -14,7 +14,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useNotifications } from "@/contexts/NotificationContext";
 import { generateManagerDutiesPDF } from "@/lib/pdfGenerator";
 import { ManagerDutiesPrintPreview } from "@/components/ManagerDutiesPrintPreview";
-import type { ManagerAssignment, ManagerDuty, ManagerShiftStart } from "@/types";
+import type { ManagerAssignment, ManagerDuty, ManagerShiftStart, AvailabilityType } from "@/types";
 import { Plus, Lock, Unlock, Download, Calendar, RefreshCw, X, Printer, Users, Zap, ChevronLeft, ChevronRight, Pencil, Trash2, AlertCircle, FileDown } from "lucide-react";
 import { getAllManagers, createManager, updateManager, deleteManager, getManagersForDuty, type Manager, getManagerAvailability, setManagerAvailability, getAvailabilityForDate, type ManagerAvailability } from "@/services/managerService";
 import { ManagerForm } from "@/components/managers/ManagerForm";
@@ -44,8 +44,6 @@ function getWeekNumber(d: Date): number {
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
   return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
-
-type AvailabilityType = "available" | "rest" | "holiday" | "sick";
 
 export default function Managers() {
   const router = useRouter();
@@ -79,7 +77,7 @@ export default function Managers() {
   const [showCalendarDialog, setShowCalendarDialog] = useState(false);
   const [selectedManagerForCalendar, setSelectedManagerForCalendar] = useState<Manager | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>("");
-  const [selectedAvailabilityType, setSelectedAvailabilityType] = useState<AvailabilityType>("rest");
+  const [selectedAvailabilityType, setSelectedAvailabilityType] = useState<AvailabilityType>("rest_day");
   const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
   const [selectedManager, setSelectedManager] = useState<any>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
@@ -565,7 +563,7 @@ export default function Managers() {
   const openCalendarDialog = (manager: Manager) => {
     setSelectedManagerForCalendar(manager);
     setSelectedDate("");
-    setSelectedAvailabilityType("rest");
+    setSelectedAvailabilityType("rest_day");
     setShowCalendarDialog(true);
   };
 
@@ -621,7 +619,7 @@ export default function Managers() {
       const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, etc.
       
       if (manager.recurring_rest_days.includes(dayOfWeek)) {
-        return "rest";
+        return "rest_day";
       }
     }
     

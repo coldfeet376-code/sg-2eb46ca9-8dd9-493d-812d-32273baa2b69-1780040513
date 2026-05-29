@@ -137,7 +137,7 @@ export default function AnalyticsPage() {
     let compliantRestDays = 0;
     
     staff.forEach(s => {
-      const restDays = s.availability?.filter(a => a.type === "rest") || [];
+      const restDays = s.availability?.filter(a => a.type === "rest_day") || [];
       totalRestDays += restDays.length;
       
       restDays.forEach(rest => {

@@ -61,12 +61,12 @@ export default function StaffManagement() {
   const [expandedStaff, setExpandedStaff] = useState<Set<string>>(new Set());
   const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
   const [batchDate, setBatchDate] = useState("");
-  const [batchAvailability, setBatchAvailability] = useState<AvailabilityType>("rest");
+  const [batchAvailability, setBatchAvailability] = useState<AvailabilityType>("rest_day");
   const [openDayDropdown, setOpenDayDropdown] = useState<{ staffId: string; date: string } | null>(null);
   
   const [editAvailabilityStaff, setEditAvailabilityStaff] = useState<{ id: string; name: string } | null>(null);
   const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
-  const [editAvailabilityType, setEditAvailabilityType] = useState<AvailabilityType | "clear">("rest");
+  const [editAvailabilityType, setEditAvailabilityType] = useState<AvailabilityType | "clear">("rest_day");
   
   // Week navigation - Start on SUNDAY of the current week
   const [currentWeekStart, setCurrentWeekStart] = useState<Date>(() => {
@@ -186,9 +186,9 @@ export default function StaffManagement() {
     const availability = member.availability || [];
     
     const stats = {
-      rest: availability.filter((a) => a.type === "rest").length,
+      rest: availability.filter((a) => a.type === "rest_day").length,
       holiday: availability.filter((a) => a.type === "holiday").length,
-      sick: availability.filter((a) => a.type === "sick").length,
+      sick: availability.filter((a) => a.type === "absent").length,
     };
     
     return stats;
@@ -403,11 +403,11 @@ export default function StaffManagement() {
     if (!availabilityType) return "bg-background border-muted-foreground/20 text-foreground";
     
     switch (availabilityType) {
-      case "rest":
+      case "rest_day":
         return "bg-blue-500 border-blue-600 text-white";
       case "holiday":
         return "bg-purple-500 border-purple-600 text-white";
-      case "sick":
+      case "absent":
         return "bg-red-500 border-red-600 text-white";
       case "available":
         return "bg-green-500 border-green-600 text-white";
@@ -420,12 +420,12 @@ export default function StaffManagement() {
     if (!availabilityType) return "—";
     
     switch (availabilityType) {
-      case "rest":
+      case "rest_day":
         return "R";
       case "holiday":
         return "H";
-      case "sick":
-        return "S";
+      case "absent":
+        return "A";
       case "available":
         return "A";
       default:
@@ -571,13 +571,13 @@ export default function StaffManagement() {
     // Set default date to today
     const today = new Date().toISOString().split("T")[0];
     setEditAvailabilityDate(today);
-    setEditAvailabilityType("rest");
+    setEditAvailabilityType("rest_day");
   };
 
   const closeEditAvailabilityDialog = () => {
     setEditAvailabilityStaff(null);
     setEditAvailabilityDate("");
-    setEditAvailabilityType("rest");
+    setEditAvailabilityType("rest_day");
   };
 
   const handleSaveEditAvailability = async () => {
@@ -792,9 +792,9 @@ export default function StaffManagement() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="rest">Rest Day</SelectItem>
+                      <SelectItem value="rest_day">Rest Day</SelectItem>
                       <SelectItem value="holiday">Holiday</SelectItem>
-                      <SelectItem value="sick">Sick Leave</SelectItem>
+                      <SelectItem value="absent">Absent</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1146,7 +1146,7 @@ export default function StaffManagement() {
                                                 {date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
                                               </div>
                                               <button
-                                                onClick={() => setDayAvailability(member.id, dateStr, "rest")}
+                                                onClick={() => setDayAvailability(member.id, dateStr, "rest_day")}
                                                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-500/10 transition-colors"
                                               >
                                                 <span className="w-6 h-6 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center">R</span>
@@ -1160,11 +1160,11 @@ export default function StaffManagement() {
                                                 <span className="text-xs font-mono">Holiday</span>
                                               </button>
                                               <button
-                                                onClick={() => setDayAvailability(member.id, dateStr, "sick")}
+                                                onClick={() => setDayAvailability(member.id, dateStr, "absent")}
                                                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-red-500/10 transition-colors"
                                               >
-                                                <span className="w-6 h-6 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center">S</span>
-                                                <span className="text-xs font-mono">Sick Leave</span>
+                                                <span className="w-6 h-6 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center">A</span>
+                                                <span className="text-xs font-mono">Absent</span>
                                               </button>
                                               <button
                                                 onClick={() => setDayAvailability(member.id, dateStr, "available")}
@@ -1288,10 +1288,10 @@ export default function StaffManagement() {
               <Label className="font-mono text-sm font-semibold">Status</Label>
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  onClick={() => setEditAvailabilityType("rest")}
+                  onClick={() => setEditAvailabilityType("rest_day")}
                   className={cn(
                     "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105",
-                    editAvailabilityType === "rest"
+                    editAvailabilityType === "rest_day"
                       ? "border-blue-500 bg-blue-500/20 shadow-md"
                       : "border-border hover:border-blue-500/50 hover:bg-blue-500/5"
                   )}
@@ -1318,18 +1318,18 @@ export default function StaffManagement() {
                 </button>
 
                 <button
-                  onClick={() => setEditAvailabilityType("sick")}
+                  onClick={() => setEditAvailabilityType("absent")}
                   className={cn(
                     "flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-all hover:scale-105",
-                    editAvailabilityType === "sick"
+                    editAvailabilityType === "absent"
                       ? "border-red-500 bg-red-500/20 shadow-md"
                       : "border-border hover:border-red-500/50 hover:bg-red-500/5"
                   )}
                 >
                   <span className="w-12 h-12 rounded-lg bg-red-500 text-white text-lg font-bold flex items-center justify-center">
-                    S
+                    A
                   </span>
-                  <span className="font-mono font-semibold text-sm">Sick Leave</span>
+                  <span className="font-mono font-semibold text-sm">Absent</span>
                 </button>
 
                 <button

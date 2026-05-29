@@ -25,7 +25,7 @@ export function StaffAvailabilityPanel({
 }: StaffAvailabilityPanelProps) {
   const [open, setOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedType, setSelectedType] = useState<AvailabilityType>("rest");
+  const [selectedType, setSelectedType] = useState<AvailabilityType>("rest_day");
   const [notes, setNotes] = useState("");
 
   const handleSubmit = async () => {
@@ -48,7 +48,7 @@ export function StaffAvailabilityPanel({
     
     setOpen(false);
     setSelectedDate(undefined);
-    setSelectedType("rest");
+    setSelectedType("rest_day");
     setNotes("");
   };
 
@@ -95,9 +95,9 @@ export function StaffAvailabilityPanel({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="rest">Rest Day</SelectItem>
+                <SelectItem value="rest_day">Rest Day</SelectItem>
                 <SelectItem value="holiday">Holiday</SelectItem>
-                <SelectItem value="sick">Sick Leave</SelectItem>
+                <SelectItem value="absent">Absent</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -51,12 +51,12 @@ export function ManagerRotaTable({
 
   const getAvailabilityBadge = (availability: AvailabilityType) => {
     switch (availability) {
-      case "rest":
+      case "rest_day":
         return <Badge variant="outline" className="text-xs font-mono">Rest</Badge>;
       case "holiday":
         return <Badge variant="outline" className="text-xs font-mono bg-green-500/10 text-green-700">Holiday</Badge>;
-      case "sick":
-        return <Badge variant="outline" className="text-xs font-mono bg-red-500/10 text-red-700">Sick</Badge>;
+      case "absent":
+        return <Badge variant="outline" className="text-xs font-mono bg-red-500/10 text-red-700">Absent</Badge>;
       default:
         return null;
     }

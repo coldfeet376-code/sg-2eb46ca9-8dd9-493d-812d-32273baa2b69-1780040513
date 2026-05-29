@@ -837,10 +837,10 @@ export default function HomePage() {
     const normalizedType = availability.type.toString().toLowerCase().trim();
     
     if (normalizedType.includes('rest')) {
-      return { type: 'rest', color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Rest Day' };
+      return { type: 'rest_day', color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Rest Day' };
     }
-    if (normalizedType.includes('sick')) {
-      return { type: 'sick', color: 'bg-red-50 text-red-700 border-red-200', label: 'Sick' };
+    if (normalizedType.includes('sick') || normalizedType.includes('absent')) {
+      return { type: 'absent', color: 'bg-red-50 text-red-700 border-red-200', label: 'Absent' };
     }
     if (normalizedType.includes('holiday') || normalizedType.includes('hol')) {
       return { type: 'holiday', color: 'bg-purple-50 text-purple-700 border-purple-200', label: 'Holiday' };
@@ -1888,9 +1888,9 @@ export default function HomePage() {
 
                         // Check availability
                         const dateStr = manualSwapDialog.assignment!.date;
-                        const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest');
+                        const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest_day');
                         const hasHoliday = s.availability?.some(a => a.date === dateStr && a.type === 'holiday');
-                        const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'sick');
+                        const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'absent');
                         
                         return !hasRestDay && !hasHoliday && !hasSickLeave;
                       })
