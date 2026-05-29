@@ -1095,6 +1095,78 @@ export default function StaffManagement() {
 
                           <CollapsibleContent>
                             <CardContent className="space-y-3 pb-6">
+                              {/* Full Year Availability Summary */}
+                              <div className="space-y-3 pb-4 border-b border-border/50">
+                                <div className="flex items-center justify-between">
+                                  <div className="text-xs font-medium text-muted-foreground font-mono">
+                                    FULL YEAR AVAILABILITY ({member.availability?.length || 0} total entries)
+                                  </div>
+                                  <div className="flex gap-4 text-xs font-mono">
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="w-3 h-3 rounded bg-blue-500"></span>
+                                      Rest: {stats.rest}
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="w-3 h-3 rounded bg-purple-500"></span>
+                                      Holiday: {stats.holiday}
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                      <span className="w-3 h-3 rounded bg-red-500"></span>
+                                      Sick: {stats.sick}
+                                    </span>
+                                  </div>
+                                </div>
+                                
+                                {member.availability && member.availability.length > 0 ? (
+                                  <div className="bg-muted/30 rounded-lg p-3 space-y-2">
+                                    <div className="text-xs font-mono text-muted-foreground">
+                                      Date Range: {
+                                        (() => {
+                                          const dates = member.availability.map(a => a.date).sort();
+                                          const first = dates[0];
+                                          const last = dates[dates.length - 1];
+                                          return `${new Date(first + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} → ${new Date(last + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+                                        })()
+                                      }
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                                      {member.availability
+                                        .sort((a, b) => a.date.localeCompare(b.date))
+                                        .map((avail) => {
+                                          const colorClass = 
+                                            avail.type === 'rest' ? 'bg-blue-500' :
+                                            avail.type === 'holiday' ? 'bg-purple-500' :
+                                            avail.type === 'sick' ? 'bg-red-500' :
+                                            'bg-green-500';
+                                          
+                                          const label = 
+                                            avail.type === 'rest' ? 'R' :
+                                            avail.type === 'holiday' ? 'H' :
+                                            avail.type === 'sick' ? 'S' : 'A';
+                                          
+                                          return (
+                                            <div
+                                              key={avail.date}
+                                              className={`${colorClass} text-white text-xs font-mono px-2 py-1 rounded flex items-center gap-1`}
+                                              title={`${avail.date} - ${avail.type}`}
+                                            >
+                                              <span className="font-bold">{label}</span>
+                                              <span className="opacity-90">{new Date(avail.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+                                            </div>
+                                          );
+                                        })
+                                      }
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="bg-muted/30 rounded-lg p-4 text-center">
+                                    <p className="text-sm text-muted-foreground font-mono">
+                                      No availability data imported yet
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+
                               {/* Weekly Availability Calendar */}
                               <div className="space-y-3">
                                 <div className="flex items-center justify-between">

@@ -83,6 +83,10 @@ export function useStaff() {
       });
 
       console.log(`✅ LOADED ${mappedStaff.length} staff members`);
+      console.log(`📊 Total availability entries: ${allAvailability.length}`);
+      if (mappedStaff.length > 0 && mappedStaff[0].availability) {
+        console.log(`📅 Sample staff availability count: ${mappedStaff[0].availability.length}`);
+      }
       return mappedStaff;
     },
     staleTime: 30000, // 30 seconds cache
