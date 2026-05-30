@@ -17,7 +17,7 @@ import * as XLSX from "xlsx";
 
 interface ParsedAvailability {
   date: string; // YYYY-MM-DD
-  status: AvailabilityType;
+  type: AvailabilityType;
 }
 
 interface ParsedStaff {
@@ -247,7 +247,7 @@ export default function ImportPage() {
           }
 
           // Store ALL days (including available) for preview purposes
-          availability.push({ date, status });
+          availability.push({ date, type: status });
         } else {
           // Debug: cell index out of range
           if (newStaff.length === 0 && dcIdx < 20) {
@@ -304,7 +304,7 @@ export default function ImportPage() {
       
       // Count total unavailable days across all staff
       const totalUnavailableDays = newStaff.reduce((sum, s) => 
-        sum + s.availability.filter(a => a.status !== "available").length, 0
+        sum + s.availability.filter(a => a.type !== "available").length, 0
       );
 
       toast({
@@ -392,9 +392,9 @@ export default function ImportPage() {
             let availabilityType: string;
 
             // Map Excel status to database availability type
-            // Database expects: 'rest_day', 'holiday', 'sick', 'available'
+            // Database expects: 'rest', 'holiday', 'sick', 'available' (NOT 'rest_day')
             if (status === "REST" || status === "R") {
-              availabilityType = "rest_day";
+              availabilityType = "rest";
             } else if (status === "HOLIDAY" || status === "HOL") {
               availabilityType = "holiday";
             } else if (status === "SICK" || status === "LEAVE" || status === "ABSENT") {
@@ -547,7 +547,7 @@ export default function ImportPage() {
         console.log(`Staff ID being used: ${staffId}`);
         console.log(`Total availability entries: ${staff.availability.length}`);
         console.log(`Unavailable days (will import): ${unavailableDays.length}`);
-        console.log(`  Rest: ${unavailableDays.filter(a => a.type === "rest_day").length}`);
+        console.log(`  Rest: ${unavailableDays.filter(a => a.type === "rest").length}`);
         console.log(`  Holiday: ${unavailableDays.filter(a => a.type === "holiday").length}`);
         console.log(`  Sick: ${unavailableDays.filter(a => a.type === "sick").length}`);
         
@@ -863,7 +863,7 @@ export default function ImportPage() {
                           const isMatched = matchedStaff.has(staff.name);
                           const willBeSkipped = updateMode && !isMatched;
                           const unavailableDays = staff.availability.filter(a => a.type !== "available");
-                          const restDays = unavailableDays.filter(a => a.type === "rest_day").length;
+                          const restDays = unavailableDays.filter(a => a.type === "rest").length;
                           const holidayDays = unavailableDays.filter(a => a.type === "holiday").length;
                           const sickDays = unavailableDays.filter(a => a.type === "sick").length;
                           
