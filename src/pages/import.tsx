@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,10 @@ import { useRouter } from "next/router";
 import { Upload, CheckCircle2, AlertCircle, Users, Clock, Phone, FileText, Calendar, RefreshCw } from "lucide-react";
 import { useSupabaseMutation, useStaff } from "@/hooks/useSupabaseQueries";
 import { useToast } from "@/hooks/use-toast";
-import type { AvailabilityType, StaffMember } from "@/types";
+import type { AvailabilityType, StaffMember, ShiftStart, ShiftPattern } from "@/types";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
+import * as XLSX from "xlsx";
 
 interface ParsedAvailability {
   date: string; // YYYY-MM-DD
@@ -31,6 +32,8 @@ interface ParsedStaff {
 export default function ImportPage() {
   const [pasteText, setPasteText] = useState("");
   const [parsedStaff, setParsedStaff] = useState<ParsedStaff[]>([]);
+  const [previewData, setPreviewData] = useState<any[]>([]);
+  const [availabilityData, setAvailabilityData] = useState<any[]>([]);
   const [updateMode, setUpdateMode] = useState(true);
   const [matchedStaff, setMatchedStaff] = useState<Map<string, string>>(new Map());
   const [isImporting, setIsImporting] = useState(false);
