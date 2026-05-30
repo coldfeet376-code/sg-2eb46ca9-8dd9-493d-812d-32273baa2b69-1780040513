@@ -426,11 +426,41 @@ export default function StaffManagement() {
         console.log("\n💾 UPSERTING availability entry...");
         console.log("   Query: UPSERT INTO availability (staff_id, date, type) VALUES (", staffId, ",", dateStr, ",", type, ")");
         
-        const upsertResult = await createAvailabilityMutation.mutateAsync({
+        // CRITICAL: Inspect the EXACT value being sent
+        console.log("\n🔬 DETAILED VALUE INSPECTION:");
+        console.log("   type value:", type);
+        console.log("   type typeof:", typeof type);
+        console.log("   type length:", type.length);
+        console.log("   type char codes:", Array.from(String(type)).map(c => c.charCodeAt(0)).join(', '));
+        console.log("   type === 'rest':", type === "rest");
+        console.log("   type === 'holiday':", type === "holiday");
+        console.log("   type === 'sick':", type === "sick");
+        console.log("   type === 'available':", type === "available");
+        
+        // Check for valid type
+        const validTypes: AvailabilityType[] = ['rest', 'holiday', 'sick', 'available'];
+        if (!validTypes.includes(type as AvailabilityType)) {
+          console.error("❌ INVALID TYPE VALUE DETECTED!");
+          console.error("   Value received:", JSON.stringify(type));
+          console.error("   Valid values:", validTypes);
+          toast({
+            title: "❌ Invalid Type",
+            description: `The value "${type}" is not valid. Expected: rest, holiday, sick, or available`,
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        console.log("✅ Type value is valid");
+        console.log("\n📤 Payload being sent to database:");
+        const payload = {
           staff_id: staffId,
           date: dateStr,
           type,
-        });
+        };
+        console.log(JSON.stringify(payload, null, 2));
+        
+        const upsertResult = await createAvailabilityMutation.mutateAsync(payload);
         
         console.log("✅ Upsert successful");
         console.log("   Result:", upsertResult);
