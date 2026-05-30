@@ -2,7 +2,7 @@ import { ReactNode, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
-import { Home, Users, Calendar, RefreshCw, BarChart3, ShieldCheck } from "lucide-react";
+import { Home, Users, Calendar, RefreshCw, BarChart3, ShieldCheck, Upload } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserProfileDropdown } from "./UserProfileDropdown";
 import { authService } from "@/services/authService";
