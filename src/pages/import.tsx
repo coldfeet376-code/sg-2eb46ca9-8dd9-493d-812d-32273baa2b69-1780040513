@@ -571,38 +571,87 @@ export default function ImportPage() {
         description: "You must be logged in to import data. Please refresh the page or log in again.",
         variant: "destructive",
       });
-      
-      // Show detailed error in console for debugging
-      console.error("Auth check failed:");
-      console.error("  - Error:", authError);
-      console.error("  - User:", user);
-      console.error("\nPossible fixes:");
-      console.error("  1. Refresh the page (F5 or pull-to-refresh on mobile)");
-      console.error("  2. Log out and log back in");
-      console.error("  3. Clear browser cache and cookies");
       return;
     }
     
     console.log("✅ AUTHENTICATED as:", user.email);
     console.log("   User ID:", user.id);
     
-    // Also verify the session is being sent with queries
-    const { data: sessionTest, error: sessionError } = await supabase
-      .from('staff')
-      .select('id')
-      .limit(1);
+    // CRITICAL TEST: Try to write ONE availability record directly
+    console.log("\n=== DIRECT DATABASE WRITE TEST ===");
+    console.log("Testing if availability table accepts writes from your session...");
     
-    if (sessionError) {
-      console.error("❌ SESSION TEST FAILED:", sessionError);
+    // Get first staff member
+    const firstStaff = await supabase
+      .from('staff')
+      .select('id, name')
+      .limit(1)
+      .single();
+    
+    if (firstStaff.error || !firstStaff.data) {
       toast({
-        title: "❌ Session Error",
-        description: "Your session exists but queries are failing. Try refreshing the page.",
+        title: "❌ No staff found",
+        description: "Import staff members first before importing availability",
         variant: "destructive",
       });
       return;
     }
     
-    console.log("✅ SESSION VERIFIED - queries are working\n");
+    console.log("Using staff:", firstStaff.data.name, "(ID:", firstStaff.data.id, ")");
+    
+    // Try to insert a test availability record
+    const testDate = '2026-06-01';
+    const { data: testInsert, error: testError, count, status, statusText } = await supabase
+      .from('availability')
+      .insert({
+        staff_id: firstStaff.data.id,
+        date: testDate,
+        type: 'rest'
+      })
+      .select()
+      .single();
+    
+    console.log("Test insert result:");
+    console.log("  - Status:", status, statusText);
+    console.log("  - Data:", testInsert);
+    console.log("  - Error:", testError);
+    console.log("  - Count:", count);
+    
+    if (testError) {
+      console.error("❌ TEST WRITE FAILED - This is why import fails!");
+      console.error("Error code:", testError.code);
+      console.error("Error message:", testError.message);
+      console.error("Error details:", testError.details);
+      console.error("Error hint:", testError.hint);
+      
+      toast({
+        title: "❌ Database Write Test Failed",
+        description: `Cannot write to availability table: ${testError.message}. Import will fail. Check console (F12) for details.`,
+        variant: "destructive",
+      });
+      
+      // Clean up test record if it somehow got through
+      await supabase
+        .from('availability')
+        .delete()
+        .eq('staff_id', firstStaff.data.id)
+        .eq('date', testDate);
+      
+      return; // STOP - don't proceed with import
+    }
+    
+    console.log("✅ TEST WRITE SUCCESSFUL - availability table is writable");
+    console.log("   Test record created:", testInsert);
+    
+    // Clean up test record
+    await supabase
+      .from('availability')
+      .delete()
+      .eq('staff_id', firstStaff.data.id)
+      .eq('date', testDate);
+    
+    console.log("   Test record cleaned up");
+    console.log("=== DATABASE IS READY FOR IMPORT ===\n");
     
     setIsImporting(true);
     setImportProgress(0);
