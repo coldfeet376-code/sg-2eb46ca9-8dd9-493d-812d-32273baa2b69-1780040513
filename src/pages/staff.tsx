@@ -225,6 +225,9 @@ export default function StaffManagement() {
     setCurrentWeekStart(sunday);
   };
 
+  // Generate week dates array for the current week
+  const weekDates = useMemo(() => getWeekDates(currentWeekStart), [currentWeekStart]);
+
   const handleAddStaff = async () => {
     if (!name.trim() || selectedTasks.length === 0) return;
 
