@@ -461,6 +461,9 @@ export default function ImportPage() {
     console.log(`Total staff to process: ${parsedStaff.length}`);
     console.log(`Update mode: ${updateMode}`);
 
+    // Process staff in batches for better performance
+    const BATCH_SIZE = 500; // Process 500 availability records per batch
+
     for (let i = 0; i < parsedStaff.length; i++) {
       const staff = parsedStaff[i];
       setCurrentProcessingStaff(staff.name);
@@ -529,7 +532,7 @@ export default function ImportPage() {
           }
         }
         
-        // UPSERT availability entries (handles duplicates properly)
+        // BATCH UPSERT availability entries for better performance
         let importedAvailCount = 0;
         let failedAvailCount = 0;
         
@@ -551,42 +554,45 @@ export default function ImportPage() {
           });
         }
         
-        console.log(`\nStarting UPSERT operations...`);
+        // Process in batches of BATCH_SIZE for efficiency
+        const batches = [];
+        for (let j = 0; j < unavailableDays.length; j += BATCH_SIZE) {
+          batches.push(unavailableDays.slice(j, j + BATCH_SIZE));
+        }
         
-        for (const avail of staff.availability) {
-          // Only import non-available days (REST/Holiday/Sick)
-          if (avail.status !== "available") {
-            try {
-              // UPSERT: Insert or update if duplicate
-              const { error: upsertError } = await supabase
-                .from('availability')
-                .upsert({
-                  staff_id: staffId,
-                  date: avail.date,
-                  type: avail.status,
-                }, {
-                  onConflict: 'staff_id,date'
-                });
-              
-              if (upsertError) {
-                throw upsertError;
-              }
-              
-              importedAvailCount++;
-              
-              // Log first 3 successful upserts for verification
-              if (importedAvailCount <= 3) {
-                console.log(`  ✓ Upserted: ${avail.date} = ${avail.status}`);
-              }
-            } catch (error: any) {
-              // Track real failures (not duplicates anymore)
-              failedAvailCount++;
-              console.error(`  ❌ FAILED: ${avail.date} = ${avail.status}`);
-              console.error(`     Error: ${error.message}`);
-              if (failedAvailCount <= 3) {
-                console.error(`     Full error:`, error);
-              }
+        console.log(`\nProcessing ${batches.length} batch(es) of up to ${BATCH_SIZE} records each...`);
+        
+        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+          const batch = batches[batchIndex];
+          
+          // Prepare batch data
+          const batchData = batch.map(avail => ({
+            staff_id: staffId,
+            date: avail.date,
+            type: avail.status,
+          }));
+          
+          try {
+            // BULK UPSERT: Insert or update all records in one query
+            const { error: batchError, count } = await supabase
+              .from('availability')
+              .upsert(batchData, {
+                onConflict: 'staff_id,date',
+                count: 'exact'
+              });
+            
+            if (batchError) {
+              console.error(`❌ Batch ${batchIndex + 1} failed:`, batchError);
+              failedAvailCount += batch.length;
+              errors.push(`${staff.name} batch ${batchIndex + 1}: ${batchError.message}`);
+            } else {
+              importedAvailCount += batch.length;
+              console.log(`  ✓ Batch ${batchIndex + 1}/${batches.length}: ${batch.length} records upserted`);
             }
+          } catch (error: any) {
+            console.error(`❌ Batch ${batchIndex + 1} exception:`, error);
+            failedAvailCount += batch.length;
+            errors.push(`${staff.name} batch ${batchIndex + 1}: ${error.message}`);
           }
         }
         
@@ -621,7 +627,11 @@ export default function ImportPage() {
       }
 
       setImportProgress(((i + 1) / parsedStaff.length) * 100);
-      await new Promise(resolve => setTimeout(resolve, 100)); // Slightly longer delay for console readability
+      
+      // Small delay every 10 staff to prevent overwhelming the database
+      if ((i + 1) % 10 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     }
 
     setIsImporting(false);
@@ -642,6 +652,7 @@ export default function ImportPage() {
     const zeroImported = availabilityStats.filter(s => s.imported === 0 && s.failed > 0).map(s => s.name);
     
     console.log(`\nTotals: ${totalImported} imported, ${totalFailed} failed`);
+    console.log(`Performance: ~${Math.round(parsedStaff.length / ((Date.now() - performance.now()) / 1000))} staff/sec`);
     
     if (zeroImported.length > 0) {
       console.error("\n⚠️ STAFF WITH ZERO AVAILABILITY IMPORTED (but had failures):");
