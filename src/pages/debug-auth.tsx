@@ -39,7 +39,7 @@ export default function DebugAuthPage() {
     // Check database auth state
     try {
       const { data: dbData, error: dbError } = await supabase
-        .rpc('get_current_user_info', {});
+        .rpc('get_current_user_info');
       
       setDbAuthState({
         data: dbData,
