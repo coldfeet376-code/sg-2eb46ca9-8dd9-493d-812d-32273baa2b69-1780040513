@@ -319,6 +319,138 @@ export default function ImportPage() {
     }
   };
 
+  const parseExcelFile = useCallback(async (file: File) => {
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+      console.log("📊 Excel rows:", rows.length);
+      console.log("📋 First 3 rows:", rows.slice(0, 3));
+
+      if (rows.length < 2) {
+        throw new Error("Excel file must have at least a header row and one data row");
+      }
+
+      // Parse header row - format: "Sunday 28/12/2025", "Monday 29/12/2025", etc.
+      const headerRow = rows[0];
+      const dateColumns: { index: number; date: string }[] = [];
+
+      console.log("🔍 Parsing header row:", headerRow);
+
+      // Find date columns (start after Name, Start Time, End Time, Clock Number)
+      for (let i = 4; i < headerRow.length; i++) {
+        const cell = headerRow[i];
+        if (typeof cell === "string" && cell.trim()) {
+          // Extract date from "DayName DD/MM/YYYY" format
+          const match = cell.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+          if (match) {
+            const [, day, month, year] = match;
+            // Convert DD/MM/YYYY to YYYY-MM-DD
+            const dateStr = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+            dateColumns.push({ index: i, date: dateStr });
+          }
+        }
+      }
+
+      console.log(`📅 Found ${dateColumns.length} date columns`);
+      console.log("📅 Date range:", dateColumns[0]?.date, "to", dateColumns[dateColumns.length - 1]?.date);
+
+      const parsedStaff: any[] = [];
+      const allAvailability: any[] = [];
+
+      // Parse staff rows
+      for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
+        const row = rows[rowIndex];
+        
+        // Skip empty rows
+        if (!row || !row[0] || typeof row[0] !== "string" || !row[0].trim()) {
+          continue;
+        }
+
+        const staffName = row[0].trim();
+        const startTime = row[1] || "06:00:00"; // Default if missing
+        const endTime = row[2] || "14:30:00";   // Default if missing
+        const clockNumber = row[3] || "";        // Clock number (optional)
+
+        console.log(`👤 Parsing staff: ${staffName} (${startTime} - ${endTime})`);
+
+        // Extract shift start hour from start time
+        let shiftStart: ShiftStart = "06:00";
+        if (typeof startTime === "string" && startTime.includes(":")) {
+          const hour = startTime.split(":")[0];
+          shiftStart = `${hour.padStart(2, "0")}:00` as ShiftStart;
+        } else if (typeof startTime === "number") {
+          // Excel time serial number (0.25 = 6:00 AM)
+          const hours = Math.floor(startTime * 24);
+          shiftStart = `${hours.toString().padStart(2, "0")}:00` as ShiftStart;
+        }
+
+        // Parse availability for each date column
+        const staffAvailability: any[] = [];
+        
+        dateColumns.forEach(({ index, date }) => {
+          const cellValue = row[index];
+          
+          if (cellValue && typeof cellValue === "string") {
+            const status = cellValue.trim().toUpperCase();
+            let availabilityType: AvailabilityType = "available";
+
+            // Map Excel status to availability type
+            if (status === "REST") {
+              availabilityType = "rest";
+            } else if (status === "HOLIDAY") {
+              availabilityType = "holiday";
+            } else if (status === "SICK") {
+              availabilityType = "sick";
+            } else if (status === "IN" || status === "AVAILABLE") {
+              availabilityType = "available";
+            }
+
+            staffAvailability.push({
+              date,
+              type: availabilityType,
+              notes: clockNumber ? `Clock: ${clockNumber}` : undefined,
+            });
+          }
+        });
+
+        console.log(`   📅 Parsed ${staffAvailability.length} availability entries for ${staffName}`);
+
+        // Add to parsed staff
+        parsedStaff.push({
+          name: staffName,
+          trainedTasks: [], // Will be set manually after import
+          shiftStart,
+          shiftPattern: "All" as ShiftPattern,
+          restDays: [],
+          availability: staffAvailability,
+        });
+
+        allAvailability.push(...staffAvailability.map(a => ({ ...a, staffName })));
+      }
+
+      console.log(`✅ Parsed ${parsedStaff.length} staff members`);
+      console.log(`📊 Total availability entries: ${allAvailability.length}`);
+
+      setPreviewData(parsedStaff);
+      setAvailabilityData(allAvailability);
+
+      toast({
+        title: "File parsed successfully",
+        description: `Found ${parsedStaff.length} staff with ${dateColumns.length} days of availability`,
+      });
+    } catch (error: any) {
+      console.error("❌ Parse error:", error);
+      toast({
+        title: "Parse error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  }, [toast]);
+
   const handleImport = async () => {
     if (parsedStaff.length === 0) return;
     
