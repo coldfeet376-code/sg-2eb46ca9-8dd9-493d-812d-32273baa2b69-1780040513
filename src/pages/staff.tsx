@@ -161,6 +161,9 @@ export default function StaffManagement() {
     }
   }, [staff]);
 
+  // Generate week dates array for the current week - MUST be before early returns
+  const weekDates = useMemo(() => getWeekDates(currentWeekStart), [currentWeekStart]);
+
   // Loading state
   if (staffLoading) {
     return (
@@ -224,9 +227,6 @@ export default function StaffManagement() {
     sunday.setHours(0, 0, 0, 0);
     setCurrentWeekStart(sunday);
   };
-
-  // Generate week dates array for the current week
-  const weekDates = useMemo(() => getWeekDates(currentWeekStart), [currentWeekStart]);
 
   const handleAddStaff = async () => {
     if (!name.trim() || selectedTasks.length === 0) return;
