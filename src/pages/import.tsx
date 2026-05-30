@@ -830,6 +830,30 @@ export default function ImportPage() {
           if (batchIndex === 0) {
             console.log(`\n📦 First batch structure (${batchData.length} records):`);
             console.log(JSON.stringify(batchData.slice(0, 3), null, 2));
+            
+            // CRITICAL: Check the EXACT type values being sent
+            console.log(`\n🔍 CRITICAL TYPE VALUE INSPECTION:`);
+            batchData.slice(0, 5).forEach((record, idx) => {
+              console.log(`Record ${idx + 1}:`);
+              console.log(`  staff_id: "${record.staff_id}" (type: ${typeof record.staff_id})`);
+              console.log(`  date: "${record.date}" (type: ${typeof record.date})`);
+              console.log(`  type: "${record.type}" (type: ${typeof record.type})`);
+              console.log(`  type length: ${record.type.length}`);
+              console.log(`  type char codes: ${Array.from(record.type).map(c => c.charCodeAt(0)).join(', ')}`);
+              console.log(`  exact match test:`);
+              console.log(`    === "rest": ${record.type === "rest"}`);
+              console.log(`    === "holiday": ${record.type === "holiday"}`);
+              console.log(`    === "sick": ${record.type === "sick"}`);
+              console.log(`    === "available": ${record.type === "available"}`);
+              
+              // Check for hidden characters or encoding issues
+              const validTypes = ['rest', 'holiday', 'sick', 'available'];
+              if (!validTypes.includes(record.type)) {
+                console.error(`❌ INVALID TYPE DETECTED: "${record.type}"`);
+                console.error(`   This value will be REJECTED by database constraint!`);
+                console.error(`   Allowed values: ${validTypes.join(', ')}`);
+              }
+            });
           }
           
           try {
