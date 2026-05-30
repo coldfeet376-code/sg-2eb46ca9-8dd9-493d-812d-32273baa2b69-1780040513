@@ -43,6 +43,7 @@ export default function ImportPage() {
   const [isClearing, setIsClearing] = useState(false);
   const [currentProcessingStaff, setCurrentProcessingStaff] = useState<string>("");
   const [importStats, setImportStats] = useState({ success: 0, skipped: 0, errors: 0 });
+  const [isDeletingStaff, setIsDeletingStaff] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -50,6 +51,68 @@ export default function ImportPage() {
   const createStaffMutation = useSupabaseMutation("staff", "insert");
   const createAvailabilityMutation = useSupabaseMutation("availability", "insert");
   const deleteAvailabilityMutation = useSupabaseMutation("availability", "delete");
+
+  const handleDeleteAllStaff = async () => {
+    if (!confirm("⚠️ This will DELETE ALL STAFF MEMBERS and their availability entries. This cannot be undone. Continue?")) {
+      return;
+    }
+
+    if (!confirm("⚠️⚠️ FINAL WARNING: You are about to permanently delete ALL staff data. Type 'DELETE' in the next prompt to confirm.")) {
+      return;
+    }
+
+    const confirmation = prompt("Type DELETE (all caps) to confirm:");
+    if (confirmation !== "DELETE") {
+      toast({
+        title: "Cancelled",
+        description: "Staff deletion cancelled",
+      });
+      return;
+    }
+
+    setIsDeletingStaff(true);
+    try {
+      // First delete all availability (foreign key constraint)
+      const { error: availError } = await supabase
+        .from('availability')
+        .delete()
+        .gte('created_at', '1970-01-01'); // Match all records
+      
+      if (availError) {
+        throw new Error(`Failed to delete availability: ${availError.message}`);
+      }
+
+      // Then delete all staff
+      const { error: staffError } = await supabase
+        .from('staff')
+        .delete()
+        .gte('created_at', '1970-01-01'); // Match all records
+      
+      if (staffError) {
+        throw new Error(`Failed to delete staff: ${staffError.message}`);
+      }
+      
+      toast({
+        title: "✓ Deleted all staff",
+        description: "All staff members and their availability have been removed from the database",
+      });
+
+      // Reset import state
+      setParsedStaff([]);
+      setPasteText("");
+      setDateRange("");
+      setImportComplete(false);
+    } catch (error: any) {
+      console.error("Error deleting staff:", error);
+      toast({
+        title: "❌ Error",
+        description: error.message || "Failed to delete staff data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingStaff(false);
+    }
+  };
 
   const handleClearAllAvailability = async () => {
     if (!confirm("⚠️ This will DELETE ALL availability entries for ALL staff members. This cannot be undone. Continue?")) {
@@ -825,23 +888,48 @@ export default function ImportPage() {
         </Card>
 
         <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 space-y-4">
+            <div className="space-y-1 mb-4">
+              <div className="font-condensed font-semibold text-sm flex items-center gap-2 text-destructive">
+                <AlertCircle className="h-4 w-4" />
+                Danger Zone
+              </div>
+              <p className="text-xs text-muted-foreground font-mono">
+                Permanent deletions - these actions cannot be undone
+              </p>
+            </div>
+
+            <div className="flex items-center justify-between border-b border-destructive/20 pb-4">
+              <div className="space-y-1">
+                <div className="font-semibold text-sm">Delete All Staff</div>
+                <p className="text-xs text-muted-foreground font-mono">
+                  Removes all staff members and their availability data
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAllStaff}
+                disabled={isDeletingStaff}
+                size="sm"
+              >
+                {isDeletingStaff ? "Deleting..." : "Delete All Staff"}
+              </Button>
+            </div>
+
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <div className="font-condensed font-semibold text-sm flex items-center gap-2 text-destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  Danger Zone
-                </div>
+                <div className="font-semibold text-sm">Clear All Availability</div>
                 <p className="text-xs text-muted-foreground font-mono">
-                  Clear all availability data for all staff members (cannot be undone)
+                  Removes availability data but keeps staff members
                 </p>
               </div>
               <Button
                 variant="destructive"
                 onClick={handleClearAllAvailability}
                 disabled={isClearing}
+                size="sm"
               >
-                {isClearing ? "Clearing..." : "Clear All Availability"}
+                {isClearing ? "Clearing..." : "Clear Availability"}
               </Button>
             </div>
           </CardContent>
