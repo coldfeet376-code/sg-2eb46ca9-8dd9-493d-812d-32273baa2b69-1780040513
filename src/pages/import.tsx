@@ -196,10 +196,21 @@ export default function ImportPage() {
         continue;
       }
 
-      // Build shift pattern (remove seconds if present)
-      const start = startTime.substring(0, 5); // HH:MM
-      const end = endTime.substring(0, 5);
-      const shift = `${start}-${end}`;
+      // Map parsed start times to valid database shift_start values
+      // Database only allows: '06:00', '14:30', '22:00'
+      const startHour = parseInt(startTime.split(":")[0]);
+      let validShiftStart: string;
+      
+      if (startHour >= 0 && startHour < 12) {
+        validShiftStart = "06:00"; // Day shift
+      } else if (startHour >= 12 && startHour < 20) {
+        validShiftStart = "14:30"; // Late shift
+      } else {
+        validShiftStart = "22:00"; // Night shift
+      }
+
+      const endShort = endTime.substring(0, 5); // HH:MM
+      const shift = `${validShiftStart}-${endShort}`;
 
       // Parse availability for all date columns
       const availability: ParsedAvailability[] = [];
@@ -269,8 +280,8 @@ export default function ImportPage() {
       newStaff.push({
         name,
         phone,
-        startTime: start,
-        endTime: end,
+        startTime: validShiftStart,
+        endTime: endShort,
         shift,
         availability
       });
@@ -371,11 +382,26 @@ export default function ImportPage() {
         }
 
         const staffName = row[0].trim();
-        const startTime = row[1] || "06:00:00";
+        const startTimeRaw = row[1] || "06:00:00";
         const endTime = row[2] || "14:30:00";
         const clockNumber = row[3] || "";
 
-        console.log(`👤 Parsing staff: ${staffName} (${startTime} - ${endTime}, clock: ${clockNumber || 'none'})`);
+        // Map parsed start times to valid database shift_start values
+        // Database only allows: '06:00', '14:30', '22:00'
+        let shiftStart: string;
+        const startHour = typeof startTimeRaw === "string" 
+          ? parseInt(startTimeRaw.split(":")[0]) 
+          : Math.floor(startTimeRaw * 24); // Excel serial number
+        
+        if (startHour >= 0 && startHour < 12) {
+          shiftStart = "06:00"; // Day shift
+        } else if (startHour >= 12 && startHour < 20) {
+          shiftStart = "14:30"; // Late shift
+        } else {
+          shiftStart = "22:00"; // Night shift
+        }
+
+        console.log(`👤 Parsing staff: ${staffName} (${startTimeRaw} → ${shiftStart}, clock: ${clockNumber || 'none'})`);
 
         // Parse availability for each date column
         const staffAvailability: ParsedAvailability[] = [];
@@ -388,6 +414,7 @@ export default function ImportPage() {
             let availabilityType: AvailabilityType;
 
             // Map Excel status to database availability type
+            // Database expects: 'rest', 'holiday', 'sick', 'available'
             if (status === "REST" || status === "R") {
               availabilityType = "rest";
             } else if (status === "HOLIDAY" || status === "HOL") {
@@ -428,9 +455,9 @@ export default function ImportPage() {
         newStaff.push({
           name: staffName,
           phone: clockNumber,
-          startTime: startTime.substring(0, 5), // HH:MM
+          startTime: shiftStart, // Now using valid shift_start value
           endTime: endTime.substring(0, 5),
-          shift: `${startTime.substring(0, 5)}-${endTime.substring(0, 5)}`,
+          shift: `${shiftStart}-${endTime.substring(0, 5)}`,
           availability: staffAvailability,
         });
       }
