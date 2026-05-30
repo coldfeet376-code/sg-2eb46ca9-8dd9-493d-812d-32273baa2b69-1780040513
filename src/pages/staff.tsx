@@ -116,16 +116,21 @@ export default function StaffManagement() {
   const deleteAvailabilityMutation = useDeleteAvailability();
   const createAvailabilityMutation = useAddAvailability();
 
-  const weekDates = useMemo(() => {
-    const dates: Date[] = [];
-    const start = new Date(currentWeekStart);
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(start);
-      date.setDate(start.getDate() + i);
-      dates.push(date);
+  // DEBUG: Log when staff data loads
+  useEffect(() => {
+    console.log('📊 STAFF PAGE DEBUG:');
+    console.log('   isLoading:', staffLoading);
+    console.log('   hasError:', staffError);
+    console.log('   staff count:', staff?.length || 0);
+    console.log('   filterShift:', filterShift);
+    
+    const filtered = staff.filter((member) => filterShift === "all" || member.shiftStart === filterShift);
+    console.log('   filtered count:', filtered.length);
+    
+    if (staff.length > 0) {
+      console.log('   First 3 staff:', staff.slice(0, 3).map(s => s.name));
     }
-    return dates;
-  }, [currentWeekStart]);
+  }, [staff, staffLoading, staffError, filterShift]);
 
   // DEBUG: Log staff data when it changes
   useEffect(() => {
