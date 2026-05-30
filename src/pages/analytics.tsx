@@ -14,15 +14,14 @@ import type { StaffMember, Assignment } from "@/types";
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
 
 // Task weights for fairness calculation - matches fairnessCalculator.ts
-const TASK_WEIGHTS: Record<string, number> = {
-  "Frozen": 1.0,
-  "Milk": 1.0,
+const TASK_WEIGHTS: Record<Task, number> = {
+  "Frozen": 1.2,
+  "Milk": 1.1,
   "TWI": 1.0,
-  "Inbound": 1.0,
-  "Inbound Late": 0.5, // Half-day shift
-  "Outbound": 1.0,
-  "Marshaling": 1.0,
-  "Housekeeping": 1.0,
+  "Inbound": 1.3,
+  "Inbound Late": 1.4,
+  "Outbound": 1.2,
+  "Marshaling": 1.1,
   "Equipment": 1.0,
 };
 

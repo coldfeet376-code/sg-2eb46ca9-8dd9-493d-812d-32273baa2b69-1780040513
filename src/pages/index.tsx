@@ -44,7 +44,7 @@ const OnboardingTour = dynamic(
 );
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping", "Equipment"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
 
 function getLocalDateString(date: Date): string {
   if (!date) return "";
@@ -92,7 +92,7 @@ export default function IndexPage() {
   
   // Safe date initialization with fallback - always start on Sunday
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [lockedAssignments, setLockedAssignments] = useState<Assignment[]>([]);
   const [showSwapSuggestions, setShowSwapSuggestions] = useState(false);
@@ -1670,7 +1670,7 @@ export default function IndexPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-4 no-print">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 no-print">
           <Card className="shadow-sm card-hover">
             <CardHeader>
               <CardTitle className="font-condensed text-base">Total Staff</CardTitle>
@@ -1974,30 +1974,17 @@ export default function IndexPage() {
             <CardContent>
               {taskConfigData && (
                 <div className="space-y-6">
-                  {["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping", "Equipment"].map((task) => (
-                    <div key={task} className="space-y-2">
-                      <h3 className="font-condensed font-semibold">{task}</h3>
-                      <div className="grid grid-cols-7 gap-2">
-                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
-                          <div key={day}>
-                            <label className="text-xs text-muted-foreground font-sans">{day}</label>
-                            <Input
-                              type="number"
-                              min="0"
-                              value={taskConfigData[task]?.[idx] || 0}
-                              onChange={(e) => {
-                                const newConfig = { ...taskConfigData };
-                                if (!newConfig[task]) newConfig[task] = [0, 0, 0, 0, 0, 0, 0];
-                                newConfig[task][idx] = parseInt(e.target.value) || 0;
-                                setTaskConfigData(newConfig);
-                              }}
-                              className="font-mono text-center"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"].map((task) => (
+                      <Button
+                        key={task}
+                        variant="outline"
+                        className="font-mono text-center"
+                      >
+                        {task}
+                      </Button>
+                    ))}
+                  </div>
                   <Button
                     onClick={() => {
                       updateTaskConfig.mutate(taskConfigData);

@@ -13,7 +13,6 @@ const TASK_WEIGHTS: Record<Task, number> = {
   "Inbound Late": 0.5, // Half-day shift
   "Outbound": 1.0,
   "Marshaling": 1.0,
-  "Housekeeping": 1.0,
   "Equipment": 1.0,
 };
 

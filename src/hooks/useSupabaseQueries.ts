@@ -3,6 +3,7 @@ import { useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { staffService } from "@/services/staffService";
 import type { StaffMember, Task, ShiftStart, ShiftPattern, AvailabilityType } from "@/types";
+import { useState } from "react";
 
 interface TaskConfig {
   [task: string]: number[];
@@ -209,7 +210,7 @@ export function useUpdateTaskConfig() {
 
   return useMutation({
     mutationFn: async (taskConfig: TaskConfig) => {
-      const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping", "Equipment"];
+      const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
       
       for (const task of TASKS) {
         const { error } = await supabase
@@ -298,4 +299,11 @@ export function useSupabaseMutation(table: "staff" | "availability" | "assignmen
       queryClient.invalidateQueries({ queryKey: [table] });
     },
   });
+}
+
+export function useOptimizedStaffRotaGenerator() {
+  const queryClient = useQueryClient();
+  const [generating, setGenerating] = useState(false);
+  
+  const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
 }
