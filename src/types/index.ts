@@ -1,8 +1,8 @@
-export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Inbound Late" | "Outbound" | "Marshaling" | "Housekeeping" | "Equipment";
+export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Outbound" | "Marshaling" | "Equipment" | "Inbound Late";
 
 export type ManagerDuty = "Intake" | "Out-loading" | "Admin" | "Floor";
 
-export type AvailabilityType = "available" | "rest" | "holiday" | "sick";
+export type AvailabilityType = "rest" | "holiday" | "sick" | "available";
 
 export type ShiftStart = 
   | "06:00" 
@@ -30,7 +30,7 @@ export type DayShiftPattern =
 
 export type ManagerShiftStart = "06:00" | "08:00";
 
-export type ShiftPattern = "Early" | "Late" | "All";
+export type ShiftPattern = "All" | "Mon-Fri" | "Sat-Sun" | "Custom";
 
 export interface AvailabilityEntry {
   date: string; // ISO date string
