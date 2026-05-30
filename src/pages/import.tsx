@@ -839,7 +839,7 @@ export default function ImportPage() {
               console.log(`  date: "${record.date}" (type: ${typeof record.date})`);
               console.log(`  type: "${record.type}" (type: ${typeof record.type})`);
               console.log(`  type length: ${record.type.length}`);
-              console.log(`  type char codes: ${Array.from(record.type).map(c => c.charCodeAt(0)).join(', ')}`);
+              console.log(`  type char codes: ${Array.from(String(record.type)).map(c => c.charCodeAt(0)).join(', ')}`);
               console.log(`  exact match test:`);
               console.log(`    === "rest": ${record.type === "rest"}`);
               console.log(`    === "holiday": ${record.type === "holiday"}`);
