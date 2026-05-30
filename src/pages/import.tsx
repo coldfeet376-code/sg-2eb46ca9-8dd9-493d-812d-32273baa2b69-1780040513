@@ -613,28 +613,48 @@ export default function ImportPage() {
           const batchData = batch.map(avail => ({
             staff_id: staffId,
             date: avail.date,
-            type: avail.type, // Now using 'rest_day', 'holiday', 'sick'
+            type: avail.type, // Now using 'rest', 'holiday', 'sick'
           }));
+          
+          // Debug: log the first batch data structure
+          if (batchIndex === 0) {
+            console.log(`\n📦 First batch structure (${batchData.length} records):`);
+            console.log(JSON.stringify(batchData.slice(0, 3), null, 2));
+          }
           
           try {
             // BULK UPSERT: Insert or update all records in one query
-            const { error: batchError, count } = await supabase
+            const { data, error: batchError, count, status, statusText } = await supabase
               .from('availability')
               .upsert(batchData, {
                 onConflict: 'staff_id,date',
                 count: 'exact'
               });
             
+            // Log FULL response details
+            console.log(`\n📊 Batch ${batchIndex + 1} response:`);
+            console.log(`  - Status: ${status} ${statusText || ''}`);
+            console.log(`  - Count: ${count}`);
+            console.log(`  - Error: ${batchError ? JSON.stringify(batchError) : 'null'}`);
+            console.log(`  - Data: ${data ? `${data.length} records` : 'null'}`);
+            
             if (batchError) {
               console.error(`❌ Batch ${batchIndex + 1} failed:`, batchError);
               failedAvailCount += batch.length;
               errors.push(`${staff.name} batch ${batchIndex + 1}: ${batchError.message}`);
+            } else if (count === 0 || count === null) {
+              // Silent failure - no error but also no records saved
+              console.error(`❌ Batch ${batchIndex + 1} SILENT FAILURE: No error returned but count = ${count}`);
+              console.error(`   This usually means RLS policy is blocking the insert`);
+              failedAvailCount += batch.length;
+              errors.push(`${staff.name} batch ${batchIndex + 1}: Silent failure (RLS policy blocking?)`);
             } else {
               importedAvailCount += batch.length;
               console.log(`  ✓ Batch ${batchIndex + 1}/${batches.length}: ${batch.length} records upserted`);
             }
           } catch (error: any) {
             console.error(`❌ Batch ${batchIndex + 1} exception:`, error);
+            console.error(`   Error details:`, JSON.stringify(error, null, 2));
             failedAvailCount += batch.length;
             errors.push(`${staff.name} batch ${batchIndex + 1}: ${error.message}`);
           }
