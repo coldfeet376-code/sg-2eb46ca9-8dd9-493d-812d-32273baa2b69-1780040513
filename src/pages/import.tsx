@@ -564,8 +564,8 @@ export default function ImportPage() {
             const staffData = {
               name: staff.name,
               trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"],
-              shift_start: staff.startTime,
-              shift_pattern: "All",
+              shift_start: staff.startTime as ShiftStart, // Type cast to ShiftStart
+              shift_pattern: "All" as ShiftPattern,
             };
             
             console.log(`➕ CREATING NEW staff with data:`, staffData);
