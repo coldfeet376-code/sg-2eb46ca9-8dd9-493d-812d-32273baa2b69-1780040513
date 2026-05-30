@@ -373,22 +373,13 @@ export default function ImportPage() {
         }
 
         const staffName = row[0].trim();
-        const startTime = row[1] || "06:00:00"; // Default if missing
-        const endTime = row[2] || "14:30:00";   // Default if missing
+        // Ignore shift time columns (index 1, 2, 3) - just use defaults
         const clockNumber = row[3] || "";        // Clock number (optional)
 
-        console.log(`👤 Parsing staff: ${staffName} (${startTime} - ${endTime})`);
+        console.log(`👤 Parsing staff: ${staffName} (clock: ${clockNumber || 'none'})`);
 
-        // Extract shift start hour from start time
-        let shiftStart: ShiftStart = "06:00";
-        if (typeof startTime === "string" && startTime.includes(":")) {
-          const hour = startTime.split(":")[0];
-          shiftStart = `${hour.padStart(2, "0")}:00` as ShiftStart;
-        } else if (typeof startTime === "number") {
-          // Excel time serial number (0.25 = 6:00 AM)
-          const hours = Math.floor(startTime * 24);
-          shiftStart = `${hours.toString().padStart(2, "0")}:00` as ShiftStart;
-        }
+        // Use default shift start - user can adjust later in Staff page
+        const shiftStart: ShiftStart = "06:00";
 
         // Parse availability for each date column
         const staffAvailability: any[] = [];
@@ -401,16 +392,17 @@ export default function ImportPage() {
             let availabilityType: AvailabilityType = "available";
 
             // Map Excel status to availability type
-            if (status === "REST") {
+            if (status === "REST" || status === "R") {
               availabilityType = "rest";
-            } else if (status === "HOLIDAY") {
+            } else if (status === "HOLIDAY" || status === "HOL") {
               availabilityType = "holiday";
-            } else if (status === "SICK") {
+            } else if (status === "SICK" || status === "LEAVE" || status === "ABSENT") {
               availabilityType = "sick";
-            } else if (status === "IN" || status === "AVAILABLE") {
+            } else if (status === "IN" || status === "AVAILABLE" || status === "") {
               availabilityType = "available";
             }
 
+            // Store ALL entries including "available" for complete import
             staffAvailability.push({
               date,
               type: availabilityType,
@@ -424,7 +416,7 @@ export default function ImportPage() {
         // Add to parsed staff
         parsedStaff.push({
           name: staffName,
-          trainedTasks: [], // Will be set manually after import
+          trainedTasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"], // Default all tasks
           shiftStart,
           shiftPattern: "All" as ShiftPattern,
           restDays: [],
