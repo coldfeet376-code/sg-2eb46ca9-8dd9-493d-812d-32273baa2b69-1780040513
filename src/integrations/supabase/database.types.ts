@@ -440,6 +440,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_current_user_info: { Args: never; Returns: Json }
       save_rota_bypass_cache: {
         Args: {
           p_fairness_metrics?: Json

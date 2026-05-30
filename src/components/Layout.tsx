@@ -73,11 +73,15 @@ export function Layout({ children }: LayoutProps) {
             <ThemeToggle />
             <UserProfileDropdown />
           </div>
+        </div>
+        
+        {/* Import and Debug Auth links */}
+        <div className="hidden md:flex items-center gap-1 ml-4">
           <Link
             href="/import"
             className={cn(
               "inline-flex items-center gap-2 px-4 py-2 rounded-md font-mono text-sm transition-colors",
-              pathname === "/import"
+              router.pathname === "/import"
                 ? "bg-primary text-primary-foreground"
                 : "hover:bg-muted"
             )}
@@ -90,7 +94,7 @@ export function Layout({ children }: LayoutProps) {
             href="/debug-auth"
             className={cn(
               "inline-flex items-center gap-2 px-4 py-2 rounded-md font-mono text-sm transition-colors border border-warning",
-              pathname === "/debug-auth"
+              router.pathname === "/debug-auth"
                 ? "bg-warning text-warning-foreground"
                 : "hover:bg-warning/10"
             )}
