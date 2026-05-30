@@ -2,15 +2,14 @@ import type { Assignment, FairnessMetrics, StaffMember, Task } from "@/types";
 
 // Task weights for fairness calculation
 const TASK_WEIGHTS: Record<Task, number> = {
-  "Frozen": 1.0,
-  "Milk": 1.0,
+  "Frozen": 1.2,
+  "Milk": 1.1,
   "TWI": 1.0,
-  "Inbound": 1.0,
-  "Inbound Late": 0.5, // Half-day shift
-  "Outbound": 1.0,
-  "Marshaling": 1.0,
-  "Housekeeping": 1.0,
+  "Inbound": 1.3,
+  "Outbound": 1.2,
+  "Marshaling": 1.1,
   "Equipment": 1.0,
+  "Inbound Late": 1.4,
 };
 
 export function calculateFairnessMetrics(
@@ -45,7 +44,6 @@ export function calculateFairnessMetrics(
       "Inbound Late": 0,
       "Outbound": 0,
       "Marshaling": 0,
-      "Housekeeping": 0,
       "Equipment": 0,
     };
 

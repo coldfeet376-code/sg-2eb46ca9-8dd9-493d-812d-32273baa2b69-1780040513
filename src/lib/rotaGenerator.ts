@@ -68,7 +68,16 @@ export function generateWeeklyRota({
   // Track weighted assignment counts (Inbound Late = 0.5, others = 1.0)
   const assignmentCounts: Record<string, number> = {}; // Raw counts for display
   const weightedCounts: Record<string, number> = {}; // Weighted for fairness
-  const taskCounts: Record<string, Record<Task, number>> = {};
+  const taskCounts: Record<Task, number> = {
+    "Frozen": 0,
+    "Milk": 0,
+    "TWI": 0,
+    "Inbound": 0,
+    "Outbound": 0,
+    "Marshaling": 0,
+    "Equipment": 0,
+    "Inbound Late": 0,
+  };
   const lastTaskAssigned: Record<string, Task | null> = {};
   const inboundCounts: Record<string, number> = {};
 
