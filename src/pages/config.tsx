@@ -11,6 +11,7 @@ import { AlertCircle, RefreshCw, CheckCircle, Save, Copy, ArrowRight } from "luc
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
+// Task Configuration Page - Updated 2026-05-30
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
 
