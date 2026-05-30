@@ -196,18 +196,9 @@ export default function ImportPage() {
         continue;
       }
 
-      // Map parsed start times to valid database shift_start values
-      // Database only allows: '06:00', '14:30', '22:00'
-      const startHour = parseInt(startTime.split(":")[0]);
-      let validShiftStart: string;
-      
-      if (startHour >= 0 && startHour < 12) {
-        validShiftStart = "06:00"; // Day shift
-      } else if (startHour >= 12 && startHour < 20) {
-        validShiftStart = "14:30"; // Late shift
-      } else {
-        validShiftStart = "22:00"; // Night shift
-      }
+      // Always use 06:00 as default shift start
+      // Database only allows: '06:00', '07:00', '08:00', '08:30', '09:00', '09:30', '10:00', '11:00'
+      const validShiftStart: ShiftStart = "06:00";
 
       const endShort = endTime.substring(0, 5); // HH:MM
       const shift = `${validShiftStart}-${endShort}`;
@@ -235,18 +226,23 @@ export default function ImportPage() {
           // More robust pattern matching for statuses
           if (statusText === "REST" || statusText === "R" || statusText.startsWith("REST")) {
             status = "rest";
-          } else if (statusText === "HOLIDAY" || statusText === "HOL" || statusText.startsWith("HOLIDAY")) {
+          } else if (statusText === "HOLIDAY" || statusText === "HOL" || statusText === "H" || statusText.startsWith("HOLIDAY")) {
             status = "holiday";
           } else if (
             statusText === "SICK" || 
             statusText === "LEAVE" || 
             statusText === "ABSENT" || 
             statusText === "UNION" ||
+            statusText === "S" ||
             statusText.startsWith("SICK") ||
             statusText.startsWith("LEAVE")
           ) {
             status = "sick";
-          } else if (statusText === "IN" || statusText === "WORK" || statusText === "") {
+          } else if (statusText === "IN" || statusText === "WORK" || statusText === "A" || statusText === "") {
+            status = "available";
+          } else {
+            // Unknown status - log and default to available
+            console.warn(`⚠️ Unknown status "${statusText}" on ${date} - defaulting to 'available'`);
             status = "available";
           }
 
@@ -386,22 +382,12 @@ export default function ImportPage() {
         const endTime = row[2] || "14:30:00";
         const clockNumber = row[3] || "";
 
-        // Map parsed start times to valid database shift_start values
-        // Database only allows: '06:00', '14:30', '22:00'
-        let shiftStart: string;
-        const startHour = typeof startTimeRaw === "string" 
-          ? parseInt(startTimeRaw.split(":")[0]) 
-          : Math.floor(startTimeRaw * 24); // Excel serial number
-        
-        if (startHour >= 0 && startHour < 12) {
-          shiftStart = "06:00"; // Day shift
-        } else if (startHour >= 12 && startHour < 20) {
-          shiftStart = "14:30"; // Late shift
-        } else {
-          shiftStart = "22:00"; // Night shift
-        }
+        // Always use 06:00 as default shift start
+        // Database only allows: '06:00', '07:00', '08:00', '08:30', '09:00', '09:30', '10:00', '11:00'
+        // Excel shift times are unreliable - user can adjust individual times in Staff page
+        const shiftStart: ShiftStart = "06:00";
 
-        console.log(`👤 Parsing staff: ${staffName} (${startTimeRaw} → ${shiftStart}, clock: ${clockNumber || 'none'})`);
+        console.log(`👤 Parsing staff: ${staffName} (clock: ${clockNumber || 'none'}, shift: ${shiftStart})`);
 
         // Parse availability for each date column
         const staffAvailability: ParsedAvailability[] = [];
@@ -417,12 +403,16 @@ export default function ImportPage() {
             // Database expects: 'rest', 'holiday', 'sick', 'available'
             if (status === "REST" || status === "R") {
               availabilityType = "rest";
-            } else if (status === "HOLIDAY" || status === "HOL") {
+            } else if (status === "HOLIDAY" || status === "HOL" || status === "H") {
               availabilityType = "holiday";
-            } else if (status === "SICK" || status === "LEAVE" || status === "ABSENT") {
+            } else if (status === "SICK" || status === "LEAVE" || status === "ABSENT" || status === "S") {
               availabilityType = "sick";
-            } else {
+            } else if (status === "IN" || status === "AVAILABLE" || status === "A" || status === "") {
               // Default to available (IN, empty cells, etc.)
+              availabilityType = "available";
+            } else {
+              // Unknown status - log it and default to available
+              console.warn(`⚠️ Unknown status "${status}" for ${staffName} on ${date} - defaulting to 'available'`);
               availabilityType = "available";
             }
 
@@ -455,7 +445,7 @@ export default function ImportPage() {
         newStaff.push({
           name: staffName,
           phone: clockNumber,
-          startTime: shiftStart, // Now using valid shift_start value
+          startTime: shiftStart, // Now using valid ShiftStart value
           endTime: endTime.substring(0, 5),
           shift: `${shiftStart}-${endTime.substring(0, 5)}`,
           availability: staffAvailability,
