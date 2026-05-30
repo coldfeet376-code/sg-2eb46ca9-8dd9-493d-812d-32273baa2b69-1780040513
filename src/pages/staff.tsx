@@ -73,11 +73,41 @@ export default function StaffManagement() {
     const today = new Date();
     const day = today.getDay(); // 0 = Sunday
     const sunday = new Date(today);
-    sunday.setDate(today.getDate() - day); // Go back to Sunday of current week
+    sunday.setDate(today.getDate() - day);
     sunday.setHours(0, 0, 0, 0);
     return sunday;
   });
-  
+
+  // Helper function to generate week dates - MUST be defined before useMemo
+  const getWeekDates = (startDate: Date): Date[] => {
+    const dates: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
+  // Helper function to get local date string
+  const getLocalDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  // Helper function to check availability for a date
+  const getAvailabilityForDate = (member: StaffMember, date: Date): AvailabilityType | null => {
+    const dateStr = getLocalDateString(date);
+    const entry = member.availability?.find((a) => a.date === dateStr);
+    // Only show rest/holiday/sick - treat "available" as working day (no marker)
+    if (entry && entry.type !== 'available') {
+      return entry.type;
+    }
+    return null;
+  };
+
   const { addAuditEntry } = useAudit();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -99,14 +129,6 @@ export default function StaffManagement() {
   
   // Force re-render key - increments after successful cache updates
   const [renderKey, setRenderKey] = useState(0);
-
-  // Consistent date string formatting
-  const getLocalDateString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
 
   // React Query hooks
   const { data: staff = [], isLoading: staffLoading, error: staffError, refetch } = useStaff();
@@ -200,17 +222,6 @@ export default function StaffManagement() {
     };
     
     return stats;
-  };
-
-  // Get week dates (Saturday to Sunday)
-  const getWeekDates = (weekStart: Date): Date[] => {
-    const dates: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(weekStart);
-      date.setDate(weekStart.getDate() + i);
-      dates.push(date);
-    }
-    return dates;
   };
 
   const navigateWeek = (direction: "prev" | "next") => {
@@ -399,16 +410,6 @@ export default function StaffManagement() {
     } finally {
       setLoadingCell(null);
     }
-  };
-
-  const getAvailabilityForDate = (member: StaffMember, date: Date): AvailabilityType | null => {
-    const dateStr = getLocalDateString(date);
-    const entry = member.availability?.find((a) => a.date === dateStr);
-    // Only show rest/holiday/sick - treat "available" as working day (no marker)
-    if (entry && entry.type !== 'available') {
-      return entry.type;
-    }
-    return null;
   };
 
   const getDayColor = (availabilityType: AvailabilityType | null): string => {
