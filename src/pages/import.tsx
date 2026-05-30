@@ -668,7 +668,7 @@ export default function ImportPage() {
           
           try {
             // BULK UPSERT: Insert or update all records in one query
-            const { data, error: batchError, count, status, statusText } = await supabase
+            const { error: batchError, count, status, statusText } = await supabase
               .from('availability')
               .upsert(batchData, {
                 onConflict: 'staff_id,date',
@@ -680,7 +680,6 @@ export default function ImportPage() {
             console.log(`  - Status: ${status} ${statusText || ''}`);
             console.log(`  - Count: ${count}`);
             console.log(`  - Error: ${batchError ? JSON.stringify(batchError) : 'null'}`);
-            console.log(`  - Data: ${data ? `${data.length} records` : 'null'}`);
             
             if (batchError) {
               console.error(`❌ Batch ${batchIndex + 1} failed:`, batchError);
