@@ -379,8 +379,13 @@ export default function ImportPage() {
 
         const staffName = row[0].trim();
         const startTimeRaw = row[1] || "06:00:00";
-        const endTime = row[2] || "14:30:00";
+        const endTimeRaw = row[2] || "14:30:00";
         const clockNumber = row[3] || "";
+
+        // Convert endTime to string if it's an Excel serial number
+        const endTime = typeof endTimeRaw === "string" 
+          ? endTimeRaw 
+          : "14:30:00"; // Default if it's a number
 
         // Always use 06:00 as default shift start
         // Database only allows: '06:00', '07:00', '08:00', '08:30', '09:00', '09:30', '10:00', '11:00'
