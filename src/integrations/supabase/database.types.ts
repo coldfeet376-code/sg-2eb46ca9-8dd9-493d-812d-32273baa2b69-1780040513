@@ -302,34 +302,34 @@ export type Database = {
       }
       rotas: {
         Row: {
-          assignments: Json
           created_at: string | null
           created_by: string | null
           fairness_metrics: Json | null
           id: string
           locked_count: number | null
+          rota_data: Json | null
           updated_at: string | null
           version: number | null
           week_start: string
         }
         Insert: {
-          assignments: Json
           created_at?: string | null
           created_by?: string | null
           fairness_metrics?: Json | null
           id?: string
           locked_count?: number | null
+          rota_data?: Json | null
           updated_at?: string | null
           version?: number | null
           week_start: string
         }
         Update: {
-          assignments?: Json
           created_at?: string | null
           created_by?: string | null
           fairness_metrics?: Json | null
           id?: string
           locked_count?: number | null
+          rota_data?: Json | null
           updated_at?: string | null
           version?: number | null
           week_start?: string
@@ -414,12 +414,40 @@ export type Database = {
         }
         Relationships: []
       }
+      two_factor_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          email: string
+          expires_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          email: string
+          expires_at: string
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          email?: string
+          expires_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      save_rota_bypass_cache: {
+        Args: {
+          p_fairness_metrics?: Json
+          p_rota_data: Json
+          p_week_start: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

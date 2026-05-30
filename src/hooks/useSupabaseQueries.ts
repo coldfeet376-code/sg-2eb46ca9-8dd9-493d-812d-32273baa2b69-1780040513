@@ -20,8 +20,19 @@ export function useStaff() {
         .select("*")
         .order("name");
 
-      if (staffError) throw staffError;
-      if (!staffData || staffData.length === 0) return [];
+      console.log("📡 Supabase staff query result:");
+      console.log("   Error:", staffError);
+      console.log("   Data count:", staffData?.length || 0);
+      
+      if (staffError) {
+        console.error("❌ Staff query error:", staffError);
+        throw staffError;
+      }
+
+      if (!staffData || staffData.length === 0) {
+        console.warn("⚠️ No staff data returned from database");
+        return [];
+      }
 
       // Fetch ALL availability data with pagination to bypass 1000-row limit
       let allAvailability: any[] = [];
