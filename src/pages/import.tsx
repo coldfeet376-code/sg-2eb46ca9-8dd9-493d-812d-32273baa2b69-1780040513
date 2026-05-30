@@ -44,6 +44,11 @@ export default function ImportPage() {
   const [currentProcessingStaff, setCurrentProcessingStaff] = useState<string>("");
   const [importStats, setImportStats] = useState({ success: 0, skipped: 0, errors: 0 });
   const [isDeletingStaff, setIsDeletingStaff] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+    details?: any;
+  } | null>(null);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -624,9 +629,20 @@ export default function ImportPage() {
       console.error("Error details:", testError.details);
       console.error("Error hint:", testError.hint);
       
+      // SET VISIBLE ERROR STATE
+      setTestResult({
+        success: false,
+        message: testError.message,
+        details: {
+          code: testError.code,
+          details: testError.details,
+          hint: testError.hint,
+        }
+      });
+      
       toast({
         title: "❌ Database Write Test Failed",
-        description: `Cannot write to availability table: ${testError.message}. Import will fail. Check console (F12) for details.`,
+        description: `${testError.message} - See error panel below for details.`,
         variant: "destructive",
       });
       
@@ -642,6 +658,13 @@ export default function ImportPage() {
     
     console.log("✅ TEST WRITE SUCCESSFUL - availability table is writable");
     console.log("   Test record created:", testInsert);
+    
+    // SET SUCCESS STATE
+    setTestResult({
+      success: true,
+      message: "Availability table is writable - proceeding with import",
+      details: testInsert
+    });
     
     // Clean up test record
     await supabase
@@ -983,6 +1006,40 @@ export default function ImportPage() {
             </div>
           </CardContent>
         </Card>
+
+        {testResult && (
+          <Alert className={testResult.success ? "border-green-500 bg-green-500/10" : "border-destructive bg-destructive/10"}>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <div className="space-y-3">
+                <div className="font-semibold text-sm flex items-center gap-2">
+                  {testResult.success ? "✅ Database Write Test: PASSED" : "❌ Database Write Test: FAILED"}
+                </div>
+                
+                <div className="text-xs font-mono bg-background/50 p-3 rounded">
+                  <div className="font-semibold mb-2">Error Message:</div>
+                  <div className="text-destructive">{testResult.message}</div>
+                </div>
+
+                {testResult.details && !testResult.success && (
+                  <div className="text-xs font-mono bg-background/50 p-3 rounded space-y-2">
+                    <div className="font-semibold">Technical Details:</div>
+                    {testResult.details.code && <div>Code: {testResult.details.code}</div>}
+                    {testResult.details.details && <div>Details: {testResult.details.details}</div>}
+                    {testResult.details.hint && <div>Hint: {testResult.details.hint}</div>}
+                  </div>
+                )}
+
+                <div className="text-xs text-muted-foreground">
+                  {testResult.success 
+                    ? "Availability writes are working - you can proceed with import"
+                    : "⚠️ SCREENSHOT THIS ERROR and send it to get help fixing the issue"
+                  }
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
 
         {!importComplete ? (
           <>
