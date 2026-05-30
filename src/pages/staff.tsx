@@ -33,6 +33,7 @@ import { Users, Plus, Trash2, Clock, Edit, X, ChevronDown, Calendar as CalendarI
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping", "Equipment"];
@@ -384,27 +385,71 @@ export default function StaffManagement() {
   };
 
   const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
+    console.log("\n\n🔵 ========== AVAILABILITY WRITE ATTEMPT ==========");
+    console.log("📅 Date:", dateStr);
+    console.log("👤 Staff ID:", staffId);
+    console.log("📝 Type:", type);
+    
+    // CHECK AUTH STATE BEFORE WRITE
+    console.log("\n🔐 Checking authentication...");
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log("   Session exists:", !!session);
+    console.log("   Session error:", sessionError);
+    if (session) {
+      console.log("   User ID:", session.user?.id);
+      console.log("   Email:", session.user?.email);
+      console.log("   Access token (first 30 chars):", session.access_token?.substring(0, 30) + "...");
+    } else {
+      console.error("❌ NO SESSION - This is why writes are failing!");
+      toast({
+        title: "❌ Not Authenticated",
+        description: "Please refresh the page or log in again",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setLoadingCell({ staffId, date: dateStr });
     setOpenDayDropdown(null);
 
     try {
       if (type === "clear") {
-        // Delete the availability entry
-        await deleteAvailabilityMutation.mutateAsync({ staffId, date: dateStr });
+        console.log("\n🗑️ DELETING availability entry...");
+        console.log("   Query: DELETE FROM availability WHERE staff_id =", staffId, "AND date =", dateStr);
+        
+        const deleteResult = await deleteAvailabilityMutation.mutateAsync({ staffId, date: dateStr });
+        
+        console.log("✅ Delete successful");
+        console.log("   Result:", deleteResult);
         toast({ title: "Availability cleared", description: "Day marked as working" });
       } else {
-        // Upsert the availability entry
-        await createAvailabilityMutation.mutateAsync({
+        console.log("\n💾 UPSERTING availability entry...");
+        console.log("   Query: UPSERT INTO availability (staff_id, date, type) VALUES (", staffId, ",", dateStr, ",", type, ")");
+        
+        const upsertResult = await createAvailabilityMutation.mutateAsync({
           staff_id: staffId,
           date: dateStr,
           type,
         });
+        
+        console.log("✅ Upsert successful");
+        console.log("   Result:", upsertResult);
         toast({ title: "Availability updated", description: `Day marked as ${type}` });
       }
+      console.log("\n🔵 ========== WRITE COMPLETED SUCCESSFULLY ==========\n");
     } catch (error: any) {
+      console.error("\n❌ ========== WRITE FAILED ==========");
+      console.error("Error object:", error);
+      console.error("Error message:", error.message);
+      console.error("Error code:", error.code);
+      console.error("Error details:", error.details);
+      console.error("Error hint:", error.hint);
+      console.error("Full error JSON:", JSON.stringify(error, null, 2));
+      console.error("========================================\n");
+      
       toast({ 
         title: "Error updating availability", 
-        description: error.message,
+        description: error.message || "Unknown error occurred",
         variant: "destructive" 
       });
     } finally {
