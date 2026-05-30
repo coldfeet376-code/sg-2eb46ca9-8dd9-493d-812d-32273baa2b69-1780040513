@@ -492,6 +492,50 @@ export default function ImportPage() {
   const handleImport = async () => {
     if (parsedStaff.length === 0) return;
     
+    // VERIFY AUTHENTICATION BEFORE IMPORT
+    console.log("\n=== AUTHENTICATION CHECK ===");
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      console.error("❌ NOT AUTHENTICATED:", authError);
+      toast({
+        title: "❌ Authentication Required",
+        description: "You must be logged in to import data. Please refresh the page or log in again.",
+        variant: "destructive",
+      });
+      
+      // Show detailed error in console for debugging
+      console.error("Auth check failed:");
+      console.error("  - Error:", authError);
+      console.error("  - User:", user);
+      console.error("\nPossible fixes:");
+      console.error("  1. Refresh the page (F5 or pull-to-refresh on mobile)");
+      console.error("  2. Log out and log back in");
+      console.error("  3. Clear browser cache and cookies");
+      return;
+    }
+    
+    console.log("✅ AUTHENTICATED as:", user.email);
+    console.log("   User ID:", user.id);
+    
+    // Also verify the session is being sent with queries
+    const { data: sessionTest, error: sessionError } = await supabase
+      .from('staff')
+      .select('id')
+      .limit(1);
+    
+    if (sessionError) {
+      console.error("❌ SESSION TEST FAILED:", sessionError);
+      toast({
+        title: "❌ Session Error",
+        description: "Your session exists but queries are failing. Try refreshing the page.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log("✅ SESSION VERIFIED - queries are working\n");
+    
     setIsImporting(true);
     setImportProgress(0);
     setImportStats({ success: 0, skipped: 0, errors: 0 });
