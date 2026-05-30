@@ -389,16 +389,20 @@ export default function ImportPage() {
           
           if (cellValue && typeof cellValue === "string") {
             const status = cellValue.trim().toUpperCase();
-            let availabilityType: AvailabilityType = "available";
+            let availabilityType: string;
 
-            // Map Excel status to availability type
+            // Map Excel status to database availability type
+            // Database expects: 'rest_day', 'holiday', 'sick', 'available'
             if (status === "REST" || status === "R") {
-              availabilityType = "rest";
+              availabilityType = "rest_day";
             } else if (status === "HOLIDAY" || status === "HOL") {
               availabilityType = "holiday";
             } else if (status === "SICK" || status === "LEAVE" || status === "ABSENT") {
               availabilityType = "sick";
             } else if (status === "IN" || status === "AVAILABLE" || status === "") {
+              availabilityType = "available";
+            } else {
+              // Default unknown statuses to available
               availabilityType = "available";
             }
 
@@ -536,21 +540,22 @@ export default function ImportPage() {
         let importedAvailCount = 0;
         let failedAvailCount = 0;
         
-        const unavailableDays = staff.availability.filter(a => a.status !== "available");
+        // Only import non-available days (rest_day, holiday, sick)
+        const unavailableDays = staff.availability.filter(a => a.type !== "available");
         
         console.log(`\n--- AVAILABILITY IMPORT ---`);
         console.log(`Staff ID being used: ${staffId}`);
         console.log(`Total availability entries: ${staff.availability.length}`);
         console.log(`Unavailable days (will import): ${unavailableDays.length}`);
-        console.log(`  Rest: ${unavailableDays.filter(a => a.status === "rest").length}`);
-        console.log(`  Holiday: ${unavailableDays.filter(a => a.status === "holiday").length}`);
-        console.log(`  Sick: ${unavailableDays.filter(a => a.status === "sick").length}`);
+        console.log(`  Rest: ${unavailableDays.filter(a => a.type === "rest_day").length}`);
+        console.log(`  Holiday: ${unavailableDays.filter(a => a.type === "holiday").length}`);
+        console.log(`  Sick: ${unavailableDays.filter(a => a.type === "sick").length}`);
         
         // Show first 5 unavailable days for debugging
         if (unavailableDays.length > 0) {
           console.log(`\nFirst 5 unavailable days to import:`);
           unavailableDays.slice(0, 5).forEach((avail, idx) => {
-            console.log(`  ${idx + 1}. ${avail.date} = ${avail.status.toUpperCase()}`);
+            console.log(`  ${idx + 1}. ${avail.date} = ${avail.type.toUpperCase()}`);
           });
         }
         
@@ -565,11 +570,11 @@ export default function ImportPage() {
         for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
           const batch = batches[batchIndex];
           
-          // Prepare batch data
+          // Prepare batch data with correct type values
           const batchData = batch.map(avail => ({
             staff_id: staffId,
             date: avail.date,
-            type: avail.status,
+            type: avail.type, // Now using 'rest_day', 'holiday', 'sick'
           }));
           
           try {
@@ -857,10 +862,10 @@ export default function ImportPage() {
                         {parsedStaff.slice(0, 10).map((staff, idx) => {
                           const isMatched = matchedStaff.has(staff.name);
                           const willBeSkipped = updateMode && !isMatched;
-                          const unavailableDays = staff.availability.filter(a => a.status !== "available");
-                          const restDays = unavailableDays.filter(a => a.status === "rest").length;
-                          const holidayDays = unavailableDays.filter(a => a.status === "holiday").length;
-                          const sickDays = unavailableDays.filter(a => a.status === "sick").length;
+                          const unavailableDays = staff.availability.filter(a => a.type !== "available");
+                          const restDays = unavailableDays.filter(a => a.type === "rest_day").length;
+                          const holidayDays = unavailableDays.filter(a => a.type === "holiday").length;
+                          const sickDays = unavailableDays.filter(a => a.type === "sick").length;
                           
                           return (
                             <div 
