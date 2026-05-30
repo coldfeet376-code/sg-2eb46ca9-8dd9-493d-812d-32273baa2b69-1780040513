@@ -6,6 +6,7 @@ import { Home, Users, Calendar, RefreshCw, BarChart3, ShieldCheck, Upload } from
 import { ThemeToggle } from "./ThemeToggle";
 import { UserProfileDropdown } from "./UserProfileDropdown";
 import { authService } from "@/services/authService";
+import { cn } from "@/lib/utils";
 
 interface LayoutProps {
   children: ReactNode;
@@ -72,6 +73,30 @@ export function Layout({ children }: LayoutProps) {
             <ThemeToggle />
             <UserProfileDropdown />
           </div>
+          <Link
+            href="/import"
+            className={cn(
+              "inline-flex items-center gap-2 px-4 py-2 rounded-md font-mono text-sm transition-colors",
+              pathname === "/import"
+                ? "bg-primary text-primary-foreground"
+                : "hover:bg-muted"
+            )}
+          >
+            <Upload className="h-4 w-4" />
+            Import
+          </Link>
+          
+          <Link
+            href="/debug-auth"
+            className={cn(
+              "inline-flex items-center gap-2 px-4 py-2 rounded-md font-mono text-sm transition-colors border border-warning",
+              pathname === "/debug-auth"
+                ? "bg-warning text-warning-foreground"
+                : "hover:bg-warning/10"
+            )}
+          >
+            🔍 Auth Check
+          </Link>
         </div>
       </header>
 
