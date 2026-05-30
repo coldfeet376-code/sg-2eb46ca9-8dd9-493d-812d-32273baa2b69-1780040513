@@ -32,8 +32,6 @@ interface ParsedStaff {
 export default function ImportPage() {
   const [pasteText, setPasteText] = useState("");
   const [parsedStaff, setParsedStaff] = useState<ParsedStaff[]>([]);
-  const [previewData, setPreviewData] = useState<any[]>([]);
-  const [availabilityData, setAvailabilityData] = useState<any[]>([]);
   const [updateMode, setUpdateMode] = useState(true);
   const [matchedStaff, setMatchedStaff] = useState<Map<string, string>>(new Map());
   const [isImporting, setIsImporting] = useState(false);
@@ -360,8 +358,8 @@ export default function ImportPage() {
       console.log(`📅 Found ${dateColumns.length} date columns`);
       console.log("📅 Date range:", dateColumns[0]?.date, "to", dateColumns[dateColumns.length - 1]?.date);
 
-      const parsedStaff: any[] = [];
-      const allAvailability: any[] = [];
+      const newStaff: ParsedStaff[] = [];
+      const matches = new Map<string, string>();
 
       // Parse staff rows
       for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
@@ -373,73 +371,97 @@ export default function ImportPage() {
         }
 
         const staffName = row[0].trim();
-        // Ignore shift time columns (index 1, 2, 3) - just use defaults
-        const clockNumber = row[3] || "";        // Clock number (optional)
+        const startTime = row[1] || "06:00:00";
+        const endTime = row[2] || "14:30:00";
+        const clockNumber = row[3] || "";
 
-        console.log(`👤 Parsing staff: ${staffName} (clock: ${clockNumber || 'none'})`);
-
-        // Use default shift start - user can adjust later in Staff page
-        const shiftStart: ShiftStart = "06:00";
+        console.log(`👤 Parsing staff: ${staffName} (${startTime} - ${endTime}, clock: ${clockNumber || 'none'})`);
 
         // Parse availability for each date column
-        const staffAvailability: any[] = [];
+        const staffAvailability: ParsedAvailability[] = [];
         
         dateColumns.forEach(({ index, date }) => {
           const cellValue = row[index];
           
-          if (cellValue && typeof cellValue === "string") {
-            const status = cellValue.trim().toUpperCase();
-            let availabilityType: string;
+          if (cellValue) {
+            const status = (typeof cellValue === "string" ? cellValue : String(cellValue)).trim().toUpperCase();
+            let availabilityType: AvailabilityType;
 
             // Map Excel status to database availability type
-            // Database expects: 'rest', 'holiday', 'sick', 'available' (NOT 'rest_day')
             if (status === "REST" || status === "R") {
               availabilityType = "rest";
             } else if (status === "HOLIDAY" || status === "HOL") {
               availabilityType = "holiday";
             } else if (status === "SICK" || status === "LEAVE" || status === "ABSENT") {
               availabilityType = "sick";
-            } else if (status === "IN" || status === "AVAILABLE" || status === "") {
-              availabilityType = "available";
             } else {
-              // Default unknown statuses to available
+              // Default to available (IN, empty cells, etc.)
               availabilityType = "available";
             }
 
-            // Store ALL entries including "available" for complete import
             staffAvailability.push({
               date,
               type: availabilityType,
-              notes: clockNumber ? `Clock: ${clockNumber}` : undefined,
+            });
+          } else {
+            // Empty cell = available
+            staffAvailability.push({
+              date,
+              type: "available",
             });
           }
         });
 
         console.log(`   📅 Parsed ${staffAvailability.length} availability entries for ${staffName}`);
 
-        // Add to parsed staff
-        parsedStaff.push({
+        // Try to match with existing staff
+        if (updateMode && existingStaff.length > 0) {
+          const matchedExisting = existingStaff.find((s: StaffMember) => 
+            s.name.toLowerCase().trim() === staffName.toLowerCase().trim()
+          );
+          if (matchedExisting) {
+            matches.set(staffName, matchedExisting.id);
+          }
+        }
+
+        // Add to parsed staff (same format as paste parser)
+        newStaff.push({
           name: staffName,
-          trainedTasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"], // Default all tasks
-          shiftStart,
-          shiftPattern: "All" as ShiftPattern,
-          restDays: [],
+          phone: clockNumber,
+          startTime: startTime.substring(0, 5), // HH:MM
+          endTime: endTime.substring(0, 5),
+          shift: `${startTime.substring(0, 5)}-${endTime.substring(0, 5)}`,
           availability: staffAvailability,
         });
-
-        allAvailability.push(...staffAvailability.map(a => ({ ...a, staffName })));
       }
 
-      console.log(`✅ Parsed ${parsedStaff.length} staff members`);
-      console.log(`📊 Total availability entries: ${allAvailability.length}`);
+      console.log(`✅ Parsed ${newStaff.length} staff members`);
 
-      setPreviewData(parsedStaff);
-      setAvailabilityData(allAvailability);
+      // Set the same state variables as paste parser
+      setParsedStaff(newStaff);
+      setMatchedStaff(matches);
 
-      toast({
-        title: "File parsed successfully",
-        description: `Found ${parsedStaff.length} staff with ${dateColumns.length} days of availability`,
-      });
+      if (newStaff.length > 0 && dateColumns.length > 0) {
+        const firstDate = dateColumns[0].date;
+        const lastDate = dateColumns[dateColumns.length - 1].date;
+        setDateRange(`${firstDate} to ${lastDate}`);
+
+        const matchCount = matches.size;
+        const unmatchedCount = newStaff.length - matchCount;
+        const totalDays = dateColumns.length;
+        
+        // Count total unavailable days across all staff
+        const totalUnavailableDays = newStaff.reduce((sum, s) => 
+          sum + s.availability.filter(a => a.type !== "available").length, 0
+        );
+
+        toast({
+          title: "File parsed successfully",
+          description: updateMode 
+            ? `Found ${newStaff.length} staff (${matchCount} matched, ${unmatchedCount} not found) - ${totalUnavailableDays} total unavailable days across ${totalDays} days`
+            : `Found ${newStaff.length} staff with ${totalUnavailableDays} total unavailable days across ${totalDays} days`,
+        });
+      }
     } catch (error: any) {
       console.error("❌ Parse error:", error);
       toast({
@@ -448,7 +470,7 @@ export default function ImportPage() {
         variant: "destructive",
       });
     }
-  }, [toast]);
+  }, [toast, updateMode, existingStaff]);
 
   const handleImport = async () => {
     if (parsedStaff.length === 0) return;
@@ -772,6 +794,51 @@ export default function ImportPage() {
                   <Calendar className="h-4 w-4 mr-2" />
                   Parse Spreadsheet Data
                 </Button>
+              </CardContent>
+            </Card>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground font-mono">
+                  Or upload Excel file
+                </span>
+              </div>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-condensed flex items-center gap-2">
+                  <Upload className="h-5 w-5" />
+                  Upload Excel File
+                </CardTitle>
+                <CardDescription className="font-mono text-xs">
+                  Upload .xlsx file with staff names and availability dates
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/10 hover:bg-muted/20 transition-colors">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
+                    <p className="mb-2 text-sm text-muted-foreground font-mono">
+                      <span className="font-semibold">Click to upload</span> or drag and drop
+                    </p>
+                    <p className="text-xs text-muted-foreground font-mono">.xlsx files only</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        parseExcelFile(file);
+                      }
+                    }}
+                  />
+                </label>
               </CardContent>
             </Card>
 
