@@ -196,8 +196,8 @@ export function generateWeeklyRota({
         if (aWeighted !== bWeighted) return aWeighted - bWeighted;
         
         // Secondary: fewest times doing THIS specific task
-        const aTaskCount = (taskCounts[a.id] && taskCounts[a.id][task]) || 0;
-        const bTaskCount = (taskCounts[b.id] && taskCounts[b.id][task]) || 0;
+        const aTaskCount = (taskCounts[a.id]?.[task] as number) || 0;
+        const bTaskCount = (taskCounts[b.id]?.[task] as number) || 0;
         return aTaskCount - bTaskCount;
       });
 

@@ -9,7 +9,7 @@ import { useStaff } from "@/hooks/useSupabaseQueries";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Download, TrendingUp, Users, Target, Calendar, BarChart3, PieChart, Activity } from "lucide-react";
-import type { StaffMember, Assignment } from "@/types";
+import type { StaffMember, Assignment, Task } from "@/types";
 
 const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
 
