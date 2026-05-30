@@ -583,98 +583,124 @@ export default function ImportPage() {
     console.log("   User ID:", user.id);
     
     // CRITICAL TEST: Try to write ONE availability record directly
-    console.log("\n=== DIRECT DATABASE WRITE TEST ===");
-    console.log("Testing if availability table accepts writes from your session...");
+    // BUT ONLY if we're in UPDATE MODE or staff already exist
+    // In CREATE MODE with empty DB, we'll create staff first, then test won't be needed
     
-    // Get first staff member
-    const firstStaff = await supabase
+    const { data: staffCount, error: countError } = await supabase
       .from('staff')
-      .select('id, name')
-      .limit(1)
-      .single();
+      .select('id', { count: 'exact', head: true });
     
-    if (firstStaff.error || !firstStaff.data) {
-      toast({
-        title: "❌ No staff found",
-        description: "Import staff members first before importing availability",
-        variant: "destructive",
-      });
-      return;
-    }
+    const hasExistingStaff = !countError && staffCount && (staffCount as any).count > 0;
     
-    console.log("Using staff:", firstStaff.data.name, "(ID:", firstStaff.data.id, ")");
+    console.log("\n=== DATABASE STATE CHECK ===");
+    console.log(`Existing staff in database: ${hasExistingStaff ? 'YES' : 'NO'}`);
+    console.log(`Update mode: ${updateMode ? 'ON' : 'OFF'}`);
     
-    // Try to insert a test availability record
-    const testDate = '2026-06-01';
-    const { data: testInsert, error: testError, count, status, statusText } = await supabase
-      .from('availability')
-      .insert({
-        staff_id: firstStaff.data.id,
-        date: testDate,
-        type: 'rest'
-      })
-      .select()
-      .single();
-    
-    console.log("Test insert result:");
-    console.log("  - Status:", status, statusText);
-    console.log("  - Data:", testInsert);
-    console.log("  - Error:", testError);
-    console.log("  - Count:", count);
-    
-    if (testError) {
-      console.error("❌ TEST WRITE FAILED - This is why import fails!");
-      console.error("Error code:", testError.code);
-      console.error("Error message:", testError.message);
-      console.error("Error details:", testError.details);
-      console.error("Error hint:", testError.hint);
+    if (!updateMode && !hasExistingStaff) {
+      console.log("✓ CREATE MODE with empty database - will create staff first, then availability");
+      console.log("  Skipping availability test - staff don't exist yet");
       
-      // SET VISIBLE ERROR STATE
+      // Skip the test - staff will be created during import
       setTestResult({
-        success: false,
-        message: testError.message,
-        details: {
-          code: testError.code,
-          details: testError.details,
-          hint: testError.hint,
-        }
+        success: true,
+        message: "CREATE MODE - Staff will be created first, then availability",
+        details: { mode: "create", staffCount: 0 }
+      });
+    } else {
+      // Test availability writes ONLY if staff exist
+      console.log("\n=== DIRECT DATABASE WRITE TEST ===");
+      console.log("Testing if availability table accepts writes from your session...");
+      
+      // Get first staff member
+      const firstStaff = await supabase
+        .from('staff')
+        .select('id, name')
+        .limit(1)
+        .single();
+      
+      if (firstStaff.error || !firstStaff.data) {
+        toast({
+          title: "❌ No staff found",
+          description: "Import staff members first before importing availability",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log("Using staff:", firstStaff.data.name, "(ID:", firstStaff.data.id, ")");
+      
+      // Try to insert a test availability record
+      const testDate = '2026-06-01';
+      const { data: testInsert, error: testError, count, status, statusText } = await supabase
+        .from('availability')
+        .insert({
+          staff_id: firstStaff.data.id,
+          date: testDate,
+          type: 'rest'
+        })
+        .select()
+        .single();
+      
+      console.log("Test insert result:");
+      console.log("  - Status:", status, statusText);
+      console.log("  - Data:", testInsert);
+      console.log("  - Error:", testError);
+      console.log("  - Count:", count);
+      
+      if (testError) {
+        console.error("❌ TEST WRITE FAILED - This is why import fails!");
+        console.error("Error code:", testError.code);
+        console.error("Error message:", testError.message);
+        console.error("Error details:", testError.details);
+        console.error("Error hint:", testError.hint);
+        
+        // SET VISIBLE ERROR STATE
+        setTestResult({
+          success: false,
+          message: testError.message,
+          details: {
+            code: testError.code,
+            details: testError.details,
+            hint: testError.hint,
+          }
+        });
+        
+        toast({
+          title: "❌ Database Write Test Failed",
+          description: `${testError.message} - See error panel below for details.`,
+          variant: "destructive",
+        });
+        
+        // Clean up test record if it somehow got through
+        await supabase
+          .from('availability')
+          .delete()
+          .eq('staff_id', firstStaff.data.id)
+          .eq('date', testDate);
+        
+        return; // STOP - don't proceed with import
+      }
+      
+      console.log("✅ TEST WRITE SUCCESSFUL - availability table is writable");
+      console.log("   Test record created:", testInsert);
+      
+      // SET SUCCESS STATE
+      setTestResult({
+        success: true,
+        message: "Availability table is writable - proceeding with import",
+        details: testInsert
       });
       
-      toast({
-        title: "❌ Database Write Test Failed",
-        description: `${testError.message} - See error panel below for details.`,
-        variant: "destructive",
-      });
-      
-      // Clean up test record if it somehow got through
+      // Clean up test record
       await supabase
         .from('availability')
         .delete()
         .eq('staff_id', firstStaff.data.id)
         .eq('date', testDate);
       
-      return; // STOP - don't proceed with import
+      console.log("   Test record cleaned up");
+      console.log("=== DATABASE IS READY FOR IMPORT ===\n");
     }
-    
-    console.log("✅ TEST WRITE SUCCESSFUL - availability table is writable");
-    console.log("   Test record created:", testInsert);
-    
-    // SET SUCCESS STATE
-    setTestResult({
-      success: true,
-      message: "Availability table is writable - proceeding with import",
-      details: testInsert
-    });
-    
-    // Clean up test record
-    await supabase
-      .from('availability')
-      .delete()
-      .eq('staff_id', firstStaff.data.id)
-      .eq('date', testDate);
-    
-    console.log("   Test record cleaned up");
-    console.log("=== DATABASE IS READY FOR IMPORT ===\n");
     
     setIsImporting(true);
     setImportProgress(0);
