@@ -280,8 +280,11 @@ export default function ImportPage() {
         debugLines.push(`Shift: ${shift}, Phone: ${phone || "none"}`);
         debugLines.push(`Total cells in row: ${cells.length}`);
         debugLines.push(`Date columns to check: ${dateColumns.length}`);
-        debugLines.push(`First 20 availability cells:`);
+        debugLines.push(`\n📋 AVAILABILITY PARSING (showing first 30 days):`);
       }
+      
+      // Track what we find for summary
+      const parsedTypes = { rest: 0, holiday: 0, sick: 0, available: 0 };
       
       for (let dcIdx = 0; dcIdx < dateColumns.length; dcIdx++) {
         const { index, date } = dateColumns[dcIdx];
@@ -291,12 +294,17 @@ export default function ImportPage() {
           const statusText = rawCell.trim().toUpperCase();
           let status: AvailabilityType = "available";
 
-          // More robust pattern matching for statuses
+          // CASE-INSENSITIVE pattern matching for statuses
+          // Now handles: Rest/REST/rest/R/r
           if (statusText === "REST" || statusText === "R" || statusText.startsWith("REST")) {
             status = "rest";
-          } else if (statusText === "HOLIDAY" || statusText === "HOL" || statusText === "H" || statusText.startsWith("HOLIDAY")) {
+          } 
+          // Now handles: Holiday/HOLIDAY/holiday/HOL/hol/H/h
+          else if (statusText === "HOLIDAY" || statusText === "HOL" || statusText === "H" || statusText.startsWith("HOLIDAY")) {
             status = "holiday";
-          } else if (
+          } 
+          // Now handles: Sick/SICK/sick/Leave/LEAVE/leave/Absent/S/s
+          else if (
             statusText === "SICK" || 
             statusText === "LEAVE" || 
             statusText === "ABSENT" || 
@@ -306,27 +314,44 @@ export default function ImportPage() {
             statusText.startsWith("LEAVE")
           ) {
             status = "sick";
-          } else if (statusText === "IN" || statusText === "WORK" || statusText === "A" || statusText === "") {
+          } 
+          // Now handles: IN/In/in/WORK/Work/work/A/a or empty
+          else if (statusText === "IN" || statusText === "WORK" || statusText === "A" || statusText === "") {
             status = "available";
           } else {
             // Unknown status - log and default to available
-            console.warn(`⚠️ Unknown status "${statusText}" on ${date} - defaulting to 'available'`);
+            console.warn(`⚠️ Unknown status "${statusText}" (original: "${rawCell}") on ${date} for ${name} - defaulting to 'available'`);
             status = "available";
           }
 
-          // Debug logging for first person, first 20 days
-          if (newStaff.length === 0 && dcIdx < 20) {
-            debugLines.push(`  Cell ${index} (${date}): "${rawCell}" → ${status}`);
+          // Count what we're parsing
+          parsedTypes[status]++;
+
+          // Detailed logging for first person, first 30 days
+          if (newStaff.length === 0 && dcIdx < 30) {
+            const arrow = rawCell !== statusText ? `"${rawCell}" → "${statusText}" → ` : `"${rawCell}" → `;
+            const statusEmoji = status === "rest" ? "🛌" : status === "holiday" ? "🏖️" : status === "sick" ? "🤒" : "✅";
+            debugLines.push(`  ${date}: ${arrow}${statusEmoji} ${status.toUpperCase()}`);
           }
 
           // Store ALL days (including available) for preview purposes
           availability.push({ date, type: status });
         } else {
           // Debug: cell index out of range
-          if (newStaff.length === 0 && dcIdx < 20) {
-            debugLines.push(`  Cell ${index} (${date}): OUT OF RANGE (row has only ${cells.length} cells)`);
+          if (newStaff.length === 0 && dcIdx < 30) {
+            debugLines.push(`  ${date}: ❌ OUT OF RANGE (row has only ${cells.length} cells)`);
           }
         }
+      }
+
+      // Show summary for first person
+      if (newStaff.length === 0) {
+        debugLines.push(`\n📊 FIRST PERSON SUMMARY:`);
+        debugLines.push(`  🛌 Rest: ${parsedTypes.rest} days`);
+        debugLines.push(`  🏖️ Holiday: ${parsedTypes.holiday} days`);
+        debugLines.push(`  🤒 Sick: ${parsedTypes.sick} days`);
+        debugLines.push(`  ✅ Available: ${parsedTypes.available} days`);
+        debugLines.push(`  Total: ${parsedTypes.rest + parsedTypes.holiday + parsedTypes.sick + parsedTypes.available} days parsed`);
       }
 
       // Try to match with existing staff
@@ -465,28 +490,48 @@ export default function ImportPage() {
         // Parse availability for each date column
         const staffAvailability: ParsedAvailability[] = [];
         
+        // Track what we find for logging
+        const parsedTypes = { rest: 0, holiday: 0, sick: 0, available: 0 };
+        const firstDays: string[] = [];
+        
         dateColumns.forEach(({ index, date }) => {
           const cellValue = row[index];
           
           if (cellValue) {
-            const status = (typeof cellValue === "string" ? cellValue : String(cellValue)).trim().toUpperCase();
+            const rawValue = typeof cellValue === "string" ? cellValue : String(cellValue);
+            const status = rawValue.trim().toUpperCase();
             let availabilityType: AvailabilityType;
 
-            // Map Excel status to database availability type
+            // CASE-INSENSITIVE mapping - Excel status to database availability type
             // Database expects: 'rest', 'holiday', 'sick', 'available'
+            
+            // Now handles: Rest/REST/rest/R/r
             if (status === "REST" || status === "R") {
               availabilityType = "rest";
-            } else if (status === "HOLIDAY" || status === "HOL" || status === "H") {
+            } 
+            // Now handles: Holiday/HOLIDAY/holiday/HOL/hol/H/h
+            else if (status === "HOLIDAY" || status === "HOL" || status === "H") {
               availabilityType = "holiday";
-            } else if (status === "SICK" || status === "LEAVE" || status === "ABSENT" || status === "S") {
+            } 
+            // Now handles: Sick/SICK/sick/Leave/LEAVE/leave/Absent/S/s
+            else if (status === "SICK" || status === "LEAVE" || status === "ABSENT" || status === "S") {
               availabilityType = "sick";
-            } else if (status === "IN" || status === "AVAILABLE" || status === "A" || status === "") {
-              // Default to available (IN, empty cells, etc.)
+            } 
+            // Now handles: IN/In/in/AVAILABLE/Available/available/A/a or empty
+            else if (status === "IN" || status === "AVAILABLE" || status === "A" || status === "") {
               availabilityType = "available";
             } else {
               // Unknown status - log it and default to available
-              console.warn(`⚠️ Unknown status "${status}" for ${staffName} on ${date} - defaulting to 'available'`);
+              console.warn(`⚠️ Unknown status "${status}" (original: "${rawValue}") for ${staffName} on ${date} - defaulting to 'available'`);
               availabilityType = "available";
+            }
+
+            parsedTypes[availabilityType]++;
+            
+            // Log first 10 days for debugging
+            if (firstDays.length < 10) {
+              const statusEmoji = availabilityType === "rest" ? "🛌" : availabilityType === "holiday" ? "🏖️" : availabilityType === "sick" ? "🤒" : "✅";
+              firstDays.push(`${date}: ${rawValue !== status ? `"${rawValue}" → "${status}" → ` : `"${rawValue}" → `}${statusEmoji} ${availabilityType}`);
             }
 
             staffAvailability.push({
@@ -495,6 +540,7 @@ export default function ImportPage() {
             });
           } else {
             // Empty cell = available
+            parsedTypes.available++;
             staffAvailability.push({
               date,
               type: "available",
@@ -503,6 +549,11 @@ export default function ImportPage() {
         });
 
         console.log(`   📅 Parsed ${staffAvailability.length} availability entries for ${staffName}`);
+        console.log(`   📊 Breakdown: 🛌 ${parsedTypes.rest} rest, 🏖️ ${parsedTypes.holiday} holiday, 🤒 ${parsedTypes.sick} sick, ✅ ${parsedTypes.available} available`);
+        if (firstDays.length > 0) {
+          console.log(`   📋 First ${firstDays.length} days:`);
+          firstDays.forEach(day => console.log(`      ${day}`));
+        }
 
         // Try to match with existing staff
         if (updateMode && existingStaff.length > 0) {
