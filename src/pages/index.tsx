@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { Layout } from "@/components/Layout";
 import { SEO } from "@/components/SEO";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1081,7 +1080,7 @@ export default function IndexPage() {
   };
 
   return (
-    <Layout>
+    <>
       <OnboardingTour />
       <SEO
         title="Warehouse Rota System"
@@ -2001,6 +2000,6 @@ export default function IndexPage() {
           </Card>
         </TabsContent>
       </Tabs>
-    </Layout>
+    </>
   );
 }

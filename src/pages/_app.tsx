@@ -12,6 +12,7 @@ import { authService } from "@/services/authService";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { Layout } from "@/components/Layout";
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -72,6 +73,15 @@ export default function App({ Component, pageProps }: AppProps) {
     );
   }
 
+  // Public pages (login, signup, etc.) render without Layout
+  const PageContent = isPublicRoute ? (
+    <Component {...pageProps} />
+  ) : (
+    <Layout>
+      <Component {...pageProps} />
+    </Layout>
+  );
+
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
@@ -79,7 +89,7 @@ export default function App({ Component, pageProps }: AppProps) {
           <TourProvider>
             <UndoRedoProvider>
               <AuditProvider>
-                <Component {...pageProps} />
+                {PageContent}
                 <Toaster />
                 <InstallPrompt />
               </AuditProvider>
