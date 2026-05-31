@@ -1,19 +1,12 @@
 import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { Button } from "@/components/ui/button";
-import { Home, Users, Calendar, RefreshCw, BarChart3, ShieldCheck, Upload, Settings, UserCog, ArrowLeftRight } from "lucide-react";
-import { ThemeToggle } from "./ThemeToggle";
-import { UserProfileDropdown } from "./UserProfileDropdown";
-import { authService } from "@/services/authService";
+import { Calendar, Users, Settings, BarChart3, ArrowLeftRight, UserCog, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { UserProfileDropdown } from "./UserProfileDropdown";
 import { supabase } from "@/integrations/supabase/client";
 
-interface LayoutProps {
-  children: ReactNode;
-}
-
-export function Layout({ children }: LayoutProps) {
+export function Layout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
@@ -46,110 +39,67 @@ export function Layout({ children }: LayoutProps) {
     }
   };
 
-  const navItems = [
-    { href: "/", label: "Rota", icon: Home },
-    { href: "/staff", label: "Staff", icon: Users },
-    { href: "/managers", label: "Managers", icon: Calendar },
-    { href: "/swaps", label: "Swaps", icon: RefreshCw },
-    { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  const navigation = [
+    { name: "Rota", href: "/", icon: Calendar },
+    { name: "Staff", href: "/staff", icon: Users },
+    { name: "Managers", href: "/managers", icon: UserCog },
+    { name: "Swaps", href: "/swaps", icon: ArrowLeftRight },
+    { name: "Import", href: "/import", icon: Upload },
+    { name: "Config", href: "/config", icon: Settings },
+    { name: "Analytics", href: "/analytics", icon: BarChart3 },
   ];
 
-  // Add Admin tab only for admin users
-  if (isAdmin) {
-    navItems.push({
-      href: "/admin/invites",
-      label: "Admin",
-      icon: ShieldCheck,
-    });
+  // Add Admin link if user is admin
+  if (isAdmin && !checkingAdmin) {
+    navigation.push({ name: "Admin", href: "/admin/setup", icon: UserCog });
   }
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b border-border/50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-6">
-            <h1 className="text-xl font-condensed font-bold tracking-tight">
-              GIST WAREHOUSE ROTA
-            </h1>
-            <nav className="hidden md:flex items-center gap-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = router.pathname === item.href;
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <Button
-                      variant={isActive ? "default" : "ghost"}
-                      size="sm"
-                      className="gap-2 font-sans"
+      <nav className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 max-w-7xl">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-8">
+              <Link href="/" className="flex items-center gap-2 group">
+                <Calendar className="h-6 w-6 text-primary transition-transform group-hover:scale-110" />
+                <span className="font-condensed font-bold text-xl tracking-tight">
+                  Warehouse Rota
+                </span>
+              </Link>
+
+              <div className="hidden md:flex items-center gap-1">
+                {navigation.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = router.pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center gap-2 px-4 py-2 rounded-lg font-sans font-medium text-sm transition-all",
+                        isActive
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      )}
                     >
                       <Icon className="h-4 w-4" />
-                      {item.label}
-                    </Button>
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <UserProfileDropdown />
+                      {item.name}
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <UserProfileDropdown />
+            </div>
           </div>
         </div>
-        
-        {/* Import and Debug Auth links */}
-        <div className="hidden md:flex items-center gap-1 ml-4">
-          <Link
-            href="/import"
-            className={cn(
-              "inline-flex items-center gap-2 px-4 py-2 rounded-md font-mono text-sm transition-colors",
-              router.pathname === "/import"
-                ? "bg-primary text-primary-foreground"
-                : "hover:bg-muted"
-            )}
-          >
-            <Upload className="h-4 w-4" />
-            Import
-          </Link>
-          
-          <Link
-            href="/debug-auth"
-            className={cn(
-              "inline-flex items-center gap-2 px-4 py-2 rounded-md font-mono text-sm transition-colors border border-warning",
-              router.pathname === "/debug-auth"
-                ? "bg-warning text-warning-foreground"
-                : "hover:bg-warning/10"
-            )}
-          >
-            🔍 Auth Check
-          </Link>
-        </div>
-      </header>
+      </nav>
 
-      {/* Mobile Navigation */}
-      <div className="md:hidden border-b border-border/50 bg-background">
-        <nav className="container px-4 py-2 flex gap-1 overflow-x-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = router.pathname === item.href;
-            return (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant={isActive ? "default" : "ghost"}
-                  size="sm"
-                  className="gap-2 font-sans whitespace-nowrap"
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.label}
-                </Button>
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">{children}</main>
+      <main className="container mx-auto py-8 px-4 max-w-7xl">
+        {children}
+      </main>
     </div>
   );
 }
