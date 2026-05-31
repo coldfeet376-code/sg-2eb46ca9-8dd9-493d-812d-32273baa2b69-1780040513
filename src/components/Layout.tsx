@@ -1,12 +1,13 @@
-import { ReactNode, useState, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { Button } from "@/components/ui/button";
-import { Home, Users, Calendar, RefreshCw, BarChart3, ShieldCheck, Upload } from "lucide-react";
+import { Home, Users, Calendar, RefreshCw, BarChart3, ShieldCheck, Upload, Settings, UserCog, ArrowLeftRight } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import { UserProfileDropdown } from "./UserProfileDropdown";
 import { authService } from "@/services/authService";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LayoutProps {
   children: ReactNode;
@@ -15,14 +16,35 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      const admin = await authService.isAdmin();
-      setIsAdmin(admin);
-    };
-    checkAdmin();
+    checkAdminStatus();
   }, []);
+
+  const checkAdminStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsAdmin(false);
+        setCheckingAdmin(false);
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("is_admin")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      setIsAdmin(profile?.is_admin === true);
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+      setIsAdmin(false);
+    } finally {
+      setCheckingAdmin(false);
+    }
+  };
 
   const navItems = [
     { href: "/", label: "Rota", icon: Home },

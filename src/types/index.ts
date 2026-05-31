@@ -47,13 +47,18 @@ export interface StaffMember {
   id: string;
   name: string;
   trainedTasks: Task[];
-  shiftStart?: ShiftStart;
+  shiftStart: ShiftStart;
   shiftPattern?: ShiftPattern;
-  dayShiftPattern?: DayShiftPattern; // Full shift pattern with end time
-  restDays?: number[]; // Day of week (0-6)
-  availability?: AvailabilityEntry[]; // Date-specific availability
-  preferences?: StaffPreferences; // Task preferences
-  role?: "manager" | "supervisor" | "staff"; // User role
+  restDays?: number[];
+  availability?: AvailabilityEntry[];
+}
+
+export interface StaffFormData {
+  name: string;
+  trainedTasks: Task[];
+  shiftStart: ShiftStart;
+  shiftPattern: ShiftPattern;
+  restDays: number[];
 }
 
 export interface Assignment {

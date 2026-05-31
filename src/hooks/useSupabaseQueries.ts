@@ -144,20 +144,29 @@ export function useAddStaff() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (staff: Omit<StaffMember, "id" | "availability"> & { shiftPattern?: ShiftPattern }) => {
+    mutationFn: async (staff: {
+      name: string;
+      trainedTasks: Task[];
+      shiftStart: ShiftStart;
+      shiftPattern: ShiftPattern;
+      restDays: number[];
+    }) => {
       const { data, error } = await supabase
         .from("staff")
         .insert({
           name: staff.name,
           trained_tasks: staff.trainedTasks,
           shift_start: staff.shiftStart,
-          shift_pattern: staff.shiftPattern || "All",
-          rest_days: staff.restDays || [],
+          shift_pattern: staff.shiftPattern,
+          rest_days: staff.restDays,
         })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Failed to add staff:", error);
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
@@ -170,19 +179,32 @@ export function useUpdateStaff() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: Partial<StaffMember> & { shiftPattern?: ShiftPattern } }) => {
+    mutationFn: async ({ id, updates }: { 
+      id: string; 
+      updates: {
+        name?: string;
+        trainedTasks?: Task[];
+        shiftStart?: ShiftStart;
+        shiftPattern?: ShiftPattern;
+        restDays?: number[];
+      }
+    }) => {
+      const dbUpdates: Record<string, any> = {};
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.trainedTasks !== undefined) dbUpdates.trained_tasks = updates.trainedTasks;
+      if (updates.shiftStart !== undefined) dbUpdates.shift_start = updates.shiftStart;
+      if (updates.shiftPattern !== undefined) dbUpdates.shift_pattern = updates.shiftPattern;
+      if (updates.restDays !== undefined) dbUpdates.rest_days = updates.restDays;
+
       const { error } = await supabase
         .from("staff")
-        .update({
-          name: updates.name,
-          trained_tasks: updates.trainedTasks,
-          shift_start: updates.shiftStart,
-          shift_pattern: updates.shiftPattern,
-          rest_days: updates.restDays,
-        })
+        .update(dbUpdates)
         .eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Failed to update staff:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
@@ -317,11 +339,4 @@ export function useSupabaseMutation(table: "staff" | "availability" | "assignmen
       queryClient.invalidateQueries({ queryKey: [table] });
     },
   });
-}
-
-export function useOptimizedStaffRotaGenerator() {
-  const queryClient = useQueryClient();
-  const [generating, setGenerating] = useState(false);
-  
-  const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
 }

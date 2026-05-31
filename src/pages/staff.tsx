@@ -241,17 +241,23 @@ export default function StaffManagement() {
   };
 
   const handleAddStaff = async () => {
-    if (!name.trim() || selectedTasks.length === 0) return;
+    if (!name.trim() || selectedTasks.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a name and select at least one trained task",
+        variant: "destructive",
+      });
+      return;
+    }
 
     addStaffMutation.mutate(
       {
         name: name.trim(),
         trainedTasks: selectedTasks,
         shiftStart,
-        dayShiftPattern,
         shiftPattern,
-        recurringRestDays,
-      } as any,
+        restDays: recurringRestDays,
+      },
       {
         onSuccess: (newStaff) => {
           addAuditEntry({
@@ -263,19 +269,20 @@ export default function StaffManagement() {
           });
           setName("");
           setSelectedTasks([]);
+          setShiftStart("06:00");
           setDayShiftPattern("06:00-14:30");
           setShiftPattern("All");
           setRecurringRestDays([]);
           toast({
-            title: "Staff added",
+            title: "✅ Staff Added",
             description: `${newStaff.name} has been added successfully`,
           });
         },
         onError: (error: any) => {
           console.error("Error adding staff:", error);
           toast({
-            title: "❌ Failed to add staff",
-            description: error.message || "An error occurred while adding staff member",
+            title: "❌ Failed to Add Staff",
+            description: error.message || "An error occurred while adding staff member. Check console for details.",
             variant: "destructive",
           });
         },
@@ -304,7 +311,14 @@ export default function StaffManagement() {
   };
 
   const handleSaveEdit = async () => {
-    if (!editingStaffId || !editName.trim() || editTasks.length === 0) return;
+    if (!editingStaffId || !editName.trim() || editTasks.length === 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a name and select at least one trained task",
+        variant: "destructive",
+      });
+      return;
+    }
 
     updateStaffMutation.mutate(
       {
@@ -313,10 +327,9 @@ export default function StaffManagement() {
           name: editName.trim(),
           trainedTasks: editTasks,
           shiftStart: editShift,
-          dayShiftPattern: editDayShiftPattern,
           shiftPattern: editShiftPattern,
           restDays: editRecurringRestDays,
-        } as any,
+        },
       },
       {
         onSuccess: () => {
@@ -327,10 +340,18 @@ export default function StaffManagement() {
             entityId: editingStaffId,
             details: `Updated staff member: ${editName.trim()}`,
           });
-          setEditingStaffId(null);
+          handleCancelEdit();
           toast({
-            title: "Staff updated",
+            title: "✅ Staff Updated",
             description: "Changes saved successfully",
+          });
+        },
+        onError: (error: any) => {
+          console.error("Error updating staff:", error);
+          toast({
+            title: "❌ Update Failed",
+            description: error.message || "Failed to save changes. Check console for details.",
+            variant: "destructive",
           });
         },
       }
