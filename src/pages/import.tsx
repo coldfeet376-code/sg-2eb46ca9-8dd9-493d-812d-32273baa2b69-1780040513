@@ -227,64 +227,6 @@ export default function ImportPage() {
       return;
     }
 
-    // VALIDATE: All dates must be in current year
-    const currentYear = new Date().getFullYear();
-    const dateYears = dateColumns.map(dc => parseInt(dc.date.split('-')[0]));
-    const uniqueYears = [...new Set(dateYears)];
-    
-    earlyDebug.push(`\n=== YEAR VALIDATION ===`);
-    earlyDebug.push(`Current year: ${currentYear}`);
-    earlyDebug.push(`Years found in headers: ${uniqueYears.join(', ')}`);
-    
-    if (uniqueYears.length > 1) {
-      earlyDebug.push(`\n✗ ERROR: Multiple years detected (${uniqueYears.join(', ')})`);
-      console.log(earlyDebug.join('\n'));
-      setDebugInfo(earlyDebug.join('\n'));
-      
-      toast({
-        title: "Multiple years detected",
-        description: `Headers contain dates from ${uniqueYears.join(', ')}. All dates must be from the same year.`,
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (uniqueYears[0] !== currentYear) {
-      const yearDiff = currentYear - uniqueYears[0];
-      const isOldData = yearDiff > 0;
-      
-      earlyDebug.push(`\n⚠️ WARNING: Date year mismatch`);
-      earlyDebug.push(`  Expected: ${currentYear}`);
-      earlyDebug.push(`  Found: ${uniqueYears[0]}`);
-      earlyDebug.push(`  Difference: ${isOldData ? `${yearDiff} year(s) old` : `${Math.abs(yearDiff)} year(s) in the future`}`);
-      
-      console.log(earlyDebug.join('\n'));
-      setDebugInfo(earlyDebug.join('\n'));
-      
-      const continueImport = confirm(
-        `⚠️ YEAR MISMATCH WARNING\n\n` +
-        `The spreadsheet contains dates from ${uniqueYears[0]}, but the current year is ${currentYear}.\n\n` +
-        `This appears to be ${isOldData ? 'OLD' : 'FUTURE'} data (${Math.abs(yearDiff)} year difference).\n\n` +
-        `Importing this data may:\n` +
-        `• Create availability entries for the wrong dates\n` +
-        `• Cause confusion in rota planning\n` +
-        `• Mix data from different years\n\n` +
-        `Are you SURE you want to continue?`
-      );
-      
-      if (!continueImport) {
-        toast({
-          title: "Import cancelled",
-          description: `Dates are from ${uniqueYears[0]}, expected ${currentYear}. Update your spreadsheet and try again.`,
-        });
-        return;
-      }
-      
-      earlyDebug.push(`  User chose to continue despite year mismatch`);
-    } else {
-      earlyDebug.push(`✓ Year validation passed - all dates are in current year (${currentYear})`);
-    }
-
     earlyDebug.push(`Date columns found: ${dateColumns.length}`);
     earlyDebug.push(`First date: ${dateColumns[0].date}, Last date: ${dateColumns[dateColumns.length - 1].date}`);
 
@@ -490,49 +432,6 @@ export default function ImportPage() {
 
       console.log(`📅 Found ${dateColumns.length} date columns`);
       console.log("📅 Date range:", dateColumns[0]?.date, "to", dateColumns[dateColumns.length - 1]?.date);
-
-      // VALIDATE: All dates must be in current year
-      const currentYear = new Date().getFullYear();
-      const dateYears = dateColumns.map(dc => parseInt(dc.date.split('-')[0]));
-      const uniqueYears = [...new Set(dateYears)];
-      
-      console.log("\n=== YEAR VALIDATION ===");
-      console.log(`Current year: ${currentYear}`);
-      console.log(`Years found in Excel headers: ${uniqueYears.join(', ')}`);
-      
-      if (uniqueYears.length > 1) {
-        console.error(`✗ ERROR: Multiple years detected (${uniqueYears.join(', ')})`);
-        throw new Error(`Excel file contains dates from multiple years (${uniqueYears.join(', ')}). All dates must be from the same year.`);
-      }
-      
-      if (uniqueYears[0] !== currentYear) {
-        const yearDiff = currentYear - uniqueYears[0];
-        const isOldData = yearDiff > 0;
-        
-        console.warn(`⚠️ WARNING: Date year mismatch`);
-        console.warn(`  Expected: ${currentYear}`);
-        console.warn(`  Found: ${uniqueYears[0]}`);
-        console.warn(`  Difference: ${isOldData ? `${yearDiff} year(s) old` : `${Math.abs(yearDiff)} year(s) in the future`}`);
-        
-        const continueImport = confirm(
-          `⚠️ YEAR MISMATCH WARNING\n\n` +
-          `The Excel file contains dates from ${uniqueYears[0]}, but the current year is ${currentYear}.\n\n` +
-          `This appears to be ${isOldData ? 'OLD' : 'FUTURE'} data (${Math.abs(yearDiff)} year difference).\n\n` +
-          `Importing this data may:\n` +
-          `• Create availability entries for the wrong dates\n` +
-          `• Cause confusion in rota planning\n` +
-          `• Mix data from different years\n\n` +
-          `Are you SURE you want to continue?`
-        );
-        
-        if (!continueImport) {
-          throw new Error(`Import cancelled - dates are from ${uniqueYears[0]}, expected ${currentYear}`);
-        }
-        
-        console.log(`  User chose to continue despite year mismatch`);
-      } else {
-        console.log(`✓ Year validation passed - all dates are in current year (${currentYear})`);
-      }
 
       const newStaff: ParsedStaff[] = [];
       const matches = new Map<string, string>();
