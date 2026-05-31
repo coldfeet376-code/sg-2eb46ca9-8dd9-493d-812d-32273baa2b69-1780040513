@@ -271,6 +271,14 @@ export default function StaffManagement() {
             description: `${newStaff.name} has been added successfully`,
           });
         },
+        onError: (error: any) => {
+          console.error("Error adding staff:", error);
+          toast({
+            title: "❌ Failed to add staff",
+            description: error.message || "An error occurred while adding staff member",
+            variant: "destructive",
+          });
+        },
       }
     );
   };

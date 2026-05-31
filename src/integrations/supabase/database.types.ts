@@ -93,7 +93,15 @@ export type Database = {
           user_id?: string | null
           user_name?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       availability: {
         Row: {
@@ -167,7 +175,15 @@ export type Database = {
           status?: string
           token?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       manager_availability: {
         Row: {
@@ -271,7 +287,15 @@ export type Database = {
           id?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_id_fkey"
+            columns: ["id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rota_backups: {
         Row: {
@@ -334,7 +358,15 @@ export type Database = {
           version?: number | null
           week_start?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "rotas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       staff: {
         Row: {
@@ -437,7 +469,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      users: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          email_confirmed_at: string | null
+          id: string | null
+          last_sign_in_at: string | null
+          raw_app_meta_data: Json | null
+          raw_user_meta_data: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email?: string | null
+          email_confirmed_at?: string | null
+          id?: string | null
+          last_sign_in_at?: string | null
+          raw_app_meta_data?: Json | null
+          raw_user_meta_data?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string | null
+          email_confirmed_at?: string | null
+          id?: string | null
+          last_sign_in_at?: string | null
+          raw_app_meta_data?: Json | null
+          raw_user_meta_data?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       get_current_user_info: { Args: never; Returns: Json }
