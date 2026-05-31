@@ -396,7 +396,10 @@ export default function StaffManagement() {
     console.log("\n\n🔵 ========== AVAILABILITY WRITE ATTEMPT ==========");
     console.log("📅 Date:", dateStr);
     console.log("👤 Staff ID:", staffId);
-    console.log("📝 Type:", type);
+    console.log("📝 Type (RAW):", type);
+    console.log("📝 Type typeof:", typeof type);
+    console.log("📝 Type length:", type?.length);
+    console.log("📝 Type char codes:", type ? Array.from(String(type)).map(c => `${c}(${c.charCodeAt(0)})`).join(', ') : 'N/A');
     
     // CHECK AUTH STATE BEFORE WRITE
     console.log("\n🔐 Checking authentication...");
@@ -406,7 +409,6 @@ export default function StaffManagement() {
     if (session) {
       console.log("   User ID:", session.user?.id);
       console.log("   Email:", session.user?.email);
-      console.log("   Access token (first 30 chars):", session.access_token?.substring(0, 30) + "...");
     } else {
       console.error("❌ NO SESSION - This is why writes are failing!");
       toast({
@@ -423,71 +425,50 @@ export default function StaffManagement() {
     try {
       if (type === "clear") {
         console.log("\n🗑️ DELETING availability entry...");
-        console.log("   Query: DELETE FROM availability WHERE staff_id =", staffId, "AND date =", dateStr);
-        
         const deleteResult = await deleteAvailabilityMutation.mutateAsync({ staffId, date: dateStr });
-        
-        console.log("✅ Delete successful");
-        console.log("   Result:", deleteResult);
+        console.log("✅ Delete successful:", deleteResult);
         toast({ title: "Availability cleared", description: "Day marked as working" });
       } else {
         console.log("\n💾 UPSERTING availability entry...");
-        console.log("   Query: UPSERT INTO availability (staff_id, date, type) VALUES (", staffId, ",", dateStr, ",", type, ")");
         
-        // CRITICAL: Inspect the EXACT value being sent
-        console.log("\n🔬 DETAILED VALUE INSPECTION:");
-        console.log("   type value:", type);
-        console.log("   type typeof:", typeof type);
-        console.log("   type length:", type.length);
-        console.log("   type char codes:", Array.from(String(type)).map(c => c.charCodeAt(0)).join(', '));
-        console.log("   type === 'rest':", type === "rest");
-        console.log("   type === 'holiday':", type === "holiday");
-        console.log("   type === 'sick':", type === "sick");
-        console.log("   type === 'available':", type === "available");
-        
-        // Check for valid type
+        // Validate type before sending
         const validTypes: AvailabilityType[] = ['rest', 'holiday', 'sick', 'available'];
         if (!validTypes.includes(type as AvailabilityType)) {
-          console.error("❌ INVALID TYPE VALUE DETECTED!");
-          console.error("   Value received:", JSON.stringify(type));
-          console.error("   Valid values:", validTypes);
+          console.error("❌ INVALID TYPE VALUE!");
+          console.error("   Received:", JSON.stringify(type));
+          console.error("   Expected one of:", validTypes);
           toast({
-            title: "❌ Invalid Type",
-            description: `The value "${type}" is not valid. Expected: rest, holiday, sick, or available`,
+            title: "❌ Invalid availability type",
+            description: `"${type}" is not valid. Must be: rest, holiday, sick, or available`,
             variant: "destructive",
           });
           return;
         }
         
-        console.log("✅ Type value is valid");
-        console.log("\n📤 Payload being sent to database:");
         const payload = {
           staff_id: staffId,
           date: dateStr,
-          type,
+          type: type as AvailabilityType,
         };
-        console.log(JSON.stringify(payload, null, 2));
+        console.log("📤 Payload:", JSON.stringify(payload, null, 2));
         
         const upsertResult = await createAvailabilityMutation.mutateAsync(payload);
-        
-        console.log("✅ Upsert successful");
-        console.log("   Result:", upsertResult);
+        console.log("✅ Upsert successful:", upsertResult);
         toast({ title: "Availability updated", description: `Day marked as ${type}` });
       }
       console.log("\n🔵 ========== WRITE COMPLETED SUCCESSFULLY ==========\n");
     } catch (error: any) {
       console.error("\n❌ ========== WRITE FAILED ==========");
-      console.error("Error object:", error);
-      console.error("Error message:", error.message);
-      console.error("Error code:", error.code);
-      console.error("Error details:", error.details);
-      console.error("Error hint:", error.hint);
-      console.error("Full error JSON:", JSON.stringify(error, null, 2));
+      console.error("Error:", error);
+      console.error("Error message:", error?.message);
+      console.error("Error code:", error?.code);
+      console.error("Error details:", error?.details);
+      console.error("Error hint:", error?.hint);
       console.error("========================================\n");
       
       toast({ 
-        title: "Error updating availability", 
-        description: error.message || "Unknown error occurred",
+        title: "❌ Failed to update availability", 
+        description: error?.message || error?.details || "Database constraint violation - check console for details",
         variant: "destructive" 
       });
     } finally {
