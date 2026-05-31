@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useStaffData, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
+import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
 import { Plus, Pencil, Trash2, Save, X } from "lucide-react";
 import { Task, ShiftStart, ShiftPattern } from "@/types";
 
-const TASKS: Task[] = ["Frozen", "Milk", "Twi", "Inbound", "Outbound", "Marshaling"];
-const SHIFTS: ShiftStart[] = ["06:00", "10:00", "14:00"];
+const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
+const SHIFTS: ShiftStart[] = ["06:00", "10:00"];
 const PATTERNS: ShiftPattern[] = ["All", "Mon-Fri", "Sat-Sun"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -20,7 +20,7 @@ export default function StaffPage() {
   const queryClient = useQueryClient();
   
   // Data
-  const { data: staff = [], isLoading } = useStaffData();
+  const { data: staff = [], isLoading } = useStaff();
   const addStaff = useAddStaff();
   const updateStaff = useUpdateStaff();
   const deleteStaff = useDeleteStaff();
