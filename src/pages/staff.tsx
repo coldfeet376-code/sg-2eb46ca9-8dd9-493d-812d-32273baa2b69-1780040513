@@ -27,7 +27,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff, useAddAvailability, useDeleteAvailability } from "@/hooks/useSupabaseQueries";
-import type { StaffMember, Task, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
+import type { StaffMember, Task, AvailabilityType, ShiftStart, DayShiftPattern, ShiftPattern } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Trash2, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon, Info, RefreshCw, Target, Settings, HelpCircle, Sparkles, Wand2, Eye } from "lucide-react";
 import { staffService } from "@/services/staffService";
@@ -52,7 +52,7 @@ export default function StaffManagement() {
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
   const [shiftStart, setShiftStart] = useState<ShiftStart>("06:00");
   const [dayShiftPattern, setDayShiftPattern] = useState<DayShiftPattern>("06:00-14:30");
-  const [shiftPattern, setShiftPattern] = useState<"Early" | "Late" | "All">("All");
+  const [shiftPattern, setShiftPattern] = useState<ShiftPattern>("All");
   const [recurringRestDays, setRecurringRestDays] = useState<number[]>([]);
   const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -119,7 +119,7 @@ export default function StaffManagement() {
   const [editTasks, setEditTasks] = useState<Task[]>([]);
   const [editShift, setEditShift] = useState<ShiftStart>("06:00");
   const [editDayShiftPattern, setEditDayShiftPattern] = useState<DayShiftPattern>("06:00-14:30");
-  const [editShiftPattern, setEditShiftPattern] = useState<"Early" | "Late" | "All">("All");
+  const [editShiftPattern, setEditShiftPattern] = useState<ShiftPattern>("All");
   const [editRecurringRestDays, setEditRecurringRestDays] = useState<number[]>([]);
   
   // Expanded staff IDs for collapsible sections

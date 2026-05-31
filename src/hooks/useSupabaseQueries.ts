@@ -189,7 +189,14 @@ export function useUpdateStaff() {
         restDays?: number[];
       }
     }) => {
-      const dbUpdates: Record<string, any> = {};
+      const dbUpdates: {
+        name?: string;
+        trained_tasks?: string[];
+        shift_start?: string;
+        shift_pattern?: string;
+        rest_days?: number[];
+      } = {};
+      
       if (updates.name !== undefined) dbUpdates.name = updates.name;
       if (updates.trainedTasks !== undefined) dbUpdates.trained_tasks = updates.trainedTasks;
       if (updates.shiftStart !== undefined) dbUpdates.shift_start = updates.shiftStart;
