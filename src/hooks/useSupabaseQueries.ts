@@ -247,11 +247,29 @@ export function useAddAvailability() {
       type: string;
       notes?: string;
     }) => {
+      // CRITICAL: Database constraint requires lowercase: 'rest', 'holiday', 'sick', 'available'
+      // Force lowercase to prevent constraint violations
+      const normalizedType = availability.type.toLowerCase();
+      
+      console.log(`📝 Adding availability: ${availability.staff_id} on ${availability.date} → type: "${availability.type}" → normalized: "${normalizedType}"`);
+      
       const { error } = await supabase.from("availability").upsert(
-        { ...availability },
+        { 
+          staff_id: availability.staff_id,
+          date: availability.date,
+          type: normalizedType,
+          notes: availability.notes 
+        },
         { onConflict: 'staff_id,date' }
       );
-      if (error) throw error;
+      
+      if (error) {
+        console.error(`❌ Availability insert failed:`, error);
+        console.error(`   Payload: staff_id=${availability.staff_id}, date=${availability.date}, type="${normalizedType}"`);
+        throw error;
+      }
+      
+      console.log(`✅ Availability added successfully: ${normalizedType} on ${availability.date}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
