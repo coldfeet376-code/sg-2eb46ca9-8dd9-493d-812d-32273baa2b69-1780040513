@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { SEO } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,61 +6,43 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Pencil, Trash2, Save, X, Calendar } from "lucide-react";
-import { ManagerDuty, ManagerShiftStart } from "@/types";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { Plus, Pencil, Trash2, Save, X } from "lucide-react";
 
-const DUTIES: ManagerDuty[] = ["Intake", "Out-loading", "Admin", "Floor"];
-const SHIFTS: ManagerShiftStart[] = ["06:00", "08:00"];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 interface Manager {
   id: string;
   name: string;
-  email: string;
-  duties: ManagerDuty[];
-  shift_start: ManagerShiftStart;
-  rest_days: number[];
-}
-
-interface ManagerAvailability {
-  id: string;
-  manager_id: string;
-  date: string;
-  type: "rest" | "holiday" | "sick" | "available";
-  notes?: string;
+  can_admin: boolean;
+  can_floor: boolean;
+  can_intake: boolean;
+  can_out_loading: boolean;
+  preferred_shift: string;
+  recurring_rest_days: number[];
 }
 
 export default function ManagersPage() {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   
-  // Data
   const [managers, setManagers] = useState<Manager[]>([]);
-  const [availability, setAvailability] = useState<ManagerAvailability[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Add form
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [selectedDuties, setSelectedDuties] = useState<ManagerDuty[]>([]);
-  const [shiftStart, setShiftStart] = useState<ManagerShiftStart>("06:00");
+  const [canAdmin, setCanAdmin] = useState(false);
+  const [canFloor, setCanFloor] = useState(false);
+  const [canIntake, setCanIntake] = useState(false);
+  const [canOutLoading, setCanOutLoading] = useState(false);
+  const [preferredShift, setPreferredShift] = useState("06:00");
   const [restDays, setRestDays] = useState<number[]>([]);
 
-  // Edit state
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
-  const [editEmail, setEditEmail] = useState("");
-  const [editDuties, setEditDuties] = useState<ManagerDuty[]>([]);
-  const [editShift, setEditShift] = useState<ManagerShiftStart>("06:00");
+  const [editCanAdmin, setEditCanAdmin] = useState(false);
+  const [editCanFloor, setEditCanFloor] = useState(false);
+  const [editCanIntake, setEditCanIntake] = useState(false);
+  const [editCanOutLoading, setEditCanOutLoading] = useState(false);
+  const [editPreferredShift, setEditPreferredShift] = useState("06:00");
   const [editRestDays, setEditRestDays] = useState<number[]>([]);
-
-  // Availability calendar
-  const [showAvailabilityFor, setShowAvailabilityFor] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [availabilityType, setAvailabilityType] = useState<"rest" | "holiday" | "sick">("rest");
 
   useEffect(() => {
     loadData();
@@ -70,25 +51,18 @@ export default function ManagersPage() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const { data: managersData, error: managersError } = await supabase
+      const { data, error } = await supabase
         .from("managers")
         .select("*")
         .order("name");
 
-      if (managersError) throw managersError;
-      setManagers(managersData || []);
-
-      const { data: availData, error: availError } = await supabase
-        .from("manager_availability")
-        .select("*");
-
-      if (availError) throw availError;
-      setAvailability(availData || []);
+      if (error) throw error;
+      setManagers(data || []);
     } catch (error) {
       console.error("Failed to load managers:", error);
       toast({
         title: "❌ Failed to Load",
-        description: "Could not load managers data",
+        description: "Could not load managers",
         variant: "destructive",
       });
     } finally {
@@ -97,10 +71,10 @@ export default function ManagersPage() {
   };
 
   const handleAdd = async () => {
-    if (!name.trim() || !email.trim() || selectedDuties.length === 0) {
+    if (!name.trim()) {
       toast({
         title: "Validation Error",
-        description: "Name, email, and at least one duty required",
+        description: "Name is required",
         variant: "destructive",
       });
       return;
@@ -109,18 +83,22 @@ export default function ManagersPage() {
     try {
       const { error } = await supabase.from("managers").insert({
         name: name.trim(),
-        email: email.trim(),
-        duties: selectedDuties,
-        shift_start: shiftStart,
-        rest_days: restDays,
+        can_admin: canAdmin,
+        can_floor: canFloor,
+        can_intake: canIntake,
+        can_out_loading: canOutLoading,
+        preferred_shift: preferredShift,
+        recurring_rest_days: restDays,
       });
 
       if (error) throw error;
 
       toast({ title: "✅ Manager Added" });
       setName("");
-      setEmail("");
-      setSelectedDuties([]);
+      setCanAdmin(false);
+      setCanFloor(false);
+      setCanIntake(false);
+      setCanOutLoading(false);
       setRestDays([]);
       loadData();
     } catch (error: any) {
@@ -135,10 +113,12 @@ export default function ManagersPage() {
   const startEdit = (manager: Manager) => {
     setEditId(manager.id);
     setEditName(manager.name);
-    setEditEmail(manager.email);
-    setEditDuties(manager.duties);
-    setEditShift(manager.shift_start);
-    setEditRestDays(manager.rest_days || []);
+    setEditCanAdmin(manager.can_admin);
+    setEditCanFloor(manager.can_floor);
+    setEditCanIntake(manager.can_intake);
+    setEditCanOutLoading(manager.can_out_loading);
+    setEditPreferredShift(manager.preferred_shift);
+    setEditRestDays(manager.recurring_rest_days || []);
   };
 
   const cancelEdit = () => {
@@ -146,10 +126,10 @@ export default function ManagersPage() {
   };
 
   const saveEdit = async () => {
-    if (!editId || !editName.trim() || !editEmail.trim() || editDuties.length === 0) {
+    if (!editId || !editName.trim()) {
       toast({
         title: "Validation Error",
-        description: "Name, email, and at least one duty required",
+        description: "Name is required",
         variant: "destructive",
       });
       return;
@@ -160,10 +140,12 @@ export default function ManagersPage() {
         .from("managers")
         .update({
           name: editName.trim(),
-          email: editEmail.trim(),
-          duties: editDuties,
-          shift_start: editShift,
-          rest_days: editRestDays,
+          can_admin: editCanAdmin,
+          can_floor: editCanFloor,
+          can_intake: editCanIntake,
+          can_out_loading: editCanOutLoading,
+          preferred_shift: editPreferredShift,
+          recurring_rest_days: editRestDays,
         })
         .eq("id", editId);
 
@@ -199,18 +181,6 @@ export default function ManagersPage() {
     }
   };
 
-  const toggleDuty = (duty: ManagerDuty, isEdit: boolean) => {
-    if (isEdit) {
-      setEditDuties((prev) =>
-        prev.includes(duty) ? prev.filter((d) => d !== duty) : [...prev, duty]
-      );
-    } else {
-      setSelectedDuties((prev) =>
-        prev.includes(duty) ? prev.filter((d) => d !== duty) : [...prev, duty]
-      );
-    }
-  };
-
   const toggleRestDay = (day: number, isEdit: boolean) => {
     if (isEdit) {
       setEditRestDays((prev) =>
@@ -221,43 +191,6 @@ export default function ManagersPage() {
         prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
       );
     }
-  };
-
-  const handleSetAvailability = async () => {
-    if (!showAvailabilityFor || !selectedDate) return;
-
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
-
-    try {
-      const { error } = await supabase.from("manager_availability").upsert(
-        {
-          manager_id: showAvailabilityFor,
-          date: dateStr,
-          type: availabilityType,
-        },
-        { onConflict: "manager_id,date" }
-      );
-
-      if (error) throw error;
-
-      toast({ title: "✅ Availability Set" });
-      loadData();
-      setSelectedDate(undefined);
-    } catch (error: any) {
-      toast({
-        title: "❌ Failed to Set Availability",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const getManagerAvailability = (managerId: string, date: Date): string | null => {
-    const dateStr = format(date, "yyyy-MM-dd");
-    const entry = availability.find(
-      (a) => a.manager_id === managerId && a.date === dateStr
-    );
-    return entry ? entry.type : null;
   };
 
   if (isLoading) {
@@ -271,51 +204,59 @@ export default function ManagersPage() {
       <div className="space-y-6">
         <h1 className="text-3xl font-bold">Manager Management</h1>
 
-        {/* Add Manager Form */}
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Add New Manager</h2>
           
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                placeholder="Manager Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <Input
-                placeholder="Email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+            <Input
+              placeholder="Manager Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
 
             <div>
               <label className="text-sm font-medium mb-2 block">Duties</label>
               <div className="flex flex-wrap gap-2">
-                {DUTIES.map((duty) => (
-                  <Badge
-                    key={duty}
-                    variant={selectedDuties.includes(duty) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => toggleDuty(duty, false)}
-                  >
-                    {duty}
-                  </Badge>
-                ))}
+                <Badge
+                  variant={canIntake ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => setCanIntake(!canIntake)}
+                >
+                  Intake
+                </Badge>
+                <Badge
+                  variant={canOutLoading ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => setCanOutLoading(!canOutLoading)}
+                >
+                  Out-loading
+                </Badge>
+                <Badge
+                  variant={canAdmin ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => setCanAdmin(!canAdmin)}
+                >
+                  Admin
+                </Badge>
+                <Badge
+                  variant={canFloor ? "default" : "outline"}
+                  className="cursor-pointer"
+                  onClick={() => setCanFloor(!canFloor)}
+                >
+                  Floor
+                </Badge>
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-medium mb-2 block">Shift Start</label>
+              <label className="text-sm font-medium mb-2 block">Preferred Shift</label>
               <select
-                value={shiftStart}
-                onChange={(e) => setShiftStart(e.target.value as ManagerShiftStart)}
+                value={preferredShift}
+                onChange={(e) => setPreferredShift(e.target.value)}
                 className="w-full p-2 border rounded"
               >
-                {SHIFTS.map((shift) => (
-                  <option key={shift} value={shift}>{shift}</option>
-                ))}
+                <option value="06:00">06:00</option>
+                <option value="08:00">08:00</option>
               </select>
             </div>
 
@@ -342,53 +283,61 @@ export default function ManagersPage() {
           </div>
         </Card>
 
-        {/* Managers List */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Managers ({managers.length})</h2>
           
           {managers.map((manager) => (
             <Card key={manager.id} className="p-4">
               {editId === manager.id ? (
-                // Edit Mode
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <Input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                    />
-                    <Input
-                      value={editEmail}
-                      type="email"
-                      onChange={(e) => setEditEmail(e.target.value)}
-                    />
-                  </div>
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                  />
 
                   <div>
                     <label className="text-sm font-medium mb-2 block">Duties</label>
                     <div className="flex flex-wrap gap-2">
-                      {DUTIES.map((duty) => (
-                        <Badge
-                          key={duty}
-                          variant={editDuties.includes(duty) ? "default" : "outline"}
-                          className="cursor-pointer"
-                          onClick={() => toggleDuty(duty, true)}
-                        >
-                          {duty}
-                        </Badge>
-                      ))}
+                      <Badge
+                        variant={editCanIntake ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => setEditCanIntake(!editCanIntake)}
+                      >
+                        Intake
+                      </Badge>
+                      <Badge
+                        variant={editCanOutLoading ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => setEditCanOutLoading(!editCanOutLoading)}
+                      >
+                        Out-loading
+                      </Badge>
+                      <Badge
+                        variant={editCanAdmin ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => setEditCanAdmin(!editCanAdmin)}
+                      >
+                        Admin
+                      </Badge>
+                      <Badge
+                        variant={editCanFloor ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => setEditCanFloor(!editCanFloor)}
+                      >
+                        Floor
+                      </Badge>
                     </div>
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Shift Start</label>
+                    <label className="text-sm font-medium mb-2 block">Preferred Shift</label>
                     <select
-                      value={editShift}
-                      onChange={(e) => setEditShift(e.target.value as ManagerShiftStart)}
+                      value={editPreferredShift}
+                      onChange={(e) => setEditPreferredShift(e.target.value)}
                       className="w-full p-2 border rounded"
                     >
-                      {SHIFTS.map((shift) => (
-                        <option key={shift} value={shift}>{shift}</option>
-                      ))}
+                      <option value="06:00">06:00</option>
+                      <option value="08:00">08:00</option>
                     </select>
                   </div>
 
@@ -420,69 +369,26 @@ export default function ManagersPage() {
                   </div>
                 </div>
               ) : (
-                // View Mode
                 <div className="flex items-start justify-between">
                   <div className="space-y-2 flex-1">
                     <h3 className="font-semibold text-lg">{manager.name}</h3>
-                    <p className="text-sm text-muted-foreground">{manager.email}</p>
                     
                     <div className="flex flex-wrap gap-2">
-                      {manager.duties.map((duty) => (
-                        <Badge key={duty} variant="secondary">{duty}</Badge>
-                      ))}
+                      {manager.can_intake && <Badge variant="secondary">Intake</Badge>}
+                      {manager.can_out_loading && <Badge variant="secondary">Out-loading</Badge>}
+                      {manager.can_admin && <Badge variant="secondary">Admin</Badge>}
+                      {manager.can_floor && <Badge variant="secondary">Floor</Badge>}
                     </div>
                     
                     <div className="text-sm text-muted-foreground">
-                      Shift: {manager.shift_start}
-                      {manager.rest_days && manager.rest_days.length > 0 && (
-                        <> • Rest: {manager.rest_days.map(d => DAYS[d]).join(", ")}</>
+                      Shift: {manager.preferred_shift}
+                      {manager.recurring_rest_days && manager.recurring_rest_days.length > 0 && (
+                        <> • Rest: {manager.recurring_rest_days.map(d => DAYS[d]).join(", ")}</>
                       )}
                     </div>
                   </div>
 
                   <div className="flex gap-2">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowAvailabilityFor(manager.id)}
-                        >
-                          <Calendar className="h-4 w-4" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-4">
-                        <div className="space-y-4">
-                          <h4 className="font-semibold">Set Availability</h4>
-                          
-                          <CalendarComponent
-                            mode="single"
-                            selected={selectedDate}
-                            onSelect={setSelectedDate}
-                            className="rounded-md border"
-                          />
-
-                          {selectedDate && (
-                            <>
-                              <select
-                                value={availabilityType}
-                                onChange={(e) => setAvailabilityType(e.target.value as "rest" | "holiday" | "sick")}
-                                className="w-full p-2 border rounded"
-                              >
-                                <option value="rest">Rest Day</option>
-                                <option value="holiday">Holiday</option>
-                                <option value="sick">Sick</option>
-                              </select>
-
-                              <Button onClick={handleSetAvailability} className="w-full">
-                                Set Availability
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-
                     <Button
                       variant="outline"
                       size="sm"
