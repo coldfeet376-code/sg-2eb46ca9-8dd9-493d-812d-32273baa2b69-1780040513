@@ -1,421 +1,1066 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import { SEO } from "@/components/SEO";
+import { useRouter } from "next/router";
+import { Layout } from "@/components/Layout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { Plus, Pencil, Trash2, Save, X } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SEO } from "@/components/SEO";
+import { EmptyState } from "@/components/EmptyState";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useNotifications } from "@/contexts/NotificationContext";
+import { generateManagerDutiesPDF } from "@/lib/pdfGenerator";
+import { ManagerDutiesPrintPreview } from "@/components/ManagerDutiesPrintPreview";
+import type { ManagerAssignment, ManagerDuty, ManagerShiftStart } from "@/types";
+import { Plus, Lock, Unlock, Download, Calendar, RefreshCw, X, Printer, Users, Zap, ChevronLeft, ChevronRight, Pencil, Trash2, AlertCircle, FileDown } from "lucide-react";
+import { getAllManagers, createManager, updateManager, deleteManager, getManagersForDuty, type Manager, getManagerAvailability, setManagerAvailability, getAvailabilityForDate, type ManagerAvailability } from "@/services/managerService";
+import { ManagerForm } from "@/components/managers/ManagerForm";
+import { ManagerAvailabilityDialog } from "@/components/managers/ManagerAvailabilityDialog";
+import { ManagerRotaTable } from "@/components/managers/ManagerRotaTable";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { useQuery } from "@tanstack/react-query";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DUTIES: ManagerDuty[] = ["Intake", "Out-loading", "Admin", "Floor"];
+const MANAGER_PASSWORD = "manager123"; // TODO: Move to env or config
 
-interface Manager {
-  id: string;
-  name: string;
-  can_admin: boolean;
-  can_floor: boolean;
-  can_intake: boolean;
-  can_out_loading: boolean;
-  preferred_shift: string;
-  recurring_rest_days: number[];
+function formatDateRange(start: Date, end: Date): string {
+  if (!start || !end) return "";
+  return `${start.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} - ${end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
-export default function ManagersPage() {
-  const { toast } = useToast();
-  
+function getWeekNumber(d: Date): number {
+  if (!d) return 0;
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+}
+
+type AvailabilityType = "available" | "rest" | "holiday" | "sick";
+
+export default function Managers() {
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
+  const [weekStart, setWeekStart] = useState<Date>(getWeekStart(new Date()));
+  const [assignments, setAssignments] = useState<ManagerAssignment[]>([]);
+  const [isLocked, setIsLocked] = useState(false);
+  const [unlockPasswordInput, setUnlockPasswordInput] = useState("");
+  const [unlockError, setUnlockError] = useState(false);
+  const [showUnlockPrompt, setShowUnlockPrompt] = useState(false);
+  const { addNotification } = useNotifications();
+
+  // Manager management state
   const [managers, setManagers] = useState<Manager[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [showManagerDialog, setShowManagerDialog] = useState(false);
+  const [editingManager, setEditingManager] = useState<Manager | null>(null);
+  const [managerForm, setManagerForm] = useState({
+    name: "",
+    can_intake: true,
+    can_out_loading: true,
+    can_admin: true,
+    can_floor: true,
+    preferred_shift: null as "06:00" | "08:00" | null,
+    recurring_rest_days: [] as number[],
+  });
+  const [showManageSection, setShowManageSection] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [availabilityMap, setAvailabilityMap] = useState<Record<string, ManagerAvailability>>({});
+  const [showCalendarDialog, setShowCalendarDialog] = useState(false);
+  const [selectedManagerForCalendar, setSelectedManagerForCalendar] = useState<Manager | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [selectedAvailabilityType, setSelectedAvailabilityType] = useState<AvailabilityType>("rest");
+  const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
+  const [selectedManager, setSelectedManager] = useState<any>(null);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [deleteConfirmManager, setDeleteConfirmManager] = useState<Manager | null>(null);
 
-  const [name, setName] = useState("");
-  const [canAdmin, setCanAdmin] = useState(false);
-  const [canFloor, setCanFloor] = useState(false);
-  const [canIntake, setCanIntake] = useState(false);
-  const [canOutLoading, setCanOutLoading] = useState(false);
-  const [preferredShift, setPreferredShift] = useState("06:00");
-  const [restDays, setRestDays] = useState<number[]>([]);
-
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editCanAdmin, setEditCanAdmin] = useState(false);
-  const [editCanFloor, setEditCanFloor] = useState(false);
-  const [editCanIntake, setEditCanIntake] = useState(false);
-  const [editCanOutLoading, setEditCanOutLoading] = useState(false);
-  const [editPreferredShift, setEditPreferredShift] = useState("06:00");
-  const [editRestDays, setEditRestDays] = useState<number[]>([]);
+  const { data: managersData = [], isLoading: managersLoading, error: managersError } = useQuery({
+    queryKey: ["managers"],
+    queryFn: async () => {
+      const managers = await getAllManagers();
+      return managers;
+    },
+  });
 
   useEffect(() => {
-    loadData();
+    const auth = sessionStorage.getItem("manager-auth");
+    if (auth === "true") {
+      setIsAuthenticated(true);
+    }
   }, []);
 
-  const loadData = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from("managers")
-        .select("*")
-        .order("name");
+  useEffect(() => {
+    const saved = localStorage.getItem("manager-assignments");
+    const savedLock = localStorage.getItem("manager-locked");
+    if (saved) {
+      setAssignments(JSON.parse(saved));
+    }
+    if (savedLock) {
+      setIsLocked(JSON.parse(savedLock));
+    }
+  }, []);
 
-      if (error) throw error;
-      setManagers(data || []);
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadManagers();
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated && managers.length > 0) {
+      loadAvailability();
+    }
+  }, [isAuthenticated, managers, weekStart]);
+
+  const loadAvailability = async () => {
+    try {
+      const startDate = weekStart.toISOString().split("T")[0];
+      const endDate = new Date(weekStart);
+      endDate.setDate(endDate.getDate() + 6);
+      const endDateStr = endDate.toISOString().split("T")[0];
+
+      const availMap: Record<string, ManagerAvailability> = {};
+      
+      for (const manager of managers) {
+        const availData = await getManagerAvailability(manager.id, startDate, endDateStr);
+        availData.forEach(avail => {
+          const key = `${manager.id}-${avail.date}`;
+          availMap[key] = avail;
+        });
+      }
+      
+      setAvailabilityMap(availMap);
+    } catch (error) {
+      console.error("Failed to load availability:", error);
+    }
+  };
+
+  const loadManagers = async () => {
+    try {
+      setLoading(true);
+      const data = await getAllManagers();
+      setManagers(data);
     } catch (error) {
       console.error("Failed to load managers:", error);
-      toast({
-        title: "❌ Failed to Load",
-        description: "Could not load managers",
-        variant: "destructive",
+      addNotification({
+        staffName: "System",
+        message: "Failed to load managers",
+        type: "info",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleAdd = async () => {
-    if (!name.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Name is required",
-        variant: "destructive",
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === MANAGER_PASSWORD) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem("manager-auth", "true");
+      setPasswordError(false);
+      addNotification({
+        staffName: "System",
+        message: "Manager access granted",
+        type: "info",
       });
-      return;
-    }
-
-    try {
-      const { error } = await supabase.from("managers").insert({
-        name: name.trim(),
-        can_admin: canAdmin,
-        can_floor: canFloor,
-        can_intake: canIntake,
-        can_out_loading: canOutLoading,
-        preferred_shift: preferredShift,
-        recurring_rest_days: restDays,
-      });
-
-      if (error) throw error;
-
-      toast({ title: "✅ Manager Added" });
-      setName("");
-      setCanAdmin(false);
-      setCanFloor(false);
-      setCanIntake(false);
-      setCanOutLoading(false);
-      setRestDays([]);
-      loadData();
-    } catch (error: any) {
-      toast({
-        title: "❌ Failed to Add",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const startEdit = (manager: Manager) => {
-    setEditId(manager.id);
-    setEditName(manager.name);
-    setEditCanAdmin(manager.can_admin);
-    setEditCanFloor(manager.can_floor);
-    setEditCanIntake(manager.can_intake);
-    setEditCanOutLoading(manager.can_out_loading);
-    setEditPreferredShift(manager.preferred_shift);
-    setEditRestDays(manager.recurring_rest_days || []);
-  };
-
-  const cancelEdit = () => {
-    setEditId(null);
-  };
-
-  const saveEdit = async () => {
-    if (!editId || !editName.trim()) {
-      toast({
-        title: "Validation Error",
-        description: "Name is required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("managers")
-        .update({
-          name: editName.trim(),
-          can_admin: editCanAdmin,
-          can_floor: editCanFloor,
-          can_intake: editCanIntake,
-          can_out_loading: editCanOutLoading,
-          preferred_shift: editPreferredShift,
-          recurring_rest_days: editRestDays,
-        })
-        .eq("id", editId);
-
-      if (error) throw error;
-
-      toast({ title: "✅ Manager Updated" });
-      setEditId(null);
-      loadData();
-    } catch (error: any) {
-      toast({
-        title: "❌ Update Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete ${name}?`)) return;
-
-    try {
-      const { error } = await supabase.from("managers").delete().eq("id", id);
-      if (error) throw error;
-
-      toast({ title: "✅ Manager Deleted" });
-      loadData();
-    } catch (error: any) {
-      toast({
-        title: "❌ Delete Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const toggleRestDay = (day: number, isEdit: boolean) => {
-    if (isEdit) {
-      setEditRestDays((prev) =>
-        prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-      );
     } else {
-      setRestDays((prev) =>
-        prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-      );
+      setPasswordError(true);
     }
   };
 
-  if (isLoading) {
-    return <div className="text-center py-8">Loading managers...</div>;
+  const handleUnlock = () => {
+    if (unlockPasswordInput === MANAGER_PASSWORD) {
+      setIsLocked(false);
+      localStorage.setItem("manager-locked", JSON.stringify(false));
+      setShowUnlockPrompt(false);
+      setUnlockError(false);
+      setUnlockPasswordInput("");
+      addNotification({
+        staffName: "System",
+        message: "Manager rota unlocked",
+        type: "info",
+      });
+    } else {
+      setUnlockError(true);
+    }
+  };
+
+  const generateRota = async () => {
+    if (isLocked) {
+      setShowUnlockPrompt(true);
+      return;
+    }
+
+    if (managers.length === 0) {
+      addNotification({
+        staffName: "System",
+        message: "No managers available. Add managers first.",
+        type: "info",
+      });
+      return;
+    }
+
+    const newAssignments: ManagerAssignment[] = [];
+
+    // For each day of the week
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const currentDate = new Date(weekStart);
+      currentDate.setDate(weekStart.getDate() + dayOffset);
+      const dateStr = currentDate.toISOString().split("T")[0];
+      const dayOfWeek = currentDate.getDay(); // 0=Sunday, 1=Monday, etc.
+
+      // Check if this day requires same manager for Out-loading and Intake
+      // Saturday=6, Sunday=0, Monday=1, Tuesday=2, Wednesday=3
+      // Thu/Fri (4,5) need DIFFERENT managers for Intake and Out-loading
+      const requiresSameManager = [0, 1, 2, 3, 6].includes(dayOfWeek);
+
+      // Get availability for this date
+      const dayAvailability = await getAvailabilityForDate(dateStr);
+      const unavailableManagerIds = new Set(
+        dayAvailability
+          .filter(a => a.type !== "available")
+          .map(a => a.manager_id)
+      );
+
+      // Add managers with recurring rest days for this day of week
+      managers.forEach(manager => {
+        if (manager.recurring_rest_days && manager.recurring_rest_days.includes(dayOfWeek)) {
+          console.log(`⛔ ${manager.name}: Recurring rest day on ${DAYS[dayOfWeek]} (${dateStr})`);
+          unavailableManagerIds.add(manager.id);
+        }
+      });
+
+      // Get list of available managers for this day
+      const availableManagers = managers.filter(m => !unavailableManagerIds.has(m.id));
+      console.log(`📅 ${dateStr} (${DAYS[dayOfWeek]}): ${availableManagers.length} managers available, ${unavailableManagerIds.size} unavailable`);
+      const assignedManagerIdsThisDay = new Set<string>();
+      let outloadingIntakeManager: Manager | null = null;
+
+      // If this day requires same manager for Out-loading and Intake, assign them first
+      if (requiresSameManager) {
+        try {
+          // Get managers who can do BOTH Out-loading and Intake
+          const outloadingManagers = await getManagersForDuty("Out-loading");
+          const intakeManagers = await getManagersForDuty("Intake");
+          
+          // Find managers who can do both
+          const bothDutiesManagers = outloadingManagers.filter(om =>
+            intakeManagers.some(im => im.id === om.id) &&
+            !unavailableManagerIds.has(om.id)
+          );
+
+          if (bothDutiesManagers.length === 0) {
+          } else {
+            // Check who hasn't been assigned these duties recently (fairness)
+            const recentOutloading = newAssignments.filter(a => 
+              a.duty === "Out-loading" && 
+              bothDutiesManagers.some(m => m.id === a.managerId)
+            );
+            const recentIntake = newAssignments.filter(a => 
+              a.duty === "Intake" && 
+              bothDutiesManagers.some(m => m.id === a.managerId)
+            );
+
+            const recentIds = new Set([
+              ...recentOutloading.map(a => a.managerId),
+              ...recentIntake.map(a => a.managerId)
+            ]);
+
+            const freshManagers = bothDutiesManagers.filter(m => !recentIds.has(m.id));
+            const poolToUse = freshManagers.length > 0 ? freshManagers : bothDutiesManagers;
+            
+            outloadingIntakeManager = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+
+            // Assign to both Out-loading and Intake (no shiftStart anymore)
+            newAssignments.push({
+              managerId: outloadingIntakeManager.id,
+              managerName: outloadingIntakeManager.name,
+              duty: "Out-loading",
+              shiftStart: "06:00", // Keep for type compatibility, but not displayed
+              date: dateStr,
+            });
+            newAssignments.push({
+              managerId: outloadingIntakeManager.id,
+              managerName: outloadingIntakeManager.name,
+              duty: "Intake",
+              shiftStart: "06:00",
+              date: dateStr,
+            });
+            assignedManagerIdsThisDay.add(outloadingIntakeManager.id);
+          }
+        } catch (error) {
+          console.error(`Error assigning Out-loading/Intake pair on ${dateStr}:`, error);
+        }
+      }
+
+      // For Thu/Fri, assign Intake and Out-loading to DIFFERENT managers
+      if (!requiresSameManager) {
+        try {
+          // Assign Out-loading first
+          const outloadingManagers = await getManagersForDuty("Out-loading");
+          const availableOutloading = outloadingManagers.filter(m => 
+            !unavailableManagerIds.has(m.id)
+          );
+
+          if (availableOutloading.length > 0) {
+            const recentOutloading = newAssignments.filter(a => 
+              a.duty === "Out-loading" && 
+              availableOutloading.some(m => m.id === a.managerId)
+            );
+            const recentIds = new Set(recentOutloading.map(a => a.managerId));
+            const freshManagers = availableOutloading.filter(m => !recentIds.has(m.id));
+            const poolToUse = freshManagers.length > 0 ? freshManagers : availableOutloading;
+            
+            const selectedOutloading = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+            
+            newAssignments.push({
+              managerId: selectedOutloading.id,
+              managerName: selectedOutloading.name,
+              duty: "Out-loading",
+              shiftStart: "06:00",
+              date: dateStr,
+            });
+            assignedManagerIdsThisDay.add(selectedOutloading.id);
+          }
+
+          // Assign Intake to a DIFFERENT manager
+          const intakeManagers = await getManagersForDuty("Intake");
+          const availableIntake = intakeManagers.filter(m => 
+            !unavailableManagerIds.has(m.id) &&
+            !assignedManagerIdsThisDay.has(m.id) // CRITICAL: exclude already assigned
+          );
+
+          if (availableIntake.length > 0) {
+            const recentIntake = newAssignments.filter(a => 
+              a.duty === "Intake" && 
+              availableIntake.some(m => m.id === a.managerId)
+            );
+            const recentIds = new Set(recentIntake.map(a => a.managerId));
+            const freshManagers = availableIntake.filter(m => !recentIds.has(m.id));
+            const poolToUse = freshManagers.length > 0 ? freshManagers : availableIntake;
+            
+            const selectedIntake = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+            
+            newAssignments.push({
+              managerId: selectedIntake.id,
+              managerName: selectedIntake.name,
+              duty: "Intake",
+              shiftStart: "06:00",
+              date: dateStr,
+            });
+            assignedManagerIdsThisDay.add(selectedIntake.id);
+          }
+        } catch (error) {
+          console.error(`Error assigning Out-loading/Intake separately on ${dateStr}:`, error);
+        }
+      }
+
+      // Now assign remaining duties (Admin, Floor)
+      const dutiesToAssign: ManagerDuty[] = requiresSameManager && outloadingIntakeManager
+        ? ["Admin", "Floor"] // Skip Out-loading and Intake since already assigned
+        : ["Admin", "Floor"]; // Thu/Fri: already assigned Intake/Out-loading above
+
+      for (const duty of dutiesToAssign) {
+        try {
+          const dutyManagers = await getManagersForDuty(duty);
+          
+          // Filter out unavailable managers AND managers already assigned to Intake/Out-loading
+          const workingManagers = dutyManagers.filter(m => 
+            !unavailableManagerIds.has(m.id) &&
+            !assignedManagerIdsThisDay.has(m.id) // CRITICAL: exclude managers on Intake/Out-loading
+          );
+
+          if (workingManagers.length === 0) {
+            continue;
+          }
+
+          // Check who hasn't been assigned this duty recently (fairness)
+          const recentAssignments = newAssignments.filter(a => 
+            a.duty === duty && 
+            workingManagers.some(m => m.id === a.managerId)
+          );
+
+          const recentManagerIds = new Set(recentAssignments.map(a => a.managerId));
+          const freshManagers = workingManagers.filter(m => !recentManagerIds.has(m.id));
+
+          // Pick from fresh managers if available, otherwise from all eligible
+          const poolToUse = freshManagers.length > 0 ? freshManagers : workingManagers;
+          const selectedManager = poolToUse[Math.floor(Math.random() * poolToUse.length)];
+
+          newAssignments.push({
+            managerId: selectedManager.id,
+            managerName: selectedManager.name,
+            duty,
+            shiftStart: "06:00",
+            date: dateStr,
+          });
+          assignedManagerIdsThisDay.add(selectedManager.id);
+        } catch (error) {
+          console.error(`Error assigning duty ${duty}:`, error);
+        }
+      }
+
+      // After all specific duties are assigned, put all remaining available managers on Floor
+      const unassignedManagers = availableManagers.filter(m => 
+        !assignedManagerIdsThisDay.has(m.id) &&
+        m.can_floor // Only assign if they're trained for Floor
+      );
+
+      for (const manager of unassignedManagers) {
+        newAssignments.push({
+          managerId: manager.id,
+          managerName: manager.name,
+          duty: "Floor",
+          shiftStart: "06:00",
+          date: dateStr,
+        });
+      }
+    }
+
+    setAssignments(newAssignments);
+    setIsLocked(true);
+    localStorage.setItem("manager-assignments", JSON.stringify(newAssignments));
+    localStorage.setItem("manager-locked", JSON.stringify(true));
+
+    addNotification({
+      staffName: "System",
+      message: "Manager rota generated and locked",
+      type: "info",
+    });
+  };
+
+  const openCreateDialog = () => {
+    setEditingManager(null);
+    setManagerForm({
+      name: "",
+      can_intake: true,
+      can_out_loading: true,
+      can_admin: true,
+      can_floor: true,
+      preferred_shift: null,
+      recurring_rest_days: [],
+    });
+    setShowManagerDialog(true);
+  };
+
+  const openEditDialog = (manager: Manager) => {
+    setEditingManager(manager);
+    setManagerForm({
+      name: manager.name,
+      can_intake: manager.can_intake,
+      can_out_loading: manager.can_out_loading,
+      can_admin: manager.can_admin,
+      can_floor: manager.can_floor,
+      preferred_shift: manager.preferred_shift,
+      recurring_rest_days: manager.recurring_rest_days || [],
+    });
+    setShowManagerDialog(true);
+  };
+
+  const handleSaveManager = async () => {
+    try {
+      if (!managerForm.name.trim()) {
+        addNotification({
+          staffName: "System",
+          message: "Manager name is required",
+          type: "info",
+        });
+        return;
+      }
+
+      if (editingManager) {
+        await updateManager({
+          id: editingManager.id,
+          ...managerForm,
+        });
+        addNotification({
+          staffName: "System",
+          message: `Updated ${managerForm.name}`,
+          type: "info",
+        });
+      } else {
+        await createManager(managerForm);
+        addNotification({
+          staffName: "System",
+          message: `Added ${managerForm.name}`,
+          type: "info",
+        });
+      }
+
+      setShowManagerDialog(false);
+      loadManagers();
+    } catch (error) {
+      console.error("Error saving manager:", error);
+      addNotification({
+        staffName: "System",
+        message: "Failed to save manager",
+        type: "info",
+      });
+    }
+  };
+
+  const handleDeleteManager = async (manager: Manager) => {
+    if (!confirm(`Delete ${manager.name}?`)) return;
+
+    try {
+      await deleteManager(manager.id);
+      addNotification({
+        staffName: "System",
+        message: `Deleted ${manager.name}`,
+        type: "info",
+      });
+      loadManagers();
+    } catch (error) {
+      console.error("Error deleting manager:", error);
+      addNotification({
+        staffName: "System",
+        message: "Failed to delete manager",
+        type: "info",
+      });
+    }
+  };
+
+  const handleQuickAvailability = async (manager: Manager, status: AvailabilityType) => {
+    try {
+      // Set availability for all days in current week
+      const weekDates = DAYS.map((_, i) => {
+        const date = new Date(weekStart);
+        date.setDate(weekStart.getDate() + i);
+        return date;
+      });
+
+      for (const date of weekDates) {
+        const dateStr = date.toISOString().split("T")[0];
+        await setManagerAvailability(manager.id, dateStr, status, "");
+      }
+
+      addNotification({
+        staffName: "System",
+        message: `Set ${manager.name} as ${status} for current week`,
+        type: "info",
+      });
+
+      loadAvailability();
+    } catch (error) {
+      console.error("Error setting availability:", error);
+      addNotification({
+        staffName: "System",
+        message: "Failed to update availability",
+        type: "info",
+      });
+    }
+  };
+
+  const openCalendarDialog = (manager: Manager) => {
+    setSelectedManagerForCalendar(manager);
+    setSelectedDate("");
+    setSelectedAvailabilityType("rest");
+    setShowCalendarDialog(true);
+  };
+
+  const handleSetSingleDayAvailability = async () => {
+    if (!selectedManagerForCalendar || !selectedDate) {
+      addNotification({
+        staffName: "System",
+        message: "Please select a date",
+        type: "info",
+      });
+      return;
+    }
+
+    try {
+      await setManagerAvailability(
+        selectedManagerForCalendar.id,
+        selectedDate,
+        selectedAvailabilityType,
+        ""
+      );
+
+      addNotification({
+        staffName: "System",
+        message: `Set ${selectedManagerForCalendar.name} as ${selectedAvailabilityType} on ${new Date(selectedDate).toLocaleDateString()}`,
+        type: "info",
+      });
+
+      setShowCalendarDialog(false);
+      loadAvailability();
+    } catch (error) {
+      console.error("Error setting single day availability:", error);
+      addNotification({
+        staffName: "System",
+        message: "Failed to update availability",
+        type: "info",
+      });
+    }
+  };
+
+  const getAvailabilityForManagerDate = (managerId: string, dateStr: string): AvailabilityType => {
+    const key = `${managerId}-${dateStr}`;
+    const availEntry = availabilityMap[key];
+    
+    // If there's an explicit availability entry, use that
+    if (availEntry) {
+      return availEntry.type;
+    }
+    
+    // Otherwise check if this date falls on a recurring rest day
+    const manager = managers.find(m => m.id === managerId);
+    if (manager && manager.recurring_rest_days && manager.recurring_rest_days.length > 0) {
+      const date = new Date(dateStr);
+      const dayOfWeek = date.getDay(); // 0=Sunday, 1=Monday, etc.
+      
+      if (manager.recurring_rest_days.includes(dayOfWeek)) {
+        return "rest";
+      }
+    }
+    
+    // Default to available
+    return "available";
+  };
+
+  const exportPDF = () => {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    generateManagerDutiesPDF(assignments, weekStart, weekEnd);
+    
+    addNotification({
+      staffName: "System",
+      message: "Manager duties PDF downloaded successfully",
+      type: "info",
+    });
+  };
+
+  const weekDates = DAYS.map((_, i) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + i);
+    return date;
+  });
+
+  const handlePrevWeek = () => {
+    const prevWeek = new Date(weekStart);
+    prevWeek.setDate(prevWeek.getDate() - 7);
+    setWeekStart(prevWeek);
+  };
+
+  const handleNextWeek = () => {
+    const nextWeek = new Date(weekStart);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    setWeekStart(nextWeek);
+  };
+
+  const getDutyColor = (duty: ManagerDuty): string => {
+    const colorMap: Record<ManagerDuty, string> = {
+      "Intake": "bg-blue-500/20 text-blue-700 border-blue-500",
+      "Out-loading": "bg-green-500/20 text-green-700 border-green-500",
+      "Admin": "bg-purple-500/20 text-purple-700 border-purple-500",
+      "Floor": "bg-orange-500/20 text-orange-700 border-orange-500",
+    };
+    return colorMap[duty];
+  };
+
+  if (!isAuthenticated) {
+    return (
+      <Layout>
+        <SEO title="Manager Duties - Access Required" />
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <Card className="w-full max-w-md shadow-lg">
+            <CardHeader>
+              <CardTitle className="font-condensed text-2xl flex items-center gap-2">
+                <Lock className="h-6 w-6 text-primary" />
+                Manager Access Required
+              </CardTitle>
+              <CardDescription>
+                Enter password to access manager duties rota
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                <div>
+                  <Input
+                    type="password"
+                    placeholder="Enter password"
+                    value={passwordInput}
+                    onChange={(e) => {
+                      setPasswordInput(e.target.value);
+                      setPasswordError(false);
+                    }}
+                    className="font-mono"
+                  />
+                  {passwordError && (
+                    <p className="text-sm text-destructive mt-2 font-mono">
+                      Incorrect password
+                    </p>
+                  )}
+                </div>
+                <Button type="submit" className="w-full gap-2">
+                  <Unlock className="h-4 w-4" />
+                  Access Manager Duties
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </Layout>
+    );
   }
 
   return (
-    <>
-      <SEO title="Manager Management" />
-      
+    <Layout>
+      <SEO title="Manager Duties Rota" />
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Manager Management</h1>
-
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Add New Manager</h2>
-          
-          <div className="space-y-4">
-            <Input
-              placeholder="Manager Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Duties</label>
-              <div className="flex flex-wrap gap-2">
-                <Badge
-                  variant={canIntake ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => setCanIntake(!canIntake)}
-                >
-                  Intake
-                </Badge>
-                <Badge
-                  variant={canOutLoading ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => setCanOutLoading(!canOutLoading)}
-                >
-                  Out-loading
-                </Badge>
-                <Badge
-                  variant={canAdmin ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => setCanAdmin(!canAdmin)}
-                >
-                  Admin
-                </Badge>
-                <Badge
-                  variant={canFloor ? "default" : "outline"}
-                  className="cursor-pointer"
-                  onClick={() => setCanFloor(!canFloor)}
-                >
-                  Floor
-                </Badge>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Preferred Shift</label>
-              <select
-                value={preferredShift}
-                onChange={(e) => setPreferredShift(e.target.value)}
-                className="w-full p-2 border rounded"
-              >
-                <option value="06:00">06:00</option>
-                <option value="08:00">08:00</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium mb-2 block">Recurring Rest Days</label>
+        {showUnlockPrompt && (
+          <Alert className="bg-warning/10 border-warning">
+            <Lock className="h-5 w-5 text-warning" />
+            <div className="flex-1">
+              <h3 className="font-condensed font-semibold text-warning mb-2">
+                Rota is Locked
+              </h3>
+              <p className="text-sm text-warning/90 mb-3">
+                Enter password to unlock and regenerate the rota
+              </p>
               <div className="flex gap-2">
-                {DAYS.map((day, idx) => (
-                  <Badge
-                    key={idx}
-                    variant={restDays.includes(idx) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => toggleRestDay(idx, false)}
-                  >
-                    {day}
-                  </Badge>
-                ))}
+                <Input
+                  type="password"
+                  placeholder="Enter password"
+                  value={unlockPasswordInput}
+                  onChange={(e) => {
+                    setUnlockPasswordInput(e.target.value);
+                    setUnlockError(false);
+                  }}
+                  className="font-mono max-w-xs"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUnlock}
+                  className="rounded-lg"
+                >
+                  Unlock
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowUnlockPrompt(false);
+                    setUnlockPasswordInput("");
+                    setUnlockError(false);
+                  }}
+                  className="rounded-lg"
+                >
+                  Cancel
+                </Button>
               </div>
+              {unlockError && (
+                <p className="text-sm text-destructive mt-2 font-mono">
+                  Incorrect password
+                </p>
+              )}
             </div>
+          </Alert>
+        )}
 
-            <Button onClick={handleAdd}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Manager
-            </Button>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-condensed text-3xl font-bold tracking-tight">
+              Manager Duties Rota
+            </h1>
+            <p className="text-sm text-muted-foreground font-mono mt-1">
+              {weekDates[0].toLocaleDateString("en-GB", { 
+                day: "2-digit", 
+                month: "short", 
+                year: "numeric" 
+              })} - {weekDates[6].toLocaleDateString("en-GB", { 
+                day: "2-digit", 
+                month: "short", 
+                year: "numeric" 
+              })}
+            </p>
           </div>
-        </Card>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowManageSection(!showManageSection)}
+              className="gap-2 rounded-lg"
+            >
+              <Users className="h-4 w-4" />
+              <span className="font-mono text-xs">
+                {showManageSection ? "Hide" : "Manage"} Managers
+              </span>
+            </Button>
 
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Managers ({managers.length})</h2>
-          
-          {managers.map((manager) => (
-            <Card key={manager.id} className="p-4">
-              {editId === manager.id ? (
-                <div className="space-y-4">
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                  />
+            <Button
+              onClick={generateRota}
+              size="lg"
+              className="gap-2 rounded-lg shadow-md hover:shadow-lg transition-all font-condensed text-base bg-accent hover:bg-accent/90 text-accent-foreground"
+            >
+              <Zap className="h-5 w-5" />
+              <span>{isLocked ? "Regenerate" : "Generate"} Rota</span>
+            </Button>
 
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Duties</label>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge
-                        variant={editCanIntake ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => setEditCanIntake(!editCanIntake)}
-                      >
-                        Intake
-                      </Badge>
-                      <Badge
-                        variant={editCanOutLoading ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => setEditCanOutLoading(!editCanOutLoading)}
-                      >
-                        Out-loading
-                      </Badge>
-                      <Badge
-                        variant={editCanAdmin ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => setEditCanAdmin(!editCanAdmin)}
-                      >
-                        Admin
-                      </Badge>
-                      <Badge
-                        variant={editCanFloor ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => setEditCanFloor(!editCanFloor)}
-                      >
-                        Floor
-                      </Badge>
-                    </div>
-                  </div>
+            <Button variant="outline" size="sm" onClick={handlePrevWeek} className="rounded-lg">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleNextWeek} className="rounded-lg">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
 
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Preferred Shift</label>
-                    <select
-                      value={editPreferredShift}
-                      onChange={(e) => setEditPreferredShift(e.target.value)}
-                      className="w-full p-2 border rounded"
-                    >
-                      <option value="06:00">06:00</option>
-                      <option value="08:00">08:00</option>
-                    </select>
-                  </div>
+            {assignments.length > 0 && (
+              <>
+                {isLocked && (
+                  <Badge variant="outline" className="gap-1 font-mono text-xs text-warning border-warning">
+                    <Lock className="h-3 w-3" />
+                    Locked
+                  </Badge>
+                )}
+                <div className="flex gap-2 ml-auto">
+                  <Button
+                    onClick={() => setShowPrintPreview(true)}
+                    disabled={assignments.length === 0}
+                    variant="outline"
+                    className="gap-2 font-sans font-medium"
+                    size="lg"
+                  >
+                    <Printer className="h-4 w-4" />
+                    Print Preview
+                  </Button>
 
-                  <div>
-                    <label className="text-sm font-medium mb-2 block">Recurring Rest Days</label>
-                    <div className="flex gap-2">
-                      {DAYS.map((day, idx) => (
-                        <Badge
-                          key={idx}
-                          variant={editRestDays.includes(idx) ? "default" : "outline"}
-                          className="cursor-pointer"
-                          onClick={() => toggleRestDay(idx, true)}
-                        >
-                          {day}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button onClick={saveEdit}>
-                      <Save className="h-4 w-4 mr-2" />
-                      Save
-                    </Button>
-                    <Button variant="outline" onClick={cancelEdit}>
-                      <X className="h-4 w-4 mr-2" />
-                      Cancel
-                    </Button>
-                  </div>
+                  <Button
+                    onClick={exportPDF}
+                    disabled={assignments.length === 0}
+                    variant="outline"
+                    className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
+                    size="lg"
+                  >
+                    <FileDown className="h-4 w-4" />
+                    Export Duties PDF
+                  </Button>
                 </div>
-              ) : (
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2 flex-1">
-                    <h3 className="font-semibold text-lg">{manager.name}</h3>
-                    
-                    <div className="flex flex-wrap gap-2">
-                      {manager.can_intake && <Badge variant="secondary">Intake</Badge>}
-                      {manager.can_out_loading && <Badge variant="secondary">Out-loading</Badge>}
-                      {manager.can_admin && <Badge variant="secondary">Admin</Badge>}
-                      {manager.can_floor && <Badge variant="secondary">Floor</Badge>}
-                    </div>
-                    
-                    <div className="text-sm text-muted-foreground">
-                      Shift: {manager.preferred_shift}
-                      {manager.recurring_rest_days && manager.recurring_rest_days.length > 0 && (
-                        <> • Rest: {manager.recurring_rest_days.map(d => DAYS[d]).join(", ")}</>
-                      )}
-                    </div>
-                  </div>
+              </>
+            )}
+          </div>
+        </div>
 
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => startEdit(manager)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDelete(manager.id, manager.name)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+        {/* Manager Management Section */}
+        {showManageSection && (
+          <Card className="shadow-sm">
+            <CardHeader className="border-b border-border/50 bg-muted/30">
+              <CardTitle className="text-xl font-condensed font-bold tracking-tight">
+                Active Managers
+              </CardTitle>
+              <CardDescription className="text-sm font-sans">
+                {managers.length} managers • Configure duties and availability
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {loading && (
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />
+                  ))}
                 </div>
               )}
-            </Card>
-          ))}
 
-          {managers.length === 0 && (
-            <Card className="p-8 text-center text-muted-foreground">
-              No managers yet. Add your first one above.
-            </Card>
-          )}
-        </div>
+              {!loading && managers.length === 0 && (
+                <EmptyState
+                  icon={Users}
+                  title="No Managers Yet"
+                  description="Add shift managers to start scheduling warehouse duties and coordinating daily operations."
+                  action={{
+                    label: "Add First Manager",
+                    onClick: openCreateDialog
+                  }}
+                />
+              )}
+
+              {!loading && managers.length > 0 && (
+                <div className="space-y-3">
+                  {managers.map((manager) => (
+                    <div
+                      key={manager.id}
+                      className="flex items-center justify-between p-4 rounded-lg border border-border hover:bg-muted/30 transition-smooth"
+                    >
+                      <div className="flex-1">
+                        <div className="font-condensed font-semibold text-sm mb-2">
+                          {manager.name}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {manager.can_intake && (
+                            <Badge variant="outline" className="text-xs font-mono bg-blue-500/10 text-blue-700 border-blue-500">
+                              Intake
+                            </Badge>
+                          )}
+                          {manager.can_out_loading && (
+                            <Badge variant="outline" className="text-xs font-mono bg-green-500/10 text-green-700 border-green-500">
+                              Out-loading
+                            </Badge>
+                          )}
+                          {manager.can_admin && (
+                            <Badge variant="outline" className="text-xs font-mono bg-purple-500/10 text-purple-700 border-purple-500">
+                              Admin
+                            </Badge>
+                          )}
+                          {manager.can_floor && (
+                            <Badge variant="outline" className="text-xs font-mono bg-orange-500/10 text-orange-700 border-orange-500">
+                              Floor
+                            </Badge>
+                          )}
+                          {manager.preferred_shift && (
+                            <Badge variant="outline" className="text-xs font-mono bg-accent/10 text-accent-foreground border-accent">
+                              Prefers {manager.preferred_shift}
+                            </Badge>
+                          )}
+                          {manager.recurring_rest_days && manager.recurring_rest_days.length > 0 && (
+                            <Badge variant="outline" className="text-xs font-mono bg-blue-500/10 text-blue-700 border-blue-500">
+                              Rest: {manager.recurring_rest_days.map(d => DAYS[d]).join(", ")}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openCalendarDialog(manager)}
+                          className="rounded-lg gap-1"
+                        >
+                          <span className="font-mono text-xs">Set Availability</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => openEditDialog(manager)}
+                          className="rounded-lg"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeleteConfirmManager(manager)}
+                          className="rounded-lg text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <ConfirmDialog
+                open={deleteConfirmManager !== null}
+                onOpenChange={(open) => !open && setDeleteConfirmManager(null)}
+                title={`Delete ${deleteConfirmManager?.name}?`}
+                description="This action cannot be undone. This manager will be permanently removed from the system. Any existing duty assignments in generated rotas will remain."
+                confirmLabel="Delete Manager"
+                cancelLabel="Cancel"
+                variant="destructive"
+                onConfirm={async () => {
+                  if (deleteConfirmManager) {
+                    await handleDeleteManager(deleteConfirmManager);
+                    setDeleteConfirmManager(null);
+                  }
+                }}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Manager Dialog */}
+        <Dialog open={showManagerDialog} onOpenChange={setShowManagerDialog}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="font-condensed text-xl">
+                {editingManager ? "Edit Manager" : "Add Manager"}
+              </DialogTitle>
+              <DialogDescription className="font-mono text-xs">
+                {editingManager ? "Update manager details and training" : "Add a new manager to the rota system"}
+              </DialogDescription>
+            </DialogHeader>
+            <ManagerForm
+              editingManager={editingManager}
+              formData={managerForm}
+              onInputChange={(key, value) => setManagerForm(prev => ({ ...prev, [key]: value }))}
+              onSubmit={handleSaveManager}
+              onCancel={() => setShowManagerDialog(false)}
+            />
+          </DialogContent>
+        </Dialog>
+
+        {/* Calendar Availability Dialog */}
+        <ManagerAvailabilityDialog
+          open={showCalendarDialog}
+          onOpenChange={setShowCalendarDialog}
+          manager={selectedManagerForCalendar}
+          selectedDate={selectedDate}
+          onDateChange={setSelectedDate}
+          availabilityType={selectedAvailabilityType}
+          onTypeChange={setSelectedAvailabilityType}
+          onSubmit={handleSetSingleDayAvailability}
+        />
+
+        {/* Manager Rota Table */}
+        {assignments.length > 0 && (
+          <Card className="shadow-sm" data-tour="manager-rota">
+            <CardHeader className="border-b border-border/50 bg-muted/30">
+              <CardTitle className="text-xl font-condensed font-bold tracking-tight">
+                Current Week Schedule
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <ManagerRotaTable
+                weekDays={weekDates.map((date, i) => ({ date, dateStr: date.toISOString().split("T")[0], dayOfWeek: i }))}
+                managers={managers}
+                assignments={assignments}
+                getAvailabilityForManagerDate={getAvailabilityForManagerDate}
+                onDeleteAssignment={(managerId, dateStr) => {
+                   // Optional: implement if needed, currently dummy
+                   setAssignments(prev => prev.filter(a => !(a.managerId === managerId && a.date === dateStr)));
+                }}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {assignments.length === 0 && (
+          <EmptyState
+            icon={Calendar}
+            title="No Duties Scheduled Yet"
+            description="Click 'Generate Rota' to automatically create the manager duties schedule based on availability and training."
+            action={{
+              label: "Generate Rota",
+              onClick: generateRota
+            }}
+          />
+        )}
       </div>
-    </>
+      {/* Print Preview Dialog */}
+      <ManagerDutiesPrintPreview
+        open={showPrintPreview}
+        onClose={() => setShowPrintPreview(false)}
+        weekStart={weekStart}
+        assignments={assignments}
+        managers={managers.map(m => ({ id: m.id, name: m.name }))}
+      />
+    </Layout>
   );
+}
+
+function getWeekStart(date: Date): Date {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day;
+  return new Date(d.setDate(diff));
 }

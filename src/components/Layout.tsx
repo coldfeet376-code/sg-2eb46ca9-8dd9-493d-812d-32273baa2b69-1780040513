@@ -6,13 +6,10 @@ import { cn } from "@/lib/utils";
 import { UserProfileDropdown } from "./UserProfileDropdown";
 import { supabase } from "@/integrations/supabase/client";
 
-interface LayoutProps {
-  children: ReactNode;
-}
-
-export function Layout({ children }: LayoutProps) {
+export function Layout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingAdmin, setCheckingAdmin] = useState(true);
 
   useEffect(() => {
     checkAdminStatus();
@@ -23,6 +20,7 @@ export function Layout({ children }: LayoutProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setIsAdmin(false);
+        setCheckingAdmin(false);
         return;
       }
 
@@ -36,6 +34,8 @@ export function Layout({ children }: LayoutProps) {
     } catch (error) {
       console.error("Error checking admin status:", error);
       setIsAdmin(false);
+    } finally {
+      setCheckingAdmin(false);
     }
   };
 
@@ -49,8 +49,9 @@ export function Layout({ children }: LayoutProps) {
     { name: "Analytics", href: "/analytics", icon: BarChart3 },
   ];
 
-  if (isAdmin) {
-    navigation.push({ name: "Admin", href: "/admin/setup", icon: Settings });
+  // Add Admin link if user is admin
+  if (isAdmin && !checkingAdmin) {
+    navigation.push({ name: "Admin", href: "/admin/setup", icon: UserCog });
   }
 
   return (
@@ -61,7 +62,9 @@ export function Layout({ children }: LayoutProps) {
             <div className="flex items-center gap-8">
               <Link href="/" className="flex items-center gap-2 group">
                 <Calendar className="h-6 w-6 text-primary transition-transform group-hover:scale-110" />
-                <span className="font-bold text-xl tracking-tight">Warehouse Rota</span>
+                <span className="font-condensed font-bold text-xl tracking-tight">
+                  Warehouse Rota
+                </span>
               </Link>
 
               <div className="hidden md:flex items-center gap-1">
@@ -73,7 +76,7 @@ export function Layout({ children }: LayoutProps) {
                       key={item.name}
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all",
+                        "flex items-center gap-2 px-4 py-2 rounded-lg font-sans font-medium text-sm transition-all",
                         isActive
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
@@ -87,7 +90,9 @@ export function Layout({ children }: LayoutProps) {
               </div>
             </div>
 
-            <UserProfileDropdown />
+            <div className="flex items-center gap-4">
+              <UserProfileDropdown />
+            </div>
           </div>
         </div>
       </nav>
