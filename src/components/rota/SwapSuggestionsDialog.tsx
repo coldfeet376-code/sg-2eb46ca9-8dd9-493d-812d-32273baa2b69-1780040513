@@ -1,101 +1,110 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, Check } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Shuffle, Target, ArrowLeftRight, Check, Zap } from "lucide-react";
 import type { SwapSuggestion } from "@/lib/swapSuggester";
 
 interface SwapSuggestionsDialogProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
   suggestions: SwapSuggestion[];
-  onImplementSwap: (swap: SwapSuggestion) => void;
+  onApplySwap: (swap: SwapSuggestion) => void;
   onImplementAll: (swaps: SwapSuggestion[]) => void;
 }
 
 export function SwapSuggestionsDialog({
   open,
-  onOpenChange,
+  onClose,
   suggestions,
-  onImplementSwap,
+  onApplySwap,
   onImplementAll,
 }: SwapSuggestionsDialogProps) {
-  if (suggestions.length === 0) return null;
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="font-condensed text-2xl">Smart Swap Suggestions</DialogTitle>
-          <DialogDescription className="font-mono text-xs">
-            {suggestions.length} optimizations to improve fairness
-          </DialogDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="font-condensed text-2xl flex items-center gap-2">
+                <Shuffle className="h-6 w-6 text-primary" />
+                Smart Swap Suggestions
+              </DialogTitle>
+              <DialogDescription className="font-mono text-sm">
+                {suggestions.length} optimization opportunities found
+              </DialogDescription>
+            </div>
+            {suggestions.length > 0 && (
+              <Button
+                onClick={() => onImplementAll(suggestions)}
+                className="gap-2"
+                size="lg"
+              >
+                <Zap className="h-4 w-4" />
+                Implement All ({suggestions.length})
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Implement All Button */}
-          <div className="flex justify-end gap-2 pb-2 border-b">
-            <Button
-              onClick={() => {
-                onImplementAll(suggestions);
-                onOpenChange(false);
-              }}
-              className="font-mono text-sm"
-              size="sm"
-            >
-              <Check className="h-4 w-4 mr-2" />
-              Implement All {suggestions.length} Swaps
-            </Button>
-          </div>
-
-          {/* Individual Suggestions */}
-          {suggestions.map((swap, idx) => (
-            <div
-              key={`${swap.id || idx}`}
-              className="p-4 border rounded-lg bg-muted/30 space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="text-sm font-mono">
-                    <span className="font-semibold">{swap.fromStaffName}</span>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  <div className="text-sm font-mono">
-                    <span className="font-semibold">{swap.toStaffName}</span>
-                  </div>
-                </div>
-                <Badge variant="secondary" className="font-mono text-xs">
-                  {swap.task}
-                </Badge>
+        <ScrollArea className="flex-1 pr-4">
+          {suggestions.length === 0 ? (
+            <div className="py-12 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-success/10 mb-4">
+                <Target className="h-8 w-8 text-success" />
               </div>
-
-              <div className="text-xs text-muted-foreground font-mono">
-                {new Date(swap.date).toLocaleDateString("en-GB", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                })}
-              </div>
-
-              <div className="text-sm font-sans">{swap.reason}</div>
-
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-mono text-muted-foreground">
-                  Impact: +{swap.improvement.toFixed(1)}% fairness
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    onImplementSwap(swap);
-                  }}
-                  className="font-mono text-xs"
-                >
-                  Apply This Swap
-                </Button>
-              </div>
+              <h3 className="font-condensed text-lg font-semibold mb-2">
+                Rota is Optimal
+              </h3>
+              <p className="text-sm text-muted-foreground font-mono">
+                No beneficial swaps detected. Current assignments are well-balanced.
+              </p>
             </div>
-          ))}
-        </div>
+          ) : (
+            <div className="space-y-3 py-4">
+              {suggestions.map((suggestion) => (
+                <div key={suggestion.id} className="border-l-4 border-l-primary/50 border border-border rounded-lg p-4 bg-card">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {new Date(suggestion.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric" })}
+                        </Badge>
+                        <span className="text-sm font-medium">{suggestion.task}</span>
+                        <Badge variant="secondary" className="ml-2 text-xs bg-primary/10 text-primary">
+                          +{suggestion.improvement.toFixed(1)} Fairness
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded">
+                          <span className="text-sm font-semibold">{suggestion.fromStaffName}</span>
+                        </div>
+                        <ArrowLeftRight className="h-4 w-4 text-primary" />
+                        <div className="flex items-center gap-2 bg-muted/50 px-3 py-1.5 rounded">
+                          <span className="text-sm font-semibold">{suggestion.toStaffName}</span>
+                        </div>
+                      </div>
+                      
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {suggestion.reason}
+                      </p>
+                    </div>
+                    
+                    <Button
+                      size="sm"
+                      onClick={() => onApplySwap(suggestion)}
+                      className="gap-2 shrink-0"
+                    >
+                      <Check className="h-4 w-4" />
+                      Apply Swap
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );

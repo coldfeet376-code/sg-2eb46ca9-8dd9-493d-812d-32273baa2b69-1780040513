@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { staffService } from "@/services/staffService";
 import type { StaffMember, Task, ShiftStart, ShiftPattern, AvailabilityType } from "@/types";
 
 interface TaskConfig {
@@ -11,9 +10,8 @@ interface TaskConfig {
 // Staff Query Hook - Emergency cache bypass
 export function useStaff() {
   return useQuery({
-    queryKey: ["staff", "full"],
+    queryKey: ["staff"],
     queryFn: async () => {
-      console.log("🔄 FETCHING STAFF DATA from Supabase...");
       // Fetch all staff
       const { data: staffData, error: staffError } = await supabase
         .from("staff")
@@ -72,7 +70,7 @@ export function useStaff() {
           trainedTasks: s.trained_tasks as Task[],
           shiftStart: s.shift_start as ShiftStart,
           shiftPattern: s.shift_pattern as ShiftPattern,
-          restDays: (s.rest_days as number[]) || [],
+          restDays: s.rest_days || [],
           availability: staffAvailability.map((a) => ({
             id: a.id,
             date: a.date,
@@ -82,12 +80,57 @@ export function useStaff() {
         };
       });
 
-      console.log(`✅ LOADED ${mappedStaff.length} staff members`);
       return mappedStaff;
     },
-    staleTime: 30000, // 30 seconds cache
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
+    staleTime: 1000 * 30, // 30 seconds cache
+  });
+}
+
+// Staff Query Hook - Full availability join
+export function useStaffQuery() {
+  return useQuery({
+    queryKey: ["staff", "full"],
+    queryFn: async () => {
+      // Fetch staff with their availability via JOIN
+      const { data: staffData, error: staffError } = await supabase
+        .from("staff")
+        .select(`
+          *,
+          availability (
+            id,
+            date,
+            type,
+            notes,
+            created_at
+          )
+        `)
+        .order("name");
+
+      if (staffError) throw staffError;
+
+      // Transform to match StaffMember interface
+      const staff: StaffMember[] = (staffData || []).map((s) => {
+        const availabilityRecords = (s.availability || []).map((a: any) => ({
+          id: a.id,
+          date: a.date,
+          type: a.type as AvailabilityType,
+          notes: a.notes || undefined,
+        }));
+        
+        return {
+          id: s.id,
+          name: s.name,
+          trainedTasks: (s.trained_tasks || []) as Task[],
+          shiftStart: (s.shift_start || "06:00") as ShiftStart,
+          shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
+          restDays: s.rest_days || [],
+          availability: availabilityRecords,
+        };
+      });
+
+      return staff;
+    },
+    staleTime: 1000 * 30, // 30 seconds cache
   });
 }
 
@@ -231,10 +274,7 @@ export function useAddAvailability() {
       type: string;
       notes?: string;
     }) => {
-      const { error } = await supabase.from("availability").upsert(
-        { ...availability },
-        { onConflict: 'staff_id,date' }
-      );
+      const { error } = await supabase.from("availability").insert(availability);
       if (error) throw error;
     },
     onSuccess: () => {

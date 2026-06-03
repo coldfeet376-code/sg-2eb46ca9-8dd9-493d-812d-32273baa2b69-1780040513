@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -13,6 +15,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -24,12 +34,14 @@ import {
 import { SEO } from "@/components/SEO";
 import { EmptyState } from "@/components/EmptyState";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { StaffBulkOperations } from "@/components/staff/StaffBulkOperations";
+import { StaffAvailabilityPanel } from "@/components/staff/StaffAvailabilityPanel";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { useAudit } from "@/contexts/AuditContext";
-import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff, useAddAvailability, useDeleteAvailability } from "@/hooks/useSupabaseQueries";
-import type { StaffMember, Task, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
+import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
+import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Trash2, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon, Info, RefreshCw, Target, Settings, HelpCircle, Sparkles, Wand2, Eye } from "lucide-react";
+import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon, MoreVertical } from "lucide-react";
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -37,16 +49,20 @@ import { cn } from "@/lib/utils";
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"];
 const SHIFT_STARTS: ShiftStart[] = ["06:00", "07:00", "08:00", "09:00", "10:00"];
+const SHIFT_PATTERNS = ["4on4off", "5on3off"];
 
 const DAY_SHIFT_PATTERNS: DayShiftPattern[] = [
   "06:00-14:30",
-  "07:00-15:30",
-  "08:00-16:30",
-  "09:00-17:30",
-  "10:00-18:30"
+  "06:00-14:00",
+  "08:30-17:00",
+  "09:00-17:00",
+  "09:30-18:00",
+  "10:00-14:00",
+  "10:00-16:30",
+  "11:00-17:30",
 ];
 
-export default function StaffManagement() {
+export default function StaffPage() {
   const [name, setName] = useState("");
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
   const [shiftStart, setShiftStart] = useState<ShiftStart>("06:00");
@@ -56,13 +72,9 @@ export default function StaffManagement() {
   const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
-  const [showEditDialog, setShowEditDialog] = useState(false);
-  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
-  const [expandedStaff, setExpandedStaff] = useState<Set<string>>(new Set());
   const [selectedStaffIds, setSelectedStaffIds] = useState<Set<string>>(new Set());
-  const [batchDate, setBatchDate] = useState("");
+  const [batchDate, setBatchDate] = useState<string>("");
   const [batchAvailability, setBatchAvailability] = useState<AvailabilityType>("rest");
-  const [openDayDropdown, setOpenDayDropdown] = useState<{ staffId: string; date: string } | null>(null);
   
   const [editAvailabilityStaff, setEditAvailabilityStaff] = useState<{ id: string; name: string } | null>(null);
   const [editAvailabilityDate, setEditAvailabilityDate] = useState<string>("");
@@ -94,6 +106,9 @@ export default function StaffManagement() {
   // Expanded staff IDs for collapsible sections
   const [expandedStaffIds, setExpandedStaffIds] = useState<Set<string>>(new Set());
   
+  // Dropdown state for day selection
+  const [openDayDropdown, setOpenDayDropdown] = useState<{ staffId: string; date: string } | null>(null);
+  
   // Loading state for specific cell being updated
   const [loadingCell, setLoadingCell] = useState<{ staffId: string; date: string } | null>(null);
   
@@ -103,8 +118,8 @@ export default function StaffManagement() {
   // Consistent date string formatting
   const getLocalDateString = (date: Date): string => {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
 
@@ -113,19 +128,6 @@ export default function StaffManagement() {
   const addStaffMutation = useAddStaff();
   const updateStaffMutation = useUpdateStaff();
   const deleteStaffMutation = useDeleteStaff();
-  const deleteAvailabilityMutation = useDeleteAvailability();
-  const createAvailabilityMutation = useAddAvailability();
-
-  const weekDates = useMemo(() => {
-    const dates: Date[] = [];
-    const start = new Date(currentWeekStart);
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(start);
-      date.setDate(start.getDate() + i);
-      dates.push(date);
-    }
-    return dates;
-  }, [currentWeekStart]);
 
   // DEBUG: Log staff data when it changes
   useEffect(() => {
@@ -180,19 +182,7 @@ export default function StaffManagement() {
   }
 
   // Derived selected staff
-  const selectedStaff = staff.filter((s) => selectedStaffIds.has(s.id));
-
-  const getAvailabilityStats = (member: StaffMember) => {
-    const availability = member.availability || [];
-    
-    const stats = {
-      rest: availability.filter((a) => a.type === "rest").length,
-      holiday: availability.filter((a) => a.type === "holiday").length,
-      sick: availability.filter((a) => a.type === "sick").length,
-    };
-    
-    return stats;
-  };
+  const selectedStaff = staff.filter(s => selectedStaffIds.has(s.id));
 
   // Get week dates (Saturday to Sunday)
   const getWeekDates = (weekStart: Date): Date[] => {
@@ -204,6 +194,8 @@ export default function StaffManagement() {
     }
     return dates;
   };
+
+  const weekDates = getWeekDates(currentWeekStart);
 
   const navigateWeek = (direction: "prev" | "next") => {
     const newStart = new Date(currentWeekStart);
@@ -364,72 +356,173 @@ export default function StaffManagement() {
     });
   };
 
-  const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
-    setLoadingCell({ staffId, date: dateStr });
-    setOpenDayDropdown(null);
-
+  const clearAllAvailability = async (staffId: string, staffName: string) => {
     try {
-      if (type === "clear") {
-        // Delete the availability entry
-        await deleteAvailabilityMutation.mutateAsync({ staffId, date: dateStr });
-        toast({ title: "Availability cleared", description: "Day marked as working" });
-      } else {
-        // Upsert the availability entry
-        await createAvailabilityMutation.mutateAsync({
-          staff_id: staffId,
-          date: dateStr,
-          type,
+      const staffMember = staff.find(s => s.id === staffId);
+      if (!staffMember?.availability || staffMember.availability.length === 0) {
+        toast({
+          title: "No data to clear",
+          description: `${staffName} has no availability data`,
         });
-        toast({ title: "Availability updated", description: `Day marked as ${type}` });
+        return;
       }
-    } catch (error: any) {
-      toast({ 
-        title: "Error updating availability", 
-        description: error.message,
-        variant: "destructive" 
+
+      // Delete all availability entries
+      for (const entry of staffMember.availability) {
+        await staffService.deleteAvailability(staffId, entry.date);
+      }
+
+      // Refresh data
+      await queryClient.refetchQueries({ queryKey: ["staff", "full"] });
+      
+      // Force re-render
+      setRenderKey(prev => prev + 1);
+      
+      toast({
+        title: "✓ All Cleared",
+        description: `Removed ${staffMember.availability.length} availability entries for ${staffName}`,
+      });
+      
+    } catch (error) {
+      console.error("Error clearing availability:", error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to clear availability data",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
+    setOpenDayDropdown(null);
+    setLoadingCell({ staffId, date: dateStr });
+    
+    try {
+      const staffMember = staff.find(s => s.id === staffId);
+      const staffName = staffMember?.name || "Staff";
+      
+      // Parse date for display
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const dateObj = new Date(year, month - 1, day);
+      const dateDisplay = dateObj.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+      
+      if (type === "clear") {
+        await staffService.deleteAvailability(staffId, dateStr);
+      } else {
+        await staffService.addAvailability(staffId, [{
+          date: dateStr,
+          type: type,
+          notes: `Set as ${type}`,
+        }]);
+      }
+      
+      // Immediate refresh
+      await queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "full"] });
+      setRenderKey(prev => prev + 1);
+      
+      // Success feedback
+      if (type === "clear") {
+        toast({
+          title: "✓ Cleared",
+          description: `${staffName} - ${dateDisplay} marked as WORKING`,
+        });
+      } else {
+        toast({
+          title: `✓ ${type.toUpperCase()}`,
+          description: `${staffName} - ${dateDisplay}`,
+        });
+      }
+      
+    } catch (error) {
+      console.error("Error updating availability:", error);
+      toast({
+        title: "❌ Error",
+        description: error instanceof Error ? error.message : "Failed to save",
+        variant: "destructive",
       });
     } finally {
       setLoadingCell(null);
     }
   };
 
-  const getAvailabilityForDate = (member: StaffMember, date: Date): AvailabilityType | null => {
-    const dateStr = getLocalDateString(date);
-    const entry = member.availability?.find((a) => a.date === dateStr);
-    return entry ? entry.type : null;
+  const getAvailabilityForDate = (staffMember: StaffMember, date: Date): AvailabilityType | null => {
+    // Format date as YYYY-MM-DD
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+    
+    // DEBUG: Log for first staff member only to avoid spam
+    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
+      console.log(`🔍 getAvailabilityForDate: ${staffMember.name} on ${dateStr}`);
+      console.log(`   Total availability entries: ${staffMember.availability?.length || 0}`);
+      if (staffMember.availability && staffMember.availability.length > 0) {
+        console.log(`   First 3 entries:`, staffMember.availability.slice(0, 3));
+        console.log(`   Looking for exact match: ${dateStr}`);
+      }
+    }
+    
+    const entry = staffMember.availability?.find(a => a.date === dateStr);
+    
+    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
+      console.log(`   Match found:`, entry || 'NONE');
+    }
+    
+    if (!entry) return null;
+    
+    // Normalize type
+    const type = entry.type.toString().toLowerCase().trim();
+    if (type.includes('rest')) return 'rest';
+    if (type.includes('holiday')) return 'holiday';
+    if (type.includes('sick')) return 'sick';
+    if (type.includes('available')) return 'available';
+    
+    return entry.type;
   };
 
-  const getDayColor = (availabilityType: AvailabilityType | null): string => {
-    if (!availabilityType) return "bg-background border-muted-foreground/20 text-foreground";
+  const getAvailabilityStats = (staffMember: StaffMember) => {
+    const availability = staffMember.availability || [];
     
-    switch (availabilityType) {
-      case "rest":
-        return "bg-blue-500 border-blue-600 text-white";
-      case "holiday":
-        return "bg-purple-500 border-purple-600 text-white";
-      case "sick":
-        return "bg-red-500 border-red-600 text-white";
-      case "available":
-        return "bg-green-500 border-green-600 text-white";
-      default:
-        return "bg-background border-muted-foreground/20 text-foreground";
+    // DEBUG: Log for first few staff
+    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
+      console.log(`📊 getAvailabilityStats: ${staffMember.name}`);
+      console.log(`   Raw availability array:`, availability);
+      console.log(`   Array length: ${availability.length}`);
+      console.log(`   Array is array? ${Array.isArray(availability)}`);
+    }
+    
+    const stats = {
+      rest: availability.filter((a) => a.type === "rest").length,
+      holiday: availability.filter((a) => a.type === "holiday").length,
+      sick: availability.filter((a) => a.type === "sick").length,
+    };
+    
+    if (staffMember.name.includes('ABBO') || staffMember.name.includes('BRIAN')) {
+      console.log(`   Calculated stats:`, stats);
+    }
+    
+    return stats;
+  };
+
+  const getDayColor = (type: AvailabilityType | null) => {
+    if (!type) return "bg-muted/40 hover:bg-muted/60 border-border text-muted-foreground";
+    switch (type) {
+      case "rest": return "bg-blue-500 hover:bg-blue-600 border-blue-600 text-white";
+      case "holiday": return "bg-purple-500 hover:bg-purple-600 border-purple-600 text-white";
+      case "sick": return "bg-red-500 hover:bg-red-600 border-red-600 text-white";
+      case "available": return "bg-green-500 hover:bg-green-600 border-green-600 text-white";
+      default: return "bg-muted/40 hover:bg-muted/60 border-border text-muted-foreground";
     }
   };
 
-  const getDayLabel = (availabilityType: AvailabilityType | null): string => {
-    if (!availabilityType) return "—";
-    
-    switch (availabilityType) {
-      case "rest":
-        return "R";
-      case "holiday":
-        return "H";
-      case "sick":
-        return "S";
-      case "available":
-        return "A";
-      default:
-        return "—";
+  const getDayLabel = (type: AvailabilityType | null) => {
+    if (!type) return "—";
+    switch (type) {
+      case "rest": return "R";
+      case "holiday": return "H";
+      case "sick": return "S";
+      default: return "A";
     }
   };
 
@@ -485,12 +578,20 @@ export default function StaffManagement() {
     }
   };
 
-  const handleBatchAvailability = async () => {
+  const handleBatchAvailability = () => {
     if (!batchDate) {
       toast({ title: "Please select a date", variant: "destructive" });
       return;
     }
     handleBulkSetAvailability(Array.from(selectedStaffIds), [batchDate], batchAvailability);
+  };
+
+  const handleBulkImport = () => {
+    toast({ title: "Import functionality coming soon" });
+  };
+
+  const downloadTemplate = () => {
+    toast({ title: "Template download coming soon" });
   };
 
   const handleCopyWeek = async (fromWeek: Date, toWeek: Date, staffIds: string[]) => {
@@ -1095,105 +1196,6 @@ export default function StaffManagement() {
 
                           <CollapsibleContent>
                             <CardContent className="space-y-3 pb-6">
-                              {/* Weekly Availability Calendar */}
-                              <div className="space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <div className="text-xs font-medium text-muted-foreground font-mono">
-                                    WEEKLY AVAILABILITY
-                                  </div>
-                                  <div className="text-xs text-muted-foreground font-mono">
-                                    Click any day to set status
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-7 gap-2">
-                                  {weekDates.map((date, idx) => {
-                                    const dateStr = getLocalDateString(date);
-                                    const availabilityType = getAvailabilityForDate(member, date);
-                                    const dayName = DAYS[date.getDay()];
-                                    const isLoading = loadingCell?.staffId === member.id && loadingCell?.date === dateStr;
-                                    
-                                    return (
-                                      <div key={dateStr} className="flex flex-col gap-1">
-                                        <div className="text-center text-xs font-mono font-semibold text-muted-foreground">
-                                          {dayName}
-                                        </div>
-                                        <Popover 
-                                          open={openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr}
-                                          onOpenChange={(open) => {
-                                            if (open) {
-                                              setOpenDayDropdown({ staffId: member.id, date: dateStr });
-                                            } else if (openDayDropdown?.staffId === member.id && openDayDropdown?.date === dateStr) {
-                                              setOpenDayDropdown(null);
-                                            }
-                                          }}
-                                        >
-                                          <PopoverTrigger asChild>
-                                            <button
-                                              className={cn(
-                                                "h-14 rounded-lg border-2 flex items-center justify-center font-mono font-bold text-lg transition-all",
-                                                getDayColor(availabilityType),
-                                                isLoading && "opacity-50 cursor-wait",
-                                                !isLoading && "hover:scale-105 cursor-pointer shadow-sm hover:shadow-md"
-                                              )}
-                                              disabled={isLoading}
-                                            >
-                                              {isLoading ? "..." : getDayLabel(availabilityType)}
-                                            </button>
-                                          </PopoverTrigger>
-                                          <PopoverContent className="w-48 p-2" align="center">
-                                            <div className="space-y-1">
-                                              <div className="px-2 py-1.5 text-xs font-mono font-semibold text-muted-foreground border-b">
-                                                {date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" })}
-                                              </div>
-                                              <button
-                                                onClick={() => setDayAvailability(member.id, dateStr, "rest")}
-                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-blue-500/10 transition-colors"
-                                              >
-                                                <span className="w-6 h-6 rounded bg-blue-500 text-white text-xs font-bold flex items-center justify-center">R</span>
-                                                <span className="text-xs font-mono">Rest Day</span>
-                                              </button>
-                                              <button
-                                                onClick={() => setDayAvailability(member.id, dateStr, "holiday")}
-                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-purple-500/10 transition-colors"
-                                              >
-                                                <span className="w-6 h-6 rounded bg-purple-500 text-white text-xs font-bold flex items-center justify-center">H</span>
-                                                <span className="text-xs font-mono">Holiday</span>
-                                              </button>
-                                              <button
-                                                onClick={() => setDayAvailability(member.id, dateStr, "sick")}
-                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-red-500/10 transition-colors"
-                                              >
-                                                <span className="w-6 h-6 rounded bg-red-500 text-white text-xs font-bold flex items-center justify-center">S</span>
-                                                <span className="text-xs font-mono">Sick Leave</span>
-                                              </button>
-                                              <button
-                                                onClick={() => setDayAvailability(member.id, dateStr, "available")}
-                                                className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-green-500/10 transition-colors"
-                                              >
-                                                <span className="w-6 h-6 rounded bg-green-500 text-white text-xs font-bold flex items-center justify-center">A</span>
-                                                <span className="text-xs font-mono">Available</span>
-                                              </button>
-                                              <div className="border-t pt-1">
-                                                <button
-                                                  onClick={() => setDayAvailability(member.id, dateStr, "clear")}
-                                                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted transition-colors"
-                                                >
-                                                  <span className="w-6 h-6 rounded bg-muted text-muted-foreground text-xs font-bold flex items-center justify-center">—</span>
-                                                  <span className="text-xs font-mono">Clear (Working)</span>
-                                                </button>
-                                              </div>
-                                            </div>
-                                          </PopoverContent>
-                                        </Popover>
-                                        <div className="text-center text-xs font-mono text-muted-foreground">
-                                          {date.getDate()}
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-
                               <div>
                                 <div className="text-xs font-medium text-muted-foreground mb-2 font-mono">
                                   TRAINED TASKS

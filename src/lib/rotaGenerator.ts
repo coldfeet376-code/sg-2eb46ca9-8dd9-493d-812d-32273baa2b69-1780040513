@@ -117,7 +117,7 @@ export function generateWeeklyRota({
         const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'sick');
         
         // NEW: Check recurring rest days
-        const isRecurringRestDay = s.restDays?.includes(currentDate.getDay());
+        const isRecurringRestDay = s.recurringRestDays?.includes(currentDate.getDay());
         
         // DEBUG: Log Brian Murray's availability check
         if (s.name.includes('BRIAN')) {
