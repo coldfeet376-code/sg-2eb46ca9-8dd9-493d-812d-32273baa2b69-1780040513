@@ -1808,9 +1808,9 @@ export default function IndexPage() {
 
         <SwapSuggestionsDialog
           open={showSwapSuggestions}
-          onClose={() => setShowSwapSuggestions(false)}
+          onOpenChange={setShowSwapSuggestions}
           suggestions={swapSuggestions}
-          onApplySwap={(swap) => handleSwapApply(swap.fromStaffId, swap.toStaffId, swap.task, swap.date)}
+          onImplementSwap={(swap) => handleSwapApply(swap.fromStaffId, swap.toStaffId, swap.task, swap.date)}
           onImplementAll={implementAllSwaps}
         />
 
