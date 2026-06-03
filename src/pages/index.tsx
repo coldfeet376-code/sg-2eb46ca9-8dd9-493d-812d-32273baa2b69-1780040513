@@ -692,17 +692,19 @@ export default function IndexPage() {
   };
 
   const getCoveragePercentage = (): number => {
-    if (!taskConfig) return 0;
+    if (assignments.length === 0 || !taskConfig) return 0;
     
     let requiredTotal = 0;
     TASKS.forEach(task => {
-      taskConfig[task].forEach((count: number) => {
-        requiredTotal += count;
-      });
+      const taskDayConfig = taskConfig[task];
+      if (taskDayConfig && Array.isArray(taskDayConfig)) {
+        taskDayConfig.forEach((count: number) => {
+          requiredTotal += count;
+        });
+      }
     });
-    
-    if (requiredTotal === 0) return 100;
-    
+
+    if (requiredTotal === 0) return 0;
     return Math.round((assignments.length / requiredTotal) * 100);
   };
 
