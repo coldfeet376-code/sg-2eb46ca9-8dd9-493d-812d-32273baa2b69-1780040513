@@ -345,8 +345,6 @@ export default function IndexPage() {
           description: "The rota generator didn't create any assignments. Check staff availability and task configuration.",
           variant: "destructive"
         });
-        setDiagnostics(result.diagnostics);
-        setShowDiagnostics(true);
         return;
       }
 
@@ -377,7 +375,6 @@ export default function IndexPage() {
       
       // Now update state after successful save
       setAssignments(newAssignments);
-      setDiagnostics(result.diagnostics);
       setFairnessMetrics(metrics);
       setLockedAssignments(newLocked);
       
