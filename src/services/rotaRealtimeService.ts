@@ -50,8 +50,8 @@ export const rotaRealtimeService = {
         .upsert(
           {
             week_start: weekStartStr,
-            assignments,
-            fairness_metrics: fairnessMetrics,
+            assignments: assignments as any,
+            fairness_metrics: fairnessMetrics as any,
             locked_count: lockedCount,
             updated_at: new Date().toISOString(),
           },
@@ -102,10 +102,13 @@ export const rotaRealtimeService = {
         throw error;
       }
 
+      const assignments = data.assignments as any;
+      const fairnessMetrics = data.fairness_metrics as any;
+
       console.log("✅ Rota loaded:", {
         weekStart: data.week_start,
-        assignmentCount: data.assignments?.length || 0,
-        fairnessScore: data.fairness_metrics?.overallScore
+        assignmentCount: Array.isArray(assignments) ? assignments.length : 0,
+        fairnessScore: fairnessMetrics?.overallScore || null
       });
 
       return data;
