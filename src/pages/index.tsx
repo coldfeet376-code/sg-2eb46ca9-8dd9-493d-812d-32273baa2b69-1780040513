@@ -952,6 +952,7 @@ export default function IndexPage() {
 
   const implementAllSwaps = async (swaps: SwapSuggestion[]) => {
     const updatedAssignments = [...assignments];
+    const updatedLocked = [...lockedAssignments];
     let successCount = 0;
 
     swaps.forEach(swap => {
@@ -960,28 +961,58 @@ export default function IndexPage() {
       );
       
       if (fromIndex !== -1) {
+        const lockedIndex = updatedLocked.findIndex(
+          la => la.staffId === swap.fromStaffId && la.task === swap.task && la.date === swap.date
+        );
+
         updatedAssignments[fromIndex] = {
           ...updatedAssignments[fromIndex],
           staffId: swap.toStaffId,
           staffName: swap.toStaffName
         };
+
+        if (lockedIndex !== -1) {
+          updatedLocked[lockedIndex] = {
+            ...updatedLocked[lockedIndex],
+            staffId: swap.toStaffId,
+            staffName: swap.toStaffName
+          };
+        }
+
         successCount++;
       }
     });
 
+    // Recalculate fairness metrics with updated assignments
+    const newMetrics = calculateFairnessMetrics(updatedAssignments, staff);
+
     setAssignments(updatedAssignments);
+    setLockedAssignments(updatedLocked);
+    setFairnessMetrics(newMetrics);
     setShowSwapSuggestions(false);
 
+    // Save to Supabase immediately
+    try {
+      await rotaRealtimeService.saveRota(
+        weekStart,
+        updatedAssignments,
+        newMetrics,
+        updatedLocked.length
+      );
+    } catch (error) {
+      console.error("Error saving swapped rota:", error);
+    }
+
     toast({
-      title: "Swaps Implemented",
-      description: `Successfully applied ${successCount} swaps to improve fairness`,
+      title: "✅ Swaps Implemented",
+      description: `Applied ${successCount} swaps. New fairness score: ${newMetrics.overallScore}`,
     });
 
     await rotaRealtimeService.logAction(
       "updated",
       "rota",
       getLocalDateString(weekStart),
-      `Implemented ${successCount} smart swaps`
+      `Implemented ${successCount} smart swaps - Fairness: ${newMetrics.overallScore}`
     );
   };
 
@@ -1200,26 +1231,6 @@ export default function IndexPage() {
               </Button>
 
               <Button
-                onClick={() => setShowDiagnostics(true)}
-                disabled={diagnostics.length === 0}
-                variant="outline"
-                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
-                size="lg"
-              >
-                <AlertCircle className="h-5 w-5" />
-                Diagnostics
-              </Button>
-
-              <Button
-                onClick={() => setShowSundayDebug(true)}
-                variant="secondary"
-                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
-                size="lg"
-              >
-                🔍 Debug Sunday
-              </Button>
-
-              <Button
                 onClick={lockAll}
                 disabled={assignments.length === 0}
                 variant="outline"
@@ -1228,17 +1239,6 @@ export default function IndexPage() {
               >
                 <Lock className="h-4 w-4" />
                 Lock All
-              </Button>
-
-              <Button
-                onClick={() => setShowUnlockConfirm(true)}
-                disabled={lockedAssignments.length === 0}
-                variant="outline"
-                className="gap-2 font-sans font-medium"
-                size="lg"
-              >
-                <Unlock className="h-4 w-4" />
-                Unlock All ({getLockedCount()})
               </Button>
 
               <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
