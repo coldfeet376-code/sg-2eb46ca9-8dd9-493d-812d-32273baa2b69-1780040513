@@ -234,7 +234,7 @@ export default function IndexPage() {
   // Save assignments to Supabase whenever they change
   useEffect(() => {
     const saveRotaToSupabase = async () => {
-      if (assignments.length > 0) {
+      if (assignments.length > 0 && fairnessMetrics) {
         try {
           await rotaRealtimeService.saveRota(
             weekStart,
@@ -243,13 +243,13 @@ export default function IndexPage() {
             lockedAssignments.length
           );
         } catch (error) {
-          console.error("Error saving rota:", error);
+          console.error("Error auto-saving rota:", error);
         }
       }
     };
 
-    // Longer debounce to reduce excessive saves
-    const timeoutId = setTimeout(saveRotaToSupabase, 2000); // 2 seconds
+    // Only auto-save if we have both assignments AND metrics (means it was intentionally set)
+    const timeoutId = setTimeout(saveRotaToSupabase, 2000);
     return () => clearTimeout(timeoutId);
   }, [assignments, weekStart, fairnessMetrics, lockedAssignments.length]);
 
@@ -377,14 +377,36 @@ export default function IndexPage() {
         return;
       }
 
+      // Calculate metrics immediately
+      const metrics = calculateFairnessMetrics(newAssignments, staff);
+      
+      // Auto-lock all assignments
+      const newLocked = [...newAssignments];
+      
+      // Save to Supabase FIRST before updating state to prevent race condition
+      try {
+        await rotaRealtimeService.saveRota(
+          weekStart,
+          newAssignments,
+          metrics,
+          newLocked.length
+        );
+        
+        console.log("✅ Saved to Supabase successfully");
+      } catch (saveError) {
+        console.error("❌ Error saving to Supabase:", saveError);
+        toast({
+          title: "⚠️ Save Error",
+          description: "Generated rota but failed to save. It may not persist.",
+          variant: "destructive"
+        });
+      }
+      
+      // Now update state after successful save
       setAssignments(newAssignments);
       setDiagnostics(result.diagnostics);
-      
-      const metrics = calculateFairnessMetrics(newAssignments, staff);
       setFairnessMetrics(metrics);
-      
-      // Auto-lock all assignments after generation
-      setLockedAssignments([...newAssignments]);
+      setLockedAssignments(newLocked);
       
       await rotaRealtimeService.logAction(
         "generated",
