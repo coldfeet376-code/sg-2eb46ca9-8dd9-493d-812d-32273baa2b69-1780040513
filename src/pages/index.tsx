@@ -328,36 +328,89 @@ export default function IndexPage() {
   };
 
   const generateRota = async () => {
-    const result = generateWeeklyRota({
-      staff,
-      taskConfig,
-      weekStart,
-      lockedAssignments
-    });
-    const newAssignments = result.assignments;
-    setAssignments(newAssignments);
-    setDiagnostics(result.diagnostics);
-    // Don't auto-show diagnostics - user can click button if needed
-    // setShowDiagnostics(true);
-    
-    const metrics = calculateFairnessMetrics(newAssignments, staff);
-    setFairnessMetrics(metrics);
-    
-    // Auto-lock all assignments after generation
-    setLockedAssignments([...newAssignments]);
-    
-    await rotaRealtimeService.logAction(
-      "generated",
-      "rota",
-      getLocalDateString(weekStart),
-      `Generated rota for week of ${weekStart.toLocaleDateString()} (auto-locked)`
-    );
-    
-    addNotification({
-      staffName: "System",
-      message: "Rota generated and locked successfully",
-      type: "info",
-    });
+    try {
+      console.log("🔄 Starting rota generation...");
+      console.log("Staff count:", staff.length);
+      console.log("Task config:", taskConfig);
+      console.log("Week start:", weekStart);
+      console.log("Locked assignments:", lockedAssignments.length);
+
+      if (!staff.length) {
+        toast({
+          title: "⚠️ Cannot Generate Rota",
+          description: "No staff members found. Please add staff first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!taskConfig) {
+        toast({
+          title: "⚠️ Cannot Generate Rota",
+          description: "Task configuration not found. Please configure tasks first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const result = generateWeeklyRota({
+        staff,
+        taskConfig,
+        weekStart,
+        lockedAssignments
+      });
+
+      console.log("✅ Rota generated:", result);
+      console.log("Assignments count:", result.assignments.length);
+      console.log("Diagnostics:", result.diagnostics);
+
+      const newAssignments = result.assignments;
+      
+      if (newAssignments.length === 0) {
+        toast({
+          title: "⚠️ No Assignments Generated",
+          description: "The rota generator didn't create any assignments. Check staff availability and task configuration.",
+          variant: "destructive"
+        });
+        setDiagnostics(result.diagnostics);
+        setShowDiagnostics(true);
+        return;
+      }
+
+      setAssignments(newAssignments);
+      setDiagnostics(result.diagnostics);
+      
+      const metrics = calculateFairnessMetrics(newAssignments, staff);
+      setFairnessMetrics(metrics);
+      
+      // Auto-lock all assignments after generation
+      setLockedAssignments([...newAssignments]);
+      
+      await rotaRealtimeService.logAction(
+        "generated",
+        "rota",
+        getLocalDateString(weekStart),
+        `Generated rota for week of ${weekStart.toLocaleDateString()} (auto-locked)`
+      );
+      
+      toast({
+        title: "✅ Rota Generated",
+        description: `Created ${newAssignments.length} assignments and locked them`,
+      });
+
+      addNotification({
+        staffName: "System",
+        message: "Rota generated and locked successfully",
+        type: "info",
+      });
+    } catch (error) {
+      console.error("❌ Error generating rota:", error);
+      toast({
+        title: "❌ Generation Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive"
+      });
+    }
   };
 
   const forceGenerateRota = () => {
