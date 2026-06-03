@@ -70,7 +70,7 @@ export function useStaff() {
           trainedTasks: s.trained_tasks as Task[],
           shiftStart: s.shift_start as ShiftStart,
           shiftPattern: s.shift_pattern as ShiftPattern,
-          restDays: s.rest_days || [],
+          restDays: (Array.isArray(s.rest_days) ? s.rest_days : []) as number[],
           availability: staffAvailability.map((a) => ({
             id: a.id,
             date: a.date,
@@ -123,7 +123,7 @@ export function useStaffQuery() {
           trainedTasks: (s.trained_tasks || []) as Task[],
           shiftStart: (s.shift_start || "06:00") as ShiftStart,
           shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
-          restDays: s.rest_days || [],
+          restDays: (Array.isArray(s.rest_days) ? s.rest_days.filter((d): d is number => typeof d === 'number') : []),
           availability: availabilityRecords,
         };
       });
