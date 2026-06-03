@@ -1,8 +1,29 @@
-export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Inbound Late" | "Outbound" | "Marshaling" | "Housekeeping";
+export type Task = 
+  | "Frozen" 
+  | "Milk" 
+  | "TWI" 
+  | "Inbound" 
+  | "Inbound Late" 
+  | "Outbound" 
+  | "Marshaling" 
+  | "Housekeeping"
+  | "Equipment";
 
-export type ManagerDuty = "Intake" | "Out-loading" | "Admin" | "Floor";
+export type TaskWeights = {
+  [key in Task]: number;
+};
 
-export type AvailabilityType = "available" | "rest" | "holiday" | "sick";
+export const TASK_WEIGHTS: TaskWeights = {
+  "Frozen": 1.0,
+  "Milk": 1.0,
+  "TWI": 1.0,
+  "Inbound": 1.0,
+  "Inbound Late": 0.5,
+  "Outbound": 1.0,
+  "Marshaling": 1.0,
+  "Housekeeping": 1.0,
+  "Equipment": 1.0,
+};
 
 export type ShiftStart = 
   | "06:00" 
