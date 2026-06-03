@@ -32,49 +32,87 @@ export const rotaRealtimeService = {
   async saveRota(
     weekStart: Date,
     assignments: Assignment[],
-    fairnessMetrics?: FairnessMetrics | null,
-    lockedCount: number = 0
-  ): Promise<StoredRota> {
-    const weekStartStr = weekStart.toISOString().split("T")[0];
-    
-    const { data: session } = await supabase.auth.getSession();
-    const userId = session.session?.user?.id;
+    fairnessMetrics: any,
+    lockedCount: number
+  ): Promise<void> {
+    try {
+      const weekStartStr = weekStart.toISOString().split("T")[0];
+      
+      console.log("💾 Saving rota to Supabase:", {
+        weekStart: weekStartStr,
+        assignmentCount: assignments.length,
+        lockedCount,
+        fairnessScore: fairnessMetrics?.overallScore
+      });
 
-    // Upsert (insert or update)
-    const { data, error } = await supabase
-      .from("rotas")
-      .upsert(
-        {
-          week_start: weekStartStr,
-          assignments: assignments as any,
-          fairness_metrics: fairnessMetrics as any,
-          locked_count: lockedCount,
-          created_by: userId,
-        },
-        { onConflict: "week_start" }
-      )
-      .select()
-      .single();
+      const { data, error } = await supabase
+        .from("rotas")
+        .upsert(
+          {
+            week_start: weekStartStr,
+            assignments,
+            fairness_metrics: fairnessMetrics,
+            locked_count: lockedCount,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: "week_start",
+          }
+        )
+        .select()
+        .single();
 
-    if (error) throw error;
-    return data as unknown as StoredRota;
+      if (error) {
+        console.error("❌ Error saving rota:", error);
+        throw error;
+      }
+
+      console.log("✅ Rota saved successfully:", data);
+      
+      // Add small delay to ensure database commit completes
+      await new Promise(resolve => setTimeout(resolve, 200));
+    } catch (error) {
+      console.error("❌ Save rota failed:", error);
+      throw error;
+    }
   },
 
   /**
    * Get rota for a specific week
    */
-  async getRotaForWeek(weekStart: Date): Promise<StoredRota | null> {
-    const weekStartStr = weekStart.toISOString().split("T")[0];
+  async getRotaForWeek(weekStart: Date): Promise<any | null> {
+    try {
+      const weekStartStr = weekStart.toISOString().split("T")[0];
+      
+      console.log("📥 Loading rota from Supabase:", weekStartStr);
 
-    const { data, error } = await supabase
-      .from("rotas")
-      .select("*")
-      .eq("week_start", weekStartStr)
-      .maybeSingle();
+      const { data, error } = await supabase
+        .from("rotas")
+        .select("*")
+        .eq("week_start", weekStartStr)
+        .single();
 
-    if (error) throw error;
-    if (!data) return null;
-    return data as unknown as StoredRota;
+      if (error) {
+        if (error.code === "PGRST116") {
+          // No rota found - not an error
+          console.log("ℹ️ No rota found for week:", weekStartStr);
+          return null;
+        }
+        console.error("❌ Error loading rota:", error);
+        throw error;
+      }
+
+      console.log("✅ Rota loaded:", {
+        weekStart: data.week_start,
+        assignmentCount: data.assignments?.length || 0,
+        fairnessScore: data.fairness_metrics?.overallScore
+      });
+
+      return data;
+    } catch (error) {
+      console.error("❌ Load rota failed:", error);
+      return null;
+    }
   },
 
   /**

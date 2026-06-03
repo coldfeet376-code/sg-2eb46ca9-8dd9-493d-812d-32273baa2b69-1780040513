@@ -114,6 +114,7 @@ export default function IndexPage() {
     task: Task | null;
     date: string;
   }>({ open: false, task: null, date: "" });
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // React Query hooks - cached data with error handling
   const { data: staff = [], isLoading: staffLoading, error: staffError } = useStaff();
@@ -171,6 +172,12 @@ export default function IndexPage() {
   }, []);
 
   useEffect(() => {
+    // Skip auto-load if we're in the middle of generating
+    if (isGenerating) {
+      console.log("⏭️ Skipping auto-load during generation");
+      return;
+    }
+
     // Load saved assignments for the current week from Supabase
     const loadRotaFromSupabase = async () => {
       try {
@@ -196,6 +203,9 @@ export default function IndexPage() {
     // Set up real-time subscription with debouncing
     let updateTimeout: NodeJS.Timeout;
     const channel = rotaRealtimeService.subscribeToRotas((payload) => {
+      // Skip updates during generation
+      if (isGenerating) return;
+      
       // Debounce rapid updates
       clearTimeout(updateTimeout);
       updateTimeout = setTimeout(() => {
@@ -224,7 +234,7 @@ export default function IndexPage() {
         rotaRealtimeService.unsubscribe(channel);
       }
     };
-  }, [weekStart, addNotification]);
+  }, [weekStart, addNotification, isGenerating]);
 
   useEffect(() => {
     // Calculate fairness metrics when assignments change
@@ -301,6 +311,7 @@ export default function IndexPage() {
   };
 
   const generateRota = async () => {
+    setIsGenerating(true);
     try {
       console.log("🔄 Starting rota generation...");
       console.log("Staff count:", staff.length);
@@ -314,6 +325,7 @@ export default function IndexPage() {
           description: "No staff members found. Please add staff first.",
           variant: "destructive"
         });
+        setIsGenerating(false);
         return;
       }
 
@@ -323,6 +335,7 @@ export default function IndexPage() {
           description: "Task configuration not found. Please configure tasks first.",
           variant: "destructive"
         });
+        setIsGenerating(false);
         return;
       }
 
@@ -345,6 +358,7 @@ export default function IndexPage() {
           description: "The rota generator didn't create any assignments. Check staff availability and task configuration.",
           variant: "destructive"
         });
+        setIsGenerating(false);
         return;
       }
 
@@ -354,7 +368,12 @@ export default function IndexPage() {
       // Auto-lock all assignments
       const newLocked = [...newAssignments];
       
-      // Save to Supabase FIRST before updating state to prevent race condition
+      // Update state FIRST (immediate UI feedback)
+      setAssignments(newAssignments);
+      setFairnessMetrics(metrics);
+      setLockedAssignments(newLocked);
+      
+      // Save to Supabase in background
       try {
         await rotaRealtimeService.saveRota(
           weekStart,
@@ -372,11 +391,6 @@ export default function IndexPage() {
           variant: "destructive"
         });
       }
-      
-      // Now update state after successful save
-      setAssignments(newAssignments);
-      setFairnessMetrics(metrics);
-      setLockedAssignments(newLocked);
       
       await rotaRealtimeService.logAction(
         "generated",
@@ -402,6 +416,9 @@ export default function IndexPage() {
         description: error instanceof Error ? error.message : "An unknown error occurred",
         variant: "destructive"
       });
+    } finally {
+      // Clear flag after a delay to ensure save completes
+      setTimeout(() => setIsGenerating(false), 500);
     }
   };
 
