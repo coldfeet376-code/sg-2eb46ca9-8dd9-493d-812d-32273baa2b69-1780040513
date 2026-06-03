@@ -1,8 +1,8 @@
-export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Outbound" | "Marshaling" | "Equipment" | "Inbound Late";
+export type Task = "Frozen" | "Milk" | "TWI" | "Inbound" | "Inbound Late" | "Outbound" | "Marshaling" | "Housekeeping";
 
 export type ManagerDuty = "Intake" | "Out-loading" | "Admin" | "Floor";
 
-export type AvailabilityType = "rest" | "holiday" | "sick" | "available";
+export type AvailabilityType = "available" | "rest" | "holiday" | "sick";
 
 export type ShiftStart = 
   | "06:00" 
@@ -30,7 +30,7 @@ export type DayShiftPattern =
 
 export type ManagerShiftStart = "06:00" | "08:00";
 
-export type ShiftPattern = "All" | "Mon-Fri" | "Sat-Sun" | "Custom";
+export type ShiftPattern = "Early" | "Late" | "All";
 
 export interface AvailabilityEntry {
   date: string; // ISO date string
@@ -47,18 +47,13 @@ export interface StaffMember {
   id: string;
   name: string;
   trainedTasks: Task[];
-  shiftStart: ShiftStart;
+  shiftStart?: ShiftStart;
   shiftPattern?: ShiftPattern;
-  restDays?: number[];
-  availability?: AvailabilityEntry[];
-}
-
-export interface StaffFormData {
-  name: string;
-  trainedTasks: Task[];
-  shiftStart: ShiftStart;
-  shiftPattern: ShiftPattern;
-  restDays: number[];
+  dayShiftPattern?: DayShiftPattern; // Full shift pattern with end time
+  restDays?: number[]; // Day of week (0-6)
+  availability?: AvailabilityEntry[]; // Date-specific availability
+  preferences?: StaffPreferences; // Task preferences
+  role?: "manager" | "supervisor" | "staff"; // User role
 }
 
 export interface Assignment {

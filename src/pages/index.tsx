@@ -15,15 +15,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { generateWeeklyRota, getWeekStart, navigateWeek, getYearWeeks } from "@/lib/rotaGenerator";
 import { calculateFairnessMetrics } from "@/lib/fairnessCalculator";
-import { generateRotaPDF } from "@/lib/pdfGenerator";
+import { generateStaffRotaPDF } from "@/lib/pdfGenerator";
 import { rotaService } from "@/services/rotaService";
 import { staffService } from "@/services/staffService";
-import { rotaRealtimeService } from "@/services/rotaRealtimeService";
+import { rotaRealtimeService, type StoredRota } from "@/services/rotaRealtimeService";
 import { useNotifications } from "@/contexts/NotificationContext";
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { useStaff, useTaskConfig, useUpdateTaskConfig } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Assignment, Task, ShiftStart, FairnessMetrics, AvailabilityType } from "@/types";
-import { Info, Calendar, Download, Eye, RefreshCw, Lock, Unlock, Shuffle, TrendingUp, Users, Target, Settings, HelpCircle, AlertCircle, Zap, History, RotateCcw, Printer, Bug, Sparkles, Wand2, ArrowRight, ArrowLeftRight, FileDown } from "lucide-react";
+import { Info, Calendar, Download, Eye, RefreshCw, Lock, Unlock, Shuffle, TrendingUp, Users, Target, Settings, HelpCircle, AlertCircle, Zap, History, RotateCcw, Printer, Bug, Sparkles, Wand2 } from "lucide-react";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { FairnessMeter } from "@/components/rota/FairnessMeter";
 import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
@@ -35,7 +35,6 @@ import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
 import { RecentChangesPanel } from "@/components/RecentChangesPanel";
 import { useTour } from "@/contexts/TourContext";
 import { useQueryClient } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
 
 // Dynamic import for OnboardingTour to prevent SSR hydration issues
 const OnboardingTour = dynamic(
@@ -44,7 +43,7 @@ const OnboardingTour = dynamic(
 );
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"];
 
 function getLocalDateString(date: Date): string {
   if (!date) return "";
@@ -92,7 +91,7 @@ export default function IndexPage() {
   
   // Safe date initialization with fallback - always start on Sunday
   const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [lockedAssignments, setLockedAssignments] = useState<Assignment[]>([]);
   const [showSwapSuggestions, setShowSwapSuggestions] = useState(false);
@@ -107,6 +106,11 @@ export default function IndexPage() {
   const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const [fairnessMetrics, setFairnessMetrics] = useState<ReturnType<typeof calculateFairnessMetrics> | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<string[]>([]);
+  const [showSundayDebug, setShowSundayDebug] = useState(false);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
   const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<any>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -115,10 +119,6 @@ export default function IndexPage() {
     task: Task | null;
     date: string;
   }>({ open: false, task: null, date: "" });
-  const [manualSwapDialog, setManualSwapDialog] = useState<{
-    open: boolean;
-    assignment: Assignment | null;
-  }>({ open: false, assignment: null });
 
   // React Query hooks - cached data with error handling
   const { data: staff = [], isLoading: staffLoading, error: staffError } = useStaff();
@@ -181,27 +181,18 @@ export default function IndexPage() {
       try {
         const rota = await rotaRealtimeService.getRotaForWeek(weekStart);
         if (rota) {
-          const loadedAssignments = rota.assignments || [];
-          setAssignments(loadedAssignments);
-          setFairnessMetrics(
-            loadedAssignments.length > 0 && staff.length > 0
-              ? calculateFairnessMetrics(loadedAssignments, staff)
-              : null
-          );
-          // Restore locked assignments - all assignments are auto-locked after generation
-          if (loadedAssignments.length > 0) {
-            setLockedAssignments(loadedAssignments);
+          setAssignments(rota.assignments);
+          if (rota.fairness_metrics) {
+            setFairnessMetrics(rota.fairness_metrics as any);
           }
         } else {
           setAssignments([]);
           setFairnessMetrics(null);
-          setLockedAssignments([]);
         }
       } catch (error) {
         console.error("Error loading rota:", error);
         setAssignments([]);
         setFairnessMetrics(null);
-        setLockedAssignments([]);
       }
     };
 
@@ -215,16 +206,9 @@ export default function IndexPage() {
       updateTimeout = setTimeout(() => {
         const changedWeek = new Date(payload.new.week_start);
         if (changedWeek.toISOString().split("T")[0] === weekStart.toISOString().split("T")[0]) {
-          const updatedAssignments = payload.new.assignments || [];
-          setAssignments(updatedAssignments);
-          setFairnessMetrics(
-            updatedAssignments.length > 0 && staff.length > 0
-              ? calculateFairnessMetrics(updatedAssignments, staff)
-              : null
-          );
-          // Restore locked state on real-time updates
-          if (updatedAssignments.length > 0) {
-            setLockedAssignments(updatedAssignments);
+          setAssignments(payload.new.assignments);
+          if (payload.new.fairness_metrics) {
+            setFairnessMetrics(payload.new.fairness_metrics as any);
           }
           
           addNotification({
@@ -245,9 +229,9 @@ export default function IndexPage() {
         rotaRealtimeService.unsubscribe(channel);
       }
     };
-  }, [weekStart, addNotification, staff]);
+  }, [weekStart, addNotification]);
 
-  // Save assignments to Supabase whenever they change (excluding initial load and generates)
+  // Save assignments to Supabase whenever they change
   useEffect(() => {
     const saveRotaToSupabase = async () => {
       if (assignments.length > 0) {
@@ -264,8 +248,8 @@ export default function IndexPage() {
       }
     };
 
-    // Debounce saves - generateRota already saves immediately
-    const timeoutId = setTimeout(saveRotaToSupabase, 3000); // 3 seconds
+    // Longer debounce to reduce excessive saves
+    const timeoutId = setTimeout(saveRotaToSupabase, 2000); // 2 seconds
     return () => clearTimeout(timeoutId);
   }, [assignments, weekStart, fairnessMetrics, lockedAssignments.length]);
 
@@ -341,13 +325,6 @@ export default function IndexPage() {
     // Keep only last 50 snapshots to prevent storage bloat
     const updatedHistory = [snapshot, ...history].slice(0, 50);
     setHistory(updatedHistory);
-    
-    // Persist to localStorage
-    try {
-      localStorage.setItem("warehouse-rota-history", JSON.stringify(updatedHistory));
-    } catch (e) {
-      console.error("Error saving history to localStorage:", e);
-    }
   };
 
   const generateRota = async () => {
@@ -358,49 +335,29 @@ export default function IndexPage() {
       lockedAssignments
     });
     const newAssignments = result.assignments;
+    setAssignments(newAssignments);
+    setDiagnostics(result.diagnostics);
+    // Don't auto-show diagnostics - user can click button if needed
+    // setShowDiagnostics(true);
     
     const metrics = calculateFairnessMetrics(newAssignments, staff);
+    setFairnessMetrics(metrics);
     
     // Auto-lock all assignments after generation
-    const newLocked = [...newAssignments];
+    setLockedAssignments([...newAssignments]);
     
-    // Save immediately to Supabase to prevent race condition with real-time subscription
-    try {
-      await rotaRealtimeService.saveRota(
-        weekStart,
-        newAssignments,
-        metrics,
-        newLocked.length
-      );
-      
-      // Only update local state after successful save
-      setAssignments(newAssignments);
-      setFairnessMetrics(metrics);
-      setLockedAssignments(newLocked);
-      
-      // Save to history
-      saveSnapshot(newAssignments);
-      
-      await rotaRealtimeService.logAction(
-        "generated",
-        "rota",
-        getLocalDateString(weekStart),
-        `Generated rota for week of ${weekStart.toLocaleDateString()} (auto-locked)`
-      );
-      
-      addNotification({
-        staffName: "System",
-        message: "Rota generated and locked successfully",
-        type: "info",
-      });
-    } catch (error) {
-      console.error("Error saving rota:", error);
-      toast({
-        title: "❌ Save Failed",
-        description: "Rota generated but failed to save. Try again.",
-        variant: "destructive",
-      });
-    }
+    await rotaRealtimeService.logAction(
+      "generated",
+      "rota",
+      getLocalDateString(weekStart),
+      `Generated rota for week of ${weekStart.toLocaleDateString()} (auto-locked)`
+    );
+    
+    addNotification({
+      staffName: "System",
+      message: "Rota generated and locked successfully",
+      type: "info",
+    });
   };
 
   const forceGenerateRota = () => {
@@ -414,6 +371,7 @@ export default function IndexPage() {
     });
     const newAssignments = result.assignments;
     setAssignments(newAssignments);
+    setDiagnostics(result.diagnostics);
     
     // Auto-lock all assignments after forced generation
     setLockedAssignments([...newAssignments]);
@@ -433,28 +391,10 @@ export default function IndexPage() {
     setWeekStart(new Date(snapshot.weekStart));
     setHistoryOpen(false);
     
-    // Save to Supabase immediately
-    const weekStartDate = new Date(snapshot.weekStart);
-    const metrics = calculateFairnessMetrics(snapshot.assignments, staff);
-    
-    rotaRealtimeService.saveRota(
-      weekStartDate,
-      snapshot.assignments,
-      metrics,
-      snapshot.lockedAssignments.length
-    ).then(() => {
-      addNotification({
-        staffName: "System",
-        message: `Restored rota from ${new Date(snapshot.timestamp).toLocaleString()}`,
-        type: "info",
-      });
-    }).catch(error => {
-      console.error("Error saving restored rota:", error);
-      toast({
-        title: "⚠️ Restore Warning",
-        description: "Rota restored locally but failed to save to database",
-        variant: "destructive",
-      });
+    addNotification({
+      staffName: "System",
+      message: `Restored rota from ${new Date(snapshot.timestamp).toLocaleString()}`,
+      type: "info",
     });
   };
 
@@ -492,11 +432,8 @@ export default function IndexPage() {
   };
 
   const getCurrentWeekHistory = (): RotaSnapshot[] => {
-    const weekStartStr = weekStart.toISOString().split('T')[0]; // Get just the date part
-    return history.filter(h => {
-      const historyDate = new Date(h.weekStart).toISOString().split('T')[0];
-      return historyDate === weekStartStr;
-    });
+    const weekStartStr = weekStart.toISOString();
+    return history.filter(h => h.weekStart === weekStartStr);
   };
 
   const toggleLockAssignment = async (task: string, dayIndex: number, staffName: string) => {
@@ -532,20 +469,7 @@ export default function IndexPage() {
         `Locked ${staffName} for ${task} on ${DAYS[dayIndex]}`
       );
     }
-    
     setLockedAssignments(newLocked);
-    
-    // Save to Supabase immediately
-    try {
-      await rotaRealtimeService.saveRota(
-        weekStart,
-        assignments,
-        fairnessMetrics,
-        newLocked.length
-      );
-    } catch (error) {
-      console.error("Error saving lock state:", error);
-    }
   };
 
   const isAssignmentLocked = (task: string, dayIndex: number, staffName: string) => {
@@ -556,51 +480,24 @@ export default function IndexPage() {
   };
 
   const lockAll = async () => {
-    const newLocked = [...assignments];
-    setLockedAssignments(newLocked);
-    
-    // Save to Supabase immediately
-    try {
-      await rotaRealtimeService.saveRota(
-        weekStart,
-        assignments,
-        fairnessMetrics,
-        newLocked.length
-      );
-      
-      await rotaRealtimeService.logAction(
-        "locked",
-        "rota",
-        getLocalDateString(weekStart),
-        "Locked all assignments"
-      );
-    } catch (error) {
-      console.error("Error saving lock all:", error);
-    }
+    setLockedAssignments([...assignments]);
+    await rotaRealtimeService.logAction(
+      "locked",
+      "rota",
+      getLocalDateString(weekStart),
+      "Locked all assignments"
+    );
   };
 
   const unlockAll = async () => {
     setLockedAssignments([]);
+    await rotaRealtimeService.logAction(
+      "unlocked_all",
+      "rota",
+      getLocalDateString(weekStart),
+      "Unlocked all assignments"
+    );
     setShowUnlockConfirm(false);
-    
-    // Save to Supabase immediately
-    try {
-      await rotaRealtimeService.saveRota(
-        weekStart,
-        assignments,
-        fairnessMetrics,
-        0
-      );
-      
-      await rotaRealtimeService.logAction(
-        "unlocked_all",
-        "rota",
-        getLocalDateString(weekStart),
-        "Unlocked all assignments"
-      );
-    } catch (error) {
-      console.error("Error saving unlock all:", error);
-    }
   };
 
   const exportPDF = () => {
@@ -768,9 +665,13 @@ export default function IndexPage() {
   };
 
   const exportWeekPDF = () => {
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    generateRotaPDF(assignments, weekStart, weekEnd);
+    generateStaffRotaPDF({
+      weekStart,
+      assignments,
+      staff,
+      fairnessMetrics,
+      lockedCount: lockedAssignments.length,
+    });
     
     addNotification({
       staffName: "System",
@@ -795,12 +696,9 @@ export default function IndexPage() {
     
     let requiredTotal = 0;
     TASKS.forEach(task => {
-      const taskDays = taskConfig[task];
-      if (taskDays && Array.isArray(taskDays)) {
-        taskDays.forEach((count: number) => {
-          requiredTotal += count || 0;
-        });
-      }
+      taskConfig[task].forEach((count: number) => {
+        requiredTotal += count;
+      });
     });
     
     if (requiredTotal === 0) return 100;
@@ -924,65 +822,65 @@ export default function IndexPage() {
     }
   };
 
-  const handleSwapApply = (fromStaffId: string, toStaffId: string, task: Task, date: string) => {
-    const updatedAssignments = assignments.map((a) =>
-      a.staffId === fromStaffId && a.task === task && a.date === date
-        ? { ...a, staffId: toStaffId, staffName: staff.find(s => s.id === toStaffId)?.name || "" }
-        : a
+  const handleSwapApply = async (fromStaffId: string, toStaffId: string, task: string, date: string) => {
+    // Find the assignment to swap from
+    const assignmentIndex = assignments.findIndex(
+      a => a.staffId === fromStaffId && a.task === task && a.date === date
     );
 
-    const updatedLocked = lockedAssignments.map((a) =>
-      a.staffId === fromStaffId && a.task === task && a.date === date
-        ? { ...a, staffId: toStaffId, staffName: staff.find(s => s.id === toStaffId)?.name || "" }
-        : a
-    );
-
-    const newMetrics = calculateFairnessMetrics(updatedAssignments, staff);
-    
-    setAssignments(updatedAssignments);
-    setLockedAssignments(updatedLocked);
-    setFairnessMetrics(newMetrics);
-
-    toast({ title: "✅ Swap Applied", description: `Assignment updated successfully` });
-  };
-
-  const handleManualSwap = async (newStaffId: string) => {
-    if (!manualSwapDialog.assignment) return;
-
-    const { assignment } = manualSwapDialog;
-    const newStaff = staff.find(s => s.id === newStaffId);
-    if (!newStaff) return;
-
-    handleSwapApply(assignment.staffId, newStaffId, assignment.task, assignment.date);
-
-    // Save immediately
-    const updatedAssignments = assignments.map((a) =>
-      a.staffId === assignment.staffId && a.task === assignment.task && a.date === assignment.date
-        ? { ...a, staffId: newStaffId, staffName: newStaff.name }
-        : a
-    );
-
-    const newMetrics = calculateFairnessMetrics(updatedAssignments, staff);
-
-    try {
-      await rotaRealtimeService.saveRota(
-        weekStart,
-        updatedAssignments,
-        newMetrics,
-        lockedAssignments.length
-      );
-
-      await rotaRealtimeService.logAction(
-        "updated",
-        "assignment",
-        `${assignment.date}-${assignment.task}`,
-        `Manual swap: ${assignment.staffName} → ${newStaff.name}`
-      );
-    } catch (error) {
-      console.error("Error saving swap:", error);
+    if (assignmentIndex === -1) {
+      toast({
+        title: "⚠️ Swap Failed",
+        description: "Assignment not found",
+        variant: "destructive"
+      });
+      return;
     }
 
-    setManualSwapDialog({ open: false, assignment: null });
+    // Find the staff member to swap to
+    const toStaff = staff.find(s => s.id === toStaffId);
+    if (!toStaff) {
+      toast({
+        title: "⚠️ Swap Failed",
+        description: "Staff member not found",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Create new assignments array with the swap
+    const newAssignments = [...assignments];
+    newAssignments[assignmentIndex] = {
+      ...newAssignments[assignmentIndex],
+      staffId: toStaffId,
+      staffName: toStaff.name
+    };
+
+    setAssignments(newAssignments);
+
+    // Also update locked assignments if this was locked
+    const wasLocked = isAssignmentLocked(task, weekDates.findIndex(d => d.toISOString().split("T")[0] === date), assignments[assignmentIndex].staffName);
+    if (wasLocked) {
+      const newLocked = lockedAssignments.map(la => {
+        if (la.staffId === fromStaffId && la.task === task && la.date === date) {
+          return { ...la, staffId: toStaffId, staffName: toStaff.name };
+        }
+        return la;
+      });
+      setLockedAssignments(newLocked);
+    }
+
+    await rotaRealtimeService.logAction(
+      "swapped",
+      "assignment",
+      `${date}-${task}`,
+      `Swapped ${assignments[assignmentIndex].staffName} → ${toStaff.name} for ${task}`
+    );
+
+    toast({
+      title: "✅ Swap Applied",
+      description: `${assignments[assignmentIndex].staffName} → ${toStaff.name} for ${task}`,
+    });
   };
 
   const getTaskColor = (task: string): string => {
@@ -1001,83 +899,96 @@ export default function IndexPage() {
     const updatedAssignments = [...assignments];
     const updatedLocked = [...lockedAssignments];
     let successCount = 0;
-    let skippedCount = 0;
 
-    // Apply swaps one by one, validating each doesn't create conflicts
-    for (const swap of swaps) {
+    swaps.forEach(swap => {
       const fromIndex = updatedAssignments.findIndex(
         a => a.staffId === swap.fromStaffId && a.task === swap.task && a.date === swap.date
       );
       
-      if (fromIndex === -1) {
-        skippedCount++;
-        continue;
-      }
+      if (fromIndex !== -1) {
+        const lockedIndex = updatedLocked.findIndex(
+          la => la.staffId === swap.fromStaffId && la.task === swap.task && la.date === swap.date
+        );
 
-      // Validate: toStaff must not already be assigned to ANY task on this date
-      const wouldCreateDoubleBooking = updatedAssignments.some(
-        a => a.staffId === swap.toStaffId && a.date === swap.date
-      );
-
-      if (wouldCreateDoubleBooking) {
-        console.log(`⚠️ Skipping swap: ${swap.toStaffName} already assigned on ${swap.date}`);
-        skippedCount++;
-        continue;
-      }
-
-      // Apply the swap
-      const lockedIndex = updatedLocked.findIndex(
-        la => la.staffId === swap.fromStaffId && la.task === swap.task && la.date === swap.date
-      );
-
-      updatedAssignments[fromIndex] = {
-        ...updatedAssignments[fromIndex],
-        staffId: swap.toStaffId,
-        staffName: swap.toStaffName
-      };
-
-      if (lockedIndex !== -1) {
-        updatedLocked[lockedIndex] = {
-          ...updatedLocked[lockedIndex],
+        updatedAssignments[fromIndex] = {
+          ...updatedAssignments[fromIndex],
           staffId: swap.toStaffId,
           staffName: swap.toStaffName
         };
+
+        if (lockedIndex !== -1) {
+          updatedLocked[lockedIndex] = {
+            ...updatedLocked[lockedIndex],
+            staffId: swap.toStaffId,
+            staffName: swap.toStaffName
+          };
+        }
+
+        successCount++;
       }
-
-      successCount++;
-    }
-
-    // Recalculate fairness metrics with updated assignments
-    const newMetrics = calculateFairnessMetrics(updatedAssignments, staff);
+    });
 
     setAssignments(updatedAssignments);
     setLockedAssignments(updatedLocked);
-    setFairnessMetrics(newMetrics);
     setShowSwapSuggestions(false);
 
-    // Save to Supabase immediately
-    try {
-      await rotaRealtimeService.saveRota(
-        weekStart,
-        updatedAssignments,
-        newMetrics,
-        updatedLocked.length
-      );
-    } catch (error) {
-      console.error("Error saving swapped rota:", error);
-    }
-
     toast({
-      title: "✅ Swaps Implemented",
-      description: `Applied ${successCount} of ${swaps.length} swaps. New fairness: ${newMetrics.overallScore}${skippedCount > 0 ? ` (${skippedCount} skipped due to conflicts)` : ''}`,
+      title: "Swaps Implemented",
+      description: `Successfully applied ${successCount} swaps to improve fairness`,
     });
 
     await rotaRealtimeService.logAction(
       "updated",
       "rota",
       getLocalDateString(weekStart),
-      `Implemented ${successCount}/${swaps.length} smart swaps - Fairness: ${newMetrics.overallScore}`
+      `Implemented ${successCount} smart swaps`
     );
+  };
+
+  const handleDebugWeek = () => {
+    const weekStartStr = getLocalDateString(weekStart);
+    const weekDates = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart);
+      date.setDate(date.getDate() + i);
+      weekDates.push({
+        date: getLocalDateString(date),
+        dayName: DAYS[i],
+        dayOfWeek: date.getDay()
+      });
+    }
+
+    const staffWithAvailability = staff.map(s => ({
+      name: s.name,
+      shiftPattern: s.shiftPattern,
+      shiftStart: s.shiftStart,
+      trainedTasks: s.trainedTasks,
+      availabilityThisWeek: s.availability?.filter(a => {
+        const availDate = a.date;
+        return weekDates.some(wd => wd.date === availDate);
+      }) || []
+    }));
+
+    const assignmentsByTask = TASKS.map(task => ({
+      task,
+      days: DAYS.map((day, idx) => ({
+        day,
+        date: weekDates[idx].date,
+        assignments: assignments.filter(a => a.task === task && a.date === weekDates[idx].date)
+      }))
+    }));
+
+    setDebugInfo({
+      weekStart: weekStartStr,
+      weekEnd: getLocalDateString(new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)),
+      weekDates,
+      totalStaff: staff.length,
+      totalAssignments: assignments.length,
+      staffWithAvailability,
+      assignmentsByTask,
+      taskConfig: taskConfigData
+    });
+    setShowDebugPanel(true);
   };
 
   return (
@@ -1214,6 +1125,18 @@ export default function IndexPage() {
                 Generate Rota
               </Button>
 
+              {getLocalDateString(weekStart) === "2026-05-24" && (
+                <Button
+                  onClick={handleDebugWeek}
+                  size="lg"
+                  variant="outline"
+                  className="gap-2 border-warning text-warning hover:bg-warning/10"
+                >
+                  <Bug className="h-5 w-5" />
+                  Debug This Week
+                </Button>
+              )}
+
               <Button
                 onClick={() => {
                   const suggestions = suggestSwaps(assignments, staff, 10);
@@ -1237,6 +1160,26 @@ export default function IndexPage() {
               </Button>
 
               <Button
+                onClick={() => setShowDiagnostics(true)}
+                disabled={diagnostics.length === 0}
+                variant="outline"
+                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
+                size="lg"
+              >
+                <AlertCircle className="h-5 w-5" />
+                Diagnostics
+              </Button>
+
+              <Button
+                onClick={() => setShowSundayDebug(true)}
+                variant="secondary"
+                className="gap-2 font-sans font-medium shadow-sm hover:shadow-md transition-smooth"
+                size="lg"
+              >
+                🔍 Debug Sunday
+              </Button>
+
+              <Button
                 onClick={lockAll}
                 disabled={assignments.length === 0}
                 variant="outline"
@@ -1255,45 +1198,7 @@ export default function IndexPage() {
                 size="lg"
               >
                 <Unlock className="h-4 w-4" />
-                Unlock All
-              </Button>
-
-              <Button
-                onClick={async () => {
-                  setAssignments([]);
-                  setLockedAssignments([]);
-                  setFairnessMetrics(null);
-                  
-                  try {
-                    await rotaRealtimeService.saveRota(
-                      weekStart,
-                      [],
-                      null,
-                      0
-                    );
-                    
-                    await rotaRealtimeService.logAction(
-                      "cleared",
-                      "rota",
-                      getLocalDateString(weekStart),
-                      "Cleared all assignments"
-                    );
-                    
-                    toast({
-                      title: "✅ Rota Cleared",
-                      description: "All assignments removed",
-                    });
-                  } catch (error) {
-                    console.error("Error clearing rota:", error);
-                  }
-                }}
-                disabled={assignments.length === 0}
-                variant="outline"
-                className="gap-2 font-sans font-medium text-destructive hover:text-destructive"
-                size="lg"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Clear All
+                Unlock All ({getLockedCount()})
               </Button>
 
               <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
@@ -1365,17 +1270,13 @@ export default function IndexPage() {
                 </Button>
 
                 <Button
+                  onClick={exportWeekPDF}
+                  disabled={assignments.length === 0}
                   variant="outline"
                   className="gap-2 font-sans font-medium"
                   size="lg"
-                  onClick={() => {
-                    const weekEnd = new Date(weekStart);
-                    weekEnd.setDate(weekEnd.getDate() + 6);
-                    generateRotaPDF(assignments, weekStart, weekEnd);
-                  }}
-                  disabled={assignments.length === 0}
                 >
-                  <FileDown className="h-4 w-4" />
+                  <Download className="h-4 w-4" />
                   Export PDF
                 </Button>
               </div>
@@ -1670,7 +1571,7 @@ export default function IndexPage() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 grid-cols-2 md:grid-cols-3 no-print">
+        <div className="grid gap-4 grid-cols-2 md:grid-cols-4 no-print">
           <Card className="shadow-sm card-hover">
             <CardHeader>
               <CardTitle className="font-condensed text-base">Total Staff</CardTitle>
@@ -1833,133 +1734,146 @@ export default function IndexPage() {
         {/* Recent Changes Panel */}
         <RecentChangesPanel />
         
-        {/* Manual Swap Dialog */}
-        <Dialog open={manualSwapDialog.open} onOpenChange={(open) => setManualSwapDialog({ open, assignment: null })}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="font-condensed text-2xl">Manual Swap Assignment</DialogTitle>
-              <DialogDescription className="font-mono text-xs">
-                {manualSwapDialog.assignment && (
-                  <>
-                    {manualSwapDialog.assignment.task} on {new Date(manualSwapDialog.assignment.date).toLocaleDateString("en-GB", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                    })}
-                  </>
-                )}
-              </DialogDescription>
-            </DialogHeader>
-
-            {manualSwapDialog.assignment && (
-              <div className="space-y-4 py-4">
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="text-sm font-mono">
-                    <span className="text-muted-foreground">Current: </span>
-                    <span className="font-bold">{manualSwapDialog.assignment.staffName}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-sm font-medium font-mono">Select replacement staff:</div>
-                  <div className="grid gap-2 max-h-[400px] overflow-y-auto">
-                    {staff
-                      .filter(s => {
-                        // Must be trained for this task
-                        if (!s.trainedTasks.includes(manualSwapDialog.assignment!.task as Task)) return false;
-                        
-                        // Can't swap to same person
-                        if (s.id === manualSwapDialog.assignment!.staffId) return false;
-                        
-                        // Check if already assigned to another task on same day
-                        const alreadyAssignedToday = assignments.some(
-                          a => a.date === manualSwapDialog.assignment!.date && a.staffId === s.id
-                        );
-                        if (alreadyAssignedToday) return false;
-
-                        // Check availability
-                        const dateStr = manualSwapDialog.assignment!.date;
-                        const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest');
-                        const hasHoliday = s.availability?.some(a => a.date === dateStr && a.type === 'holiday');
-                        const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'sick');
-                        
-                        return !hasRestDay && !hasHoliday && !hasSickLeave;
-                      })
-                      .sort((a, b) => {
-                        // Sort by fewest assignments this week
-                        const aCount = assignments.filter(asn => asn.staffId === a.id).length;
-                        const bCount = assignments.filter(asn => asn.staffId === b.id).length;
-                        return aCount - bCount;
-                      })
-                      .map(s => {
-                        const weekAssignments = assignments.filter(a => a.staffId === s.id).length;
-                        const taskAssignments = assignments.filter(
-                          a => a.staffId === s.id && a.task === manualSwapDialog.assignment!.task
-                        ).length;
-
-                        return (
-                          <button
-                            key={s.id}
-                            onClick={() => handleManualSwap(s.id)}
-                            className="p-3 border rounded-lg hover:bg-muted transition-colors text-left"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <div className="font-mono font-semibold">{s.name}</div>
-                                <div className="text-xs text-muted-foreground font-mono mt-1">
-                                  Week: {weekAssignments} total • {taskAssignments}x {manualSwapDialog.assignment!.task}
-                                </div>
-                              </div>
-                              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                          </button>
-                        );
-                      })}
-                  </div>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* Smart Assignment Dialog */}
-        <SmartAssignmentDialog
-          open={smartAssignDialog.open}
-          onClose={() => setSmartAssignDialog({ open: false, task: null, date: "" })}
-          task={smartAssignDialog.task}
-          date={smartAssignDialog.date}
-          staff={staff}
-          assignments={assignments}
-          onAssign={async (staffId) => {
-            const staffMember = staff.find(s => s.id === staffId);
-            if (!staffMember) return;
-            
-            const newAssignment = {
-              staffId: staffMember.id,
-              staffName: staffMember.name,
-              task: smartAssignDialog.task!,
-              date: smartAssignDialog.date
-            };
-            
-            setAssignments([...assignments, newAssignment]);
-            setSmartAssignDialog({ open: false, task: null, date: "" });
-            
-            await rotaRealtimeService.logAction(
-              "assigned",
-              "assignment",
-              `${smartAssignDialog.date}-${smartAssignDialog.task}`,
-              `Smart assigned ${staffMember.name} to ${smartAssignDialog.task}`
-            );
-          }}
-        />
+        {smartAssignDialog.task && (
+          <SmartAssignmentDialog
+            open={smartAssignDialog.open}
+            onClose={() => setSmartAssignDialog({ open: false, task: null, date: "" })}
+            task={smartAssignDialog.task}
+            date={smartAssignDialog.date}
+            staff={staff}
+            assignments={assignments}
+            onAssign={async (staffId) => {
+              const staffMember = staff.find(s => s.id === staffId);
+              if (!staffMember) return;
+              
+              const newAssignment = {
+                staffId: staffMember.id,
+                staffName: staffMember.name,
+                task: smartAssignDialog.task!,
+                date: smartAssignDialog.date
+              };
+              
+              setAssignments([...assignments, newAssignment]);
+              setSmartAssignDialog({ open: false, task: null, date: "" });
+              
+              await rotaRealtimeService.logAction(
+                "assigned",
+                "assignment",
+                `${smartAssignDialog.date}-${smartAssignDialog.task}`,
+                `Smart assigned ${staffMember.name} to ${smartAssignDialog.task}`
+              );
+            }}
+          />
+        )}
 
         <SwapSuggestionsDialog
           open={showSwapSuggestions}
-          onOpenChange={setShowSwapSuggestions}
+          onClose={() => setShowSwapSuggestions(false)}
           suggestions={swapSuggestions}
-          onImplementSwap={(swap) => handleSwapApply(swap.fromStaffId, swap.toStaffId, swap.task, swap.date)}
+          onApplySwap={(swap) => handleSwapApply(swap.fromStaffId, swap.toStaffId, swap.task, swap.date)}
           onImplementAll={implementAllSwaps}
         />
+
+        {/* Debug Panel Dialog */}
+        <Dialog open={showDebugPanel} onOpenChange={setShowDebugPanel}>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle className="font-condensed text-2xl flex items-center gap-2">
+                <Bug className="h-6 w-6 text-warning" />
+                Week Debug Info: {debugInfo?.weekStart}
+              </DialogTitle>
+              <DialogDescription>
+                Diagnostic information for troubleshooting
+              </DialogDescription>
+            </DialogHeader>
+            
+            <ScrollArea className="flex-1 pr-4">
+              {debugInfo && (
+                <div className="space-y-6 font-mono text-sm">
+                  {/* Week Info */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-base">Week Range</h3>
+                    <div className="bg-muted p-3 rounded">
+                      <div>Start: {debugInfo.weekStart}</div>
+                      <div>End: {debugInfo.weekEnd}</div>
+                    </div>
+                  </div>
+
+                  {/* Week Dates */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-base">Week Dates</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      {debugInfo.weekDates.map((wd: any, i: number) => (
+                        <div key={i} className="bg-muted p-2 rounded text-xs">
+                          {wd.dayName} {wd.date} (Day {wd.dayOfWeek})
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Staff Count */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-base">Staff Overview</h3>
+                    <div className="bg-muted p-3 rounded">
+                      <div>Total Staff: {debugInfo.totalStaff}</div>
+                      <div>Total Assignments: {debugInfo.totalAssignments}</div>
+                    </div>
+                  </div>
+
+                  {/* Staff Availability This Week */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-base">Staff Availability This Week</h3>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {debugInfo.staffWithAvailability.map((s: any, i: number) => (
+                        <div key={i} className="bg-muted p-2 rounded text-xs">
+                          <div className="font-semibold">{s.name}</div>
+                          <div className="text-muted-foreground">
+                            {s.shiftPattern} · {s.shiftStart}
+                          </div>
+                          <div className="mt-1">
+                            Trained: {s.trainedTasks.join(", ") || "None"}
+                          </div>
+                          {s.availabilityThisWeek.length > 0 ? (
+                            <div className="mt-1 text-warning">
+                              Unavailable: {s.availabilityThisWeek.map((a: any) => `${a.date} (${a.type})`).join(", ")}
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-primary">Available all week</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Assignments by Task */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-base">Current Assignments</h3>
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {debugInfo.assignmentsByTask.map((taskData: any, i: number) => (
+                        <div key={i} className="bg-muted p-2 rounded text-xs">
+                          <div className="font-semibold mb-2">{taskData.task}</div>
+                          <div className="grid grid-cols-2 gap-1">
+                            {taskData.days.map((dayData: any, j: number) => (
+                              <div key={j} className={dayData.assignments.length === 0 ? "text-muted-foreground" : ""}>
+                                {dayData.day}: {dayData.assignments.length > 0 
+                                  ? dayData.assignments.map((a: any) => a.staffName).join(", ")
+                                  : "None"}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </ScrollArea>
+
+            <DialogFooter>
+              <Button onClick={() => setShowDebugPanel(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </TabsContent>
 
         {/* Settings Tab - Task Requirements Configuration */}
@@ -1974,17 +1888,30 @@ export default function IndexPage() {
             <CardContent>
               {taskConfigData && (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                    {["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"].map((task) => (
-                      <Button
-                        key={task}
-                        variant="outline"
-                        className="font-mono text-center"
-                      >
-                        {task}
-                      </Button>
-                    ))}
-                  </div>
+                  {["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"].map((task) => (
+                    <div key={task} className="space-y-2">
+                      <h3 className="font-condensed font-semibold">{task}</h3>
+                      <div className="grid grid-cols-7 gap-2">
+                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, idx) => (
+                          <div key={day}>
+                            <label className="text-xs text-muted-foreground font-sans">{day}</label>
+                            <Input
+                              type="number"
+                              min="0"
+                              value={taskConfigData[task]?.[idx] || 0}
+                              onChange={(e) => {
+                                const newConfig = { ...taskConfigData };
+                                if (!newConfig[task]) newConfig[task] = [0, 0, 0, 0, 0, 0, 0];
+                                newConfig[task][idx] = parseInt(e.target.value) || 0;
+                                setTaskConfigData(newConfig);
+                              }}
+                              className="font-mono text-center"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                   <Button
                     onClick={() => {
                       updateTaskConfig.mutate(taskConfigData);

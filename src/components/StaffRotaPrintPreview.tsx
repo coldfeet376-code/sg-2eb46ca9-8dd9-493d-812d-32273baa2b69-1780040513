@@ -15,7 +15,7 @@ interface StaffRotaPrintPreviewProps {
 }
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 
 // Get local date string without timezone conversion
 function getLocalDateString(date: Date): string {

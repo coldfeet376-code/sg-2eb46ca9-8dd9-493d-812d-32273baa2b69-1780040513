@@ -9,21 +9,9 @@ import { useStaff } from "@/hooks/useSupabaseQueries";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Download, TrendingUp, Users, Target, Calendar, BarChart3, PieChart, Activity } from "lucide-react";
-import type { StaffMember, Assignment, Task } from "@/types";
+import type { StaffMember, Assignment } from "@/types";
 
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
-
-// Task weights for fairness calculation - matches fairnessCalculator.ts
-const TASK_WEIGHTS: Record<Task, number> = {
-  "Frozen": 1.2,
-  "Milk": 1.1,
-  "TWI": 1.0,
-  "Inbound": 1.3,
-  "Inbound Late": 1.4,
-  "Outbound": 1.2,
-  "Marshaling": 1.1,
-  "Equipment": 1.0,
-};
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
 
 function getLocalDateString(date: Date): string {
   const year = date.getFullYear();
@@ -60,29 +48,16 @@ export default function AnalyticsPage() {
       }
       
       const { data, error } = await supabase
-        .from("assignments")
-        .select("*")
+        .from("rotas")
+        .select("week_start, assignments")
         .gte("week_start", start.toISOString().split('T')[0])
         .lte("week_start", end.toISOString().split('T')[0]);
 
       if (error) throw error;
 
-      const grouped = new Map<string, Assignment[]>();
-      (data || []).forEach((row: any) => {
-        const weekStart = row.week_start;
-        const assignment: Assignment = {
-          staffId: row.staff_id,
-          staffName: row.staff_name,
-          task: row.task,
-          date: row.date,
-          shiftPattern: row.shift_pattern || "All",
-        };
-        grouped.set(weekStart, [...(grouped.get(weekStart) || []), assignment]);
-      });
-
-      return Array.from(grouped.entries()).map(([weekStart, assignments]) => ({
-        weekStart,
-        assignments,
+      return (data || []).map(r => ({
+        weekStart: r.week_start,
+        assignments: (r.assignments as unknown as Assignment[]) || []
       }));
     },
   });
@@ -94,13 +69,12 @@ export default function AnalyticsPage() {
 
   // Staff utilization metrics
   const staffUtilization = useMemo(() => {
-    const utilization: Record<string, { name: string; shifts: number; weightedShifts: number; tasks: Record<string, number> }> = {};
+    const utilization: Record<string, { name: string; shifts: number; tasks: Record<string, number> }> = {};
     
     staff.forEach(s => {
       utilization[s.id] = {
         name: s.name,
         shifts: 0,
-        weightedShifts: 0,
         tasks: {},
       };
     });
@@ -108,16 +82,11 @@ export default function AnalyticsPage() {
     allAssignments.forEach(a => {
       if (utilization[a.staffId]) {
         utilization[a.staffId].shifts++;
-        
-        // Add weighted shift count
-        const taskWeight = TASK_WEIGHTS[a.task] || 1.0;
-        utilization[a.staffId].weightedShifts += taskWeight;
-        
         utilization[a.staffId].tasks[a.task] = (utilization[a.staffId].tasks[a.task] || 0) + 1;
       }
     });
     
-    return Object.values(utilization).sort((a, b) => b.weightedShifts - a.weightedShifts);
+    return Object.values(utilization).sort((a, b) => b.shifts - a.shifts);
   }, [staff, allAssignments]);
 
   // Task distribution
@@ -314,23 +283,20 @@ export default function AnalyticsPage() {
               Staff Utilization
             </CardTitle>
             <CardDescription>
-              Shift distribution per staff member (raw count / weighted fairness total)
+              Shift distribution per staff member in selected time range
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {staffUtilization.slice(0, 15).map((s, idx) => {
-                const maxWeighted = Math.max(...staffUtilization.map(u => u.weightedShifts));
-                const percentage = maxWeighted > 0 ? (s.weightedShifts / maxWeighted) * 100 : 0;
+                const maxShifts = Math.max(...staffUtilization.map(u => u.shifts));
+                const percentage = maxShifts > 0 ? (s.shifts / maxShifts) * 100 : 0;
                 
                 return (
                   <div key={idx} className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <span className="font-medium">{s.name}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="font-mono text-muted-foreground">{s.shifts} raw</span>
-                        <span className="font-mono text-primary font-semibold">{s.weightedShifts.toFixed(1)} weighted</span>
-                      </div>
+                      <span className="font-mono text-muted-foreground">{s.shifts} shifts</span>
                     </div>
                     <div className="w-full bg-muted rounded-full h-2">
                       <div
@@ -389,7 +355,7 @@ export default function AnalyticsPage() {
               Detailed Task Breakdown
             </CardTitle>
             <CardDescription>
-              Individual staff task assignments (Inbound Late counts as 0.5 for fairness)
+              Individual staff task assignments
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -398,8 +364,7 @@ export default function AnalyticsPage() {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-2 font-medium">Staff Member</th>
-                    <th className="text-center p-2 font-medium">Raw Total</th>
-                    <th className="text-center p-2 font-medium text-primary">Weighted</th>
+                    <th className="text-center p-2 font-medium">Total</th>
                     {TASKS.map(task => (
                       <th key={task} className="text-center p-2 font-medium text-xs">{task}</th>
                     ))}
@@ -410,9 +375,6 @@ export default function AnalyticsPage() {
                     <tr key={idx} className="border-b hover:bg-muted/50">
                       <td className="p-2 font-medium">{s.name}</td>
                       <td className="p-2 text-center font-mono">{s.shifts}</td>
-                      <td className="p-2 text-center font-mono text-primary font-semibold">
-                        {s.weightedShifts.toFixed(1)}
-                      </td>
                       {TASKS.map(task => (
                         <td key={task} className="p-2 text-center font-mono text-sm">
                           {s.tasks[task] || "—"}

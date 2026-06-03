@@ -50,7 +50,7 @@ export function StaffBulkOperations({
             id="bulk-data"
             value={bulkData}
             onChange={(e) => onBulkDataChange(e.target.value)}
-            placeholder="Name,Tasks&#10;John Doe,Frozen,Milk,Equipment&#10;Jane Smith,Twi,Inbound"
+            placeholder="Name,Tasks&#10;John Doe,Frozen,Milk&#10;Jane Smith,Twi,Inbound"
             className="font-mono text-xs h-32 mt-1.5"
           />
         </div>

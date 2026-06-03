@@ -44,10 +44,7 @@ export default function App({ Component, pageProps }: AppProps) {
 
     // Subscribe to auth changes
     const { data: authListener } = authService.onAuthStateChange((session) => {
-      const publicRoutes = ["/login", "/signup", "/forgot-password", "/reset-password", "/admin/setup"];
-      const isPublicRoute = publicRoutes.includes(router.pathname);
-      
-      if (!session && !isPublicRoute) {
+      if (!session && router.pathname !== "/login") {
         router.push("/login");
       }
     });
@@ -57,11 +54,8 @@ export default function App({ Component, pageProps }: AppProps) {
     };
   }, [router.pathname]);
 
-  // Show loading state while checking auth (skip for public routes)
-  const publicRoutes = ["/login", "/signup", "/forgot-password", "/reset-password", "/admin/setup"];
-  const isPublicRoute = publicRoutes.includes(router.pathname);
-  
-  if (isAuthChecking && !isPublicRoute) {
+  // Show loading state while checking auth
+  if (isAuthChecking && router.pathname !== "/login") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">

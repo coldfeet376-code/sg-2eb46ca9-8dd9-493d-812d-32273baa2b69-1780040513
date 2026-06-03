@@ -93,15 +93,7 @@ export type Database = {
           user_id?: string | null
           user_name?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "audit_log_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       availability: {
         Row: {
@@ -175,15 +167,7 @@ export type Database = {
           status?: string
           token?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "invitations_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       manager_availability: {
         Row: {
@@ -269,7 +253,6 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
-          is_admin: boolean | null
           updated_at: string | null
         }
         Insert: {
@@ -278,7 +261,6 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
-          is_admin?: boolean | null
           updated_at?: string | null
         }
         Update: {
@@ -287,18 +269,9 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
-          is_admin?: boolean | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_id_fkey"
-            columns: ["id"]
-            isOneToOne: true
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       rota_backups: {
         Row: {
@@ -329,47 +302,39 @@ export type Database = {
       }
       rotas: {
         Row: {
+          assignments: Json
           created_at: string | null
           created_by: string | null
           fairness_metrics: Json | null
           id: string
           locked_count: number | null
-          rota_data: Json | null
           updated_at: string | null
           version: number | null
           week_start: string
         }
         Insert: {
+          assignments: Json
           created_at?: string | null
           created_by?: string | null
           fairness_metrics?: Json | null
           id?: string
           locked_count?: number | null
-          rota_data?: Json | null
           updated_at?: string | null
           version?: number | null
           week_start: string
         }
         Update: {
+          assignments?: Json
           created_at?: string | null
           created_by?: string | null
           fairness_metrics?: Json | null
           id?: string
           locked_count?: number | null
-          rota_data?: Json | null
           updated_at?: string | null
           version?: number | null
           week_start?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "rotas_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       staff: {
         Row: {
@@ -449,73 +414,12 @@ export type Database = {
         }
         Relationships: []
       }
-      two_factor_codes: {
-        Row: {
-          code: string
-          created_at: string | null
-          email: string
-          expires_at: string
-        }
-        Insert: {
-          code: string
-          created_at?: string | null
-          email: string
-          expires_at: string
-        }
-        Update: {
-          code?: string
-          created_at?: string | null
-          email?: string
-          expires_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
-      users: {
-        Row: {
-          created_at: string | null
-          email: string | null
-          email_confirmed_at: string | null
-          id: string | null
-          last_sign_in_at: string | null
-          raw_app_meta_data: Json | null
-          raw_user_meta_data: Json | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          email?: string | null
-          email_confirmed_at?: string | null
-          id?: string | null
-          last_sign_in_at?: string | null
-          raw_app_meta_data?: Json | null
-          raw_user_meta_data?: Json | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          email?: string | null
-          email_confirmed_at?: string | null
-          id?: string | null
-          last_sign_in_at?: string | null
-          raw_app_meta_data?: Json | null
-          raw_user_meta_data?: Json | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Functions: {
-      get_current_user_info: { Args: never; Returns: Json }
-      save_rota_bypass_cache: {
-        Args: {
-          p_fairness_metrics?: Json
-          p_rota_data: Json
-          p_week_start: string
-        }
-        Returns: Json
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never

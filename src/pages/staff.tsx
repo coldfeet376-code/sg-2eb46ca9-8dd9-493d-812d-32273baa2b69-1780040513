@@ -27,16 +27,15 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { RotaWeekNavigator } from "@/components/rota/RotaWeekNavigator";
 import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff, useAddAvailability, useDeleteAvailability } from "@/hooks/useSupabaseQueries";
-import type { StaffMember, Task, AvailabilityType, ShiftStart, DayShiftPattern, ShiftPattern } from "@/types";
+import type { StaffMember, Task, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { Users, Plus, Trash2, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon, Info, RefreshCw, Target, Settings, HelpCircle, Sparkles, Wand2, Eye } from "lucide-react";
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
+const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"];
 const SHIFT_STARTS: ShiftStart[] = ["06:00", "07:00", "08:00", "09:00", "10:00"];
 
 const DAY_SHIFT_PATTERNS: DayShiftPattern[] = [
@@ -52,7 +51,7 @@ export default function StaffManagement() {
   const [selectedTasks, setSelectedTasks] = useState<Task[]>([]);
   const [shiftStart, setShiftStart] = useState<ShiftStart>("06:00");
   const [dayShiftPattern, setDayShiftPattern] = useState<DayShiftPattern>("06:00-14:30");
-  const [shiftPattern, setShiftPattern] = useState<ShiftPattern>("All");
+  const [shiftPattern, setShiftPattern] = useState<"Early" | "Late" | "All">("All");
   const [recurringRestDays, setRecurringRestDays] = useState<number[]>([]);
   const [filterShift, setFilterShift] = useState<ShiftStart | "all">("all");
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -74,41 +73,11 @@ export default function StaffManagement() {
     const today = new Date();
     const day = today.getDay(); // 0 = Sunday
     const sunday = new Date(today);
-    sunday.setDate(today.getDate() - day);
+    sunday.setDate(today.getDate() - day); // Go back to Sunday of current week
     sunday.setHours(0, 0, 0, 0);
     return sunday;
   });
-
-  // Helper function to generate week dates - MUST be defined before useMemo
-  const getWeekDates = (startDate: Date): Date[] => {
-    const dates: Date[] = [];
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + i);
-      dates.push(date);
-    }
-    return dates;
-  };
-
-  // Helper function to get local date string
-  const getLocalDateString = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  // Helper function to check availability for a date
-  const getAvailabilityForDate = (member: StaffMember, date: Date): AvailabilityType | null => {
-    const dateStr = getLocalDateString(date);
-    const entry = member.availability?.find((a) => a.date === dateStr);
-    // Only show rest/holiday/sick - treat "available" as working day (no marker)
-    if (entry && entry.type !== 'available') {
-      return entry.type;
-    }
-    return null;
-  };
-
+  
   const { addAuditEntry } = useAudit();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -119,7 +88,7 @@ export default function StaffManagement() {
   const [editTasks, setEditTasks] = useState<Task[]>([]);
   const [editShift, setEditShift] = useState<ShiftStart>("06:00");
   const [editDayShiftPattern, setEditDayShiftPattern] = useState<DayShiftPattern>("06:00-14:30");
-  const [editShiftPattern, setEditShiftPattern] = useState<ShiftPattern>("All");
+  const [editShiftPattern, setEditShiftPattern] = useState<"Early" | "Late" | "All">("All");
   const [editRecurringRestDays, setEditRecurringRestDays] = useState<number[]>([]);
   
   // Expanded staff IDs for collapsible sections
@@ -131,6 +100,14 @@ export default function StaffManagement() {
   // Force re-render key - increments after successful cache updates
   const [renderKey, setRenderKey] = useState(0);
 
+  // Consistent date string formatting
+  const getLocalDateString = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
   // React Query hooks
   const { data: staff = [], isLoading: staffLoading, error: staffError, refetch } = useStaff();
   const addStaffMutation = useAddStaff();
@@ -139,21 +116,16 @@ export default function StaffManagement() {
   const deleteAvailabilityMutation = useDeleteAvailability();
   const createAvailabilityMutation = useAddAvailability();
 
-  // DEBUG: Log when staff data loads
-  useEffect(() => {
-    console.log('📊 STAFF PAGE DEBUG:');
-    console.log('   isLoading:', staffLoading);
-    console.log('   hasError:', staffError);
-    console.log('   staff count:', staff?.length || 0);
-    console.log('   filterShift:', filterShift);
-    
-    const filtered = staff.filter((member) => filterShift === "all" || member.shiftStart === filterShift);
-    console.log('   filtered count:', filtered.length);
-    
-    if (staff.length > 0) {
-      console.log('   First 3 staff:', staff.slice(0, 3).map(s => s.name));
+  const weekDates = useMemo(() => {
+    const dates: Date[] = [];
+    const start = new Date(currentWeekStart);
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(start);
+      date.setDate(start.getDate() + i);
+      dates.push(date);
     }
-  }, [staff, staffLoading, staffError, filterShift]);
+    return dates;
+  }, [currentWeekStart]);
 
   // DEBUG: Log staff data when it changes
   useEffect(() => {
@@ -183,9 +155,6 @@ export default function StaffManagement() {
       }
     }
   }, [staff]);
-
-  // Generate week dates array for the current week - MUST be before early returns
-  const weekDates = useMemo(() => getWeekDates(currentWeekStart), [currentWeekStart]);
 
   // Loading state
   if (staffLoading) {
@@ -225,6 +194,17 @@ export default function StaffManagement() {
     return stats;
   };
 
+  // Get week dates (Saturday to Sunday)
+  const getWeekDates = (weekStart: Date): Date[] => {
+    const dates: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + i);
+      dates.push(date);
+    }
+    return dates;
+  };
+
   const navigateWeek = (direction: "prev" | "next") => {
     const newStart = new Date(currentWeekStart);
     newStart.setDate(currentWeekStart.getDate() + (direction === "next" ? 7 : -7));
@@ -241,23 +221,17 @@ export default function StaffManagement() {
   };
 
   const handleAddStaff = async () => {
-    if (!name.trim() || selectedTasks.length === 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a name and select at least one trained task",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!name.trim() || selectedTasks.length === 0) return;
 
     addStaffMutation.mutate(
       {
         name: name.trim(),
         trainedTasks: selectedTasks,
         shiftStart,
+        dayShiftPattern,
         shiftPattern,
-        restDays: recurringRestDays,
-      },
+        recurringRestDays,
+      } as any,
       {
         onSuccess: (newStaff) => {
           addAuditEntry({
@@ -269,21 +243,12 @@ export default function StaffManagement() {
           });
           setName("");
           setSelectedTasks([]);
-          setShiftStart("06:00");
           setDayShiftPattern("06:00-14:30");
           setShiftPattern("All");
           setRecurringRestDays([]);
           toast({
-            title: "✅ Staff Added",
+            title: "Staff added",
             description: `${newStaff.name} has been added successfully`,
-          });
-        },
-        onError: (error: any) => {
-          console.error("Error adding staff:", error);
-          toast({
-            title: "❌ Failed to Add Staff",
-            description: error.message || "An error occurred while adding staff member. Check console for details.",
-            variant: "destructive",
           });
         },
       }
@@ -311,14 +276,7 @@ export default function StaffManagement() {
   };
 
   const handleSaveEdit = async () => {
-    if (!editingStaffId || !editName.trim() || editTasks.length === 0) {
-      toast({
-        title: "Validation Error",
-        description: "Please enter a name and select at least one trained task",
-        variant: "destructive",
-      });
-      return;
-    }
+    if (!editingStaffId || !editName.trim() || editTasks.length === 0) return;
 
     updateStaffMutation.mutate(
       {
@@ -327,9 +285,10 @@ export default function StaffManagement() {
           name: editName.trim(),
           trainedTasks: editTasks,
           shiftStart: editShift,
+          dayShiftPattern: editDayShiftPattern,
           shiftPattern: editShiftPattern,
           restDays: editRecurringRestDays,
-        },
+        } as any,
       },
       {
         onSuccess: () => {
@@ -340,18 +299,10 @@ export default function StaffManagement() {
             entityId: editingStaffId,
             details: `Updated staff member: ${editName.trim()}`,
           });
-          handleCancelEdit();
+          setEditingStaffId(null);
           toast({
-            title: "✅ Staff Updated",
+            title: "Staff updated",
             description: "Changes saved successfully",
-          });
-        },
-        onError: (error: any) => {
-          console.error("Error updating staff:", error);
-          toast({
-            title: "❌ Update Failed",
-            description: error.message || "Failed to save changes. Check console for details.",
-            variant: "destructive",
           });
         },
       }
@@ -414,87 +365,38 @@ export default function StaffManagement() {
   };
 
   const setDayAvailability = async (staffId: string, dateStr: string, type: AvailabilityType | "clear") => {
-    console.log("\n\n🔵 ========== AVAILABILITY WRITE ATTEMPT ==========");
-    console.log("📅 Date:", dateStr);
-    console.log("👤 Staff ID:", staffId);
-    console.log("📝 Type (RAW):", type);
-    console.log("📝 Type typeof:", typeof type);
-    console.log("📝 Type length:", type?.length);
-    console.log("📝 Type char codes:", type ? Array.from(String(type)).map(c => `${c}(${c.charCodeAt(0)})`).join(', ') : 'N/A');
-    
-    // CHECK AUTH STATE BEFORE WRITE
-    console.log("\n🔐 Checking authentication...");
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    console.log("   Session exists:", !!session);
-    console.log("   Session error:", sessionError);
-    if (session) {
-      console.log("   User ID:", session.user?.id);
-      console.log("   Email:", session.user?.email);
-    } else {
-      console.error("❌ NO SESSION - This is why writes are failing!");
-      toast({
-        title: "❌ Not Authenticated",
-        description: "Please refresh the page or log in again",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     setLoadingCell({ staffId, date: dateStr });
     setOpenDayDropdown(null);
 
     try {
       if (type === "clear") {
-        console.log("\n🗑️ DELETING availability entry...");
-        const deleteResult = await deleteAvailabilityMutation.mutateAsync({ staffId, date: dateStr });
-        console.log("✅ Delete successful:", deleteResult);
+        // Delete the availability entry
+        await deleteAvailabilityMutation.mutateAsync({ staffId, date: dateStr });
         toast({ title: "Availability cleared", description: "Day marked as working" });
       } else {
-        console.log("\n💾 UPSERTING availability entry...");
-        
-        // Validate type before sending
-        const validTypes: AvailabilityType[] = ['rest', 'holiday', 'sick', 'available'];
-        if (!validTypes.includes(type as AvailabilityType)) {
-          console.error("❌ INVALID TYPE VALUE!");
-          console.error("   Received:", JSON.stringify(type));
-          console.error("   Expected one of:", validTypes);
-          toast({
-            title: "❌ Invalid availability type",
-            description: `"${type}" is not valid. Must be: rest, holiday, sick, or available`,
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        const payload = {
+        // Upsert the availability entry
+        await createAvailabilityMutation.mutateAsync({
           staff_id: staffId,
           date: dateStr,
-          type: type as AvailabilityType,
-        };
-        console.log("📤 Payload:", JSON.stringify(payload, null, 2));
-        
-        const upsertResult = await createAvailabilityMutation.mutateAsync(payload);
-        console.log("✅ Upsert successful:", upsertResult);
+          type,
+        });
         toast({ title: "Availability updated", description: `Day marked as ${type}` });
       }
-      console.log("\n🔵 ========== WRITE COMPLETED SUCCESSFULLY ==========\n");
     } catch (error: any) {
-      console.error("\n❌ ========== WRITE FAILED ==========");
-      console.error("Error:", error);
-      console.error("Error message:", error?.message);
-      console.error("Error code:", error?.code);
-      console.error("Error details:", error?.details);
-      console.error("Error hint:", error?.hint);
-      console.error("========================================\n");
-      
       toast({ 
-        title: "❌ Failed to update availability", 
-        description: error?.message || error?.details || "Database constraint violation - check console for details",
+        title: "Error updating availability", 
+        description: error.message,
         variant: "destructive" 
       });
     } finally {
       setLoadingCell(null);
     }
+  };
+
+  const getAvailabilityForDate = (member: StaffMember, date: Date): AvailabilityType | null => {
+    const dateStr = getLocalDateString(date);
+    const entry = member.availability?.find((a) => a.date === dateStr);
+    return entry ? entry.type : null;
   };
 
   const getDayColor = (availabilityType: AvailabilityType | null): string => {
@@ -1199,19 +1101,8 @@ export default function StaffManagement() {
                                   <div className="text-xs font-medium text-muted-foreground font-mono">
                                     WEEKLY AVAILABILITY
                                   </div>
-                                  <div className="flex gap-3 text-xs font-mono">
-                                    <span className="flex items-center gap-1.5">
-                                      <span className="w-3 h-3 rounded bg-blue-500"></span>
-                                      Rest: {stats.rest}
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                      <span className="w-3 h-3 rounded bg-purple-500"></span>
-                                      Holiday: {stats.holiday}
-                                    </span>
-                                    <span className="flex items-center gap-1.5">
-                                      <span className="w-3 h-3 rounded bg-red-500"></span>
-                                      Sick: {stats.sick}
-                                    </span>
+                                  <div className="text-xs text-muted-foreground font-mono">
+                                    Click any day to set status
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-7 gap-2">

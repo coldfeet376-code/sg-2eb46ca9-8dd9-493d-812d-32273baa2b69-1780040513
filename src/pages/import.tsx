@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,14 +10,13 @@ import { useRouter } from "next/router";
 import { Upload, CheckCircle2, AlertCircle, Users, Clock, Phone, FileText, Calendar, RefreshCw } from "lucide-react";
 import { useSupabaseMutation, useStaff } from "@/hooks/useSupabaseQueries";
 import { useToast } from "@/hooks/use-toast";
-import type { AvailabilityType, StaffMember, ShiftStart, ShiftPattern } from "@/types";
+import type { AvailabilityType, StaffMember } from "@/types";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
-import * as XLSX from "xlsx";
 
 interface ParsedAvailability {
   date: string; // YYYY-MM-DD
-  type: AvailabilityType;
+  status: AvailabilityType;
 }
 
 interface ParsedStaff {
@@ -43,12 +42,6 @@ export default function ImportPage() {
   const [isClearing, setIsClearing] = useState(false);
   const [currentProcessingStaff, setCurrentProcessingStaff] = useState<string>("");
   const [importStats, setImportStats] = useState({ success: 0, skipped: 0, errors: 0 });
-  const [isDeletingStaff, setIsDeletingStaff] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    success: boolean;
-    message: string;
-    details?: any;
-  } | null>(null);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -56,68 +49,6 @@ export default function ImportPage() {
   const createStaffMutation = useSupabaseMutation("staff", "insert");
   const createAvailabilityMutation = useSupabaseMutation("availability", "insert");
   const deleteAvailabilityMutation = useSupabaseMutation("availability", "delete");
-
-  const handleDeleteAllStaff = async () => {
-    if (!confirm("⚠️ This will DELETE ALL STAFF MEMBERS and their availability entries. This cannot be undone. Continue?")) {
-      return;
-    }
-
-    if (!confirm("⚠️⚠️ FINAL WARNING: You are about to permanently delete ALL staff data. Type 'DELETE' in the next prompt to confirm.")) {
-      return;
-    }
-
-    const confirmation = prompt("Type DELETE (all caps) to confirm:");
-    if (confirmation !== "DELETE") {
-      toast({
-        title: "Cancelled",
-        description: "Staff deletion cancelled",
-      });
-      return;
-    }
-
-    setIsDeletingStaff(true);
-    try {
-      // First delete all availability (foreign key constraint)
-      const { error: availError } = await supabase
-        .from('availability')
-        .delete()
-        .gte('created_at', '1970-01-01'); // Match all records
-      
-      if (availError) {
-        throw new Error(`Failed to delete availability: ${availError.message}`);
-      }
-
-      // Then delete all staff
-      const { error: staffError } = await supabase
-        .from('staff')
-        .delete()
-        .gte('created_at', '1970-01-01'); // Match all records
-      
-      if (staffError) {
-        throw new Error(`Failed to delete staff: ${staffError.message}`);
-      }
-      
-      toast({
-        title: "✓ Deleted all staff",
-        description: "All staff members and their availability have been removed from the database",
-      });
-
-      // Reset import state
-      setParsedStaff([]);
-      setPasteText("");
-      setDateRange("");
-      setImportComplete(false);
-    } catch (error: any) {
-      console.error("Error deleting staff:", error);
-      toast({
-        title: "❌ Error",
-        description: error.message || "Failed to delete staff data",
-        variant: "destructive",
-      });
-    } finally {
-      setIsDeletingStaff(false);
-    }
-  };
 
   const handleClearAllAvailability = async () => {
     if (!confirm("⚠️ This will DELETE ALL availability entries for ALL staff members. This cannot be undone. Continue?")) {
@@ -264,12 +195,10 @@ export default function ImportPage() {
         continue;
       }
 
-      // Always use 06:00 as default shift start
-      // Database only allows: '06:00', '07:00', '08:00', '08:30', '09:00', '09:30', '10:00', '11:00'
-      const validShiftStart: ShiftStart = "06:00";
-
-      const endShort = endTime.substring(0, 5); // HH:MM
-      const shift = `${validShiftStart}-${endShort}`;
+      // Build shift pattern (remove seconds if present)
+      const start = startTime.substring(0, 5); // HH:MM
+      const end = endTime.substring(0, 5);
+      const shift = `${start}-${end}`;
 
       // Parse availability for all date columns
       const availability: ParsedAvailability[] = [];
@@ -280,11 +209,8 @@ export default function ImportPage() {
         debugLines.push(`Shift: ${shift}, Phone: ${phone || "none"}`);
         debugLines.push(`Total cells in row: ${cells.length}`);
         debugLines.push(`Date columns to check: ${dateColumns.length}`);
-        debugLines.push(`\n📋 AVAILABILITY PARSING (showing first 30 days):`);
+        debugLines.push(`First 20 availability cells:`);
       }
-      
-      // Track what we find for summary
-      const parsedTypes = { rest: 0, holiday: 0, sick: 0, available: 0 };
       
       for (let dcIdx = 0; dcIdx < dateColumns.length; dcIdx++) {
         const { index, date } = dateColumns[dcIdx];
@@ -294,64 +220,37 @@ export default function ImportPage() {
           const statusText = rawCell.trim().toUpperCase();
           let status: AvailabilityType = "available";
 
-          // CASE-INSENSITIVE pattern matching for statuses
-          // Now handles: Rest/REST/rest/R/r
+          // More robust pattern matching for statuses
           if (statusText === "REST" || statusText === "R" || statusText.startsWith("REST")) {
             status = "rest";
-          } 
-          // Now handles: Holiday/HOLIDAY/holiday/HOL/hol/H/h
-          else if (statusText === "HOLIDAY" || statusText === "HOL" || statusText === "H" || statusText.startsWith("HOLIDAY")) {
+          } else if (statusText === "HOLIDAY" || statusText === "HOL" || statusText.startsWith("HOLIDAY")) {
             status = "holiday";
-          } 
-          // Now handles: Sick/SICK/sick/Leave/LEAVE/leave/Absent/S/s
-          else if (
+          } else if (
             statusText === "SICK" || 
             statusText === "LEAVE" || 
             statusText === "ABSENT" || 
             statusText === "UNION" ||
-            statusText === "S" ||
             statusText.startsWith("SICK") ||
             statusText.startsWith("LEAVE")
           ) {
             status = "sick";
-          } 
-          // Now handles: IN/In/in/WORK/Work/work/A/a or empty
-          else if (statusText === "IN" || statusText === "WORK" || statusText === "A" || statusText === "") {
-            status = "available";
-          } else {
-            // Unknown status - log and default to available
-            console.warn(`⚠️ Unknown status "${statusText}" (original: "${rawCell}") on ${date} for ${name} - defaulting to 'available'`);
+          } else if (statusText === "IN" || statusText === "WORK" || statusText === "") {
             status = "available";
           }
 
-          // Count what we're parsing
-          parsedTypes[status]++;
-
-          // Detailed logging for first person, first 30 days
-          if (newStaff.length === 0 && dcIdx < 30) {
-            const arrow = rawCell !== statusText ? `"${rawCell}" → "${statusText}" → ` : `"${rawCell}" → `;
-            const statusEmoji = status === "rest" ? "🛌" : status === "holiday" ? "🏖️" : status === "sick" ? "🤒" : "✅";
-            debugLines.push(`  ${date}: ${arrow}${statusEmoji} ${status.toUpperCase()}`);
+          // Debug logging for first person, first 20 days
+          if (newStaff.length === 0 && dcIdx < 20) {
+            debugLines.push(`  Cell ${index} (${date}): "${rawCell}" → ${status}`);
           }
 
           // Store ALL days (including available) for preview purposes
-          availability.push({ date, type: status });
+          availability.push({ date, status });
         } else {
           // Debug: cell index out of range
-          if (newStaff.length === 0 && dcIdx < 30) {
-            debugLines.push(`  ${date}: ❌ OUT OF RANGE (row has only ${cells.length} cells)`);
+          if (newStaff.length === 0 && dcIdx < 20) {
+            debugLines.push(`  Cell ${index} (${date}): OUT OF RANGE (row has only ${cells.length} cells)`);
           }
         }
-      }
-
-      // Show summary for first person
-      if (newStaff.length === 0) {
-        debugLines.push(`\n📊 FIRST PERSON SUMMARY:`);
-        debugLines.push(`  🛌 Rest: ${parsedTypes.rest} days`);
-        debugLines.push(`  🏖️ Holiday: ${parsedTypes.holiday} days`);
-        debugLines.push(`  🤒 Sick: ${parsedTypes.sick} days`);
-        debugLines.push(`  ✅ Available: ${parsedTypes.available} days`);
-        debugLines.push(`  Total: ${parsedTypes.rest + parsedTypes.holiday + parsedTypes.sick + parsedTypes.available} days parsed`);
       }
 
       // Try to match with existing staff
@@ -369,8 +268,8 @@ export default function ImportPage() {
       newStaff.push({
         name,
         phone,
-        startTime: validShiftStart,
-        endTime: endShort,
+        startTime: start,
+        endTime: end,
         shift,
         availability
       });
@@ -402,7 +301,7 @@ export default function ImportPage() {
       
       // Count total unavailable days across all staff
       const totalUnavailableDays = newStaff.reduce((sum, s) => 
-        sum + s.availability.filter(a => a.type !== "available").length, 0
+        sum + s.availability.filter(a => a.status !== "available").length, 0
       );
 
       toast({
@@ -420,338 +319,8 @@ export default function ImportPage() {
     }
   };
 
-  const parseExcelFile = useCallback(async (file: File) => {
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-      console.log("📊 Excel rows:", rows.length);
-      console.log("📋 First 3 rows:", rows.slice(0, 3));
-
-      if (rows.length < 2) {
-        throw new Error("Excel file must have at least a header row and one data row");
-      }
-
-      // Parse header row - format: "Sunday 28/12/2025", "Monday 29/12/2025", etc.
-      const headerRow = rows[0];
-      const dateColumns: { index: number; date: string }[] = [];
-
-      console.log("🔍 Parsing header row:", headerRow);
-
-      // Find date columns (start after Name, Start Time, End Time, Clock Number)
-      for (let i = 4; i < headerRow.length; i++) {
-        const cell = headerRow[i];
-        if (typeof cell === "string" && cell.trim()) {
-          // Extract date from "DayName DD/MM/YYYY" format
-          const match = cell.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-          if (match) {
-            const [, day, month, year] = match;
-            // Convert DD/MM/YYYY to YYYY-MM-DD
-            const dateStr = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
-            dateColumns.push({ index: i, date: dateStr });
-          }
-        }
-      }
-
-      console.log(`📅 Found ${dateColumns.length} date columns`);
-      console.log("📅 Date range:", dateColumns[0]?.date, "to", dateColumns[dateColumns.length - 1]?.date);
-
-      const newStaff: ParsedStaff[] = [];
-      const matches = new Map<string, string>();
-
-      // Parse staff rows
-      for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
-        const row = rows[rowIndex];
-        
-        // Skip empty rows
-        if (!row || !row[0] || typeof row[0] !== "string" || !row[0].trim()) {
-          continue;
-        }
-
-        const staffName = row[0].trim();
-        const startTimeRaw = row[1] || "06:00:00";
-        const endTimeRaw = row[2] || "14:30:00";
-        const clockNumber = row[3] || "";
-
-        // Convert endTime to string if it's an Excel serial number
-        const endTime = typeof endTimeRaw === "string" 
-          ? endTimeRaw 
-          : "14:30:00"; // Default if it's a number
-
-        // Always use 06:00 as default shift start
-        // Database only allows: '06:00', '07:00', '08:00', '08:30', '09:00', '09:30', '10:00', '11:00'
-        // Excel shift times are unreliable - user can adjust individual times in Staff page
-        const shiftStart: ShiftStart = "06:00";
-
-        console.log(`👤 Parsing staff: ${staffName} (clock: ${clockNumber || 'none'}, shift: ${shiftStart})`);
-
-        // Parse availability for each date column
-        const staffAvailability: ParsedAvailability[] = [];
-        
-        // Track what we find for logging
-        const parsedTypes = { rest: 0, holiday: 0, sick: 0, available: 0 };
-        const firstDays: string[] = [];
-        
-        dateColumns.forEach(({ index, date }) => {
-          const cellValue = row[index];
-          
-          if (cellValue) {
-            const rawValue = typeof cellValue === "string" ? cellValue : String(cellValue);
-            const status = rawValue.trim().toUpperCase();
-            let availabilityType: AvailabilityType;
-
-            // CASE-INSENSITIVE mapping - Excel status to database availability type
-            // Database expects: 'rest', 'holiday', 'sick', 'available'
-            
-            // Now handles: Rest/REST/rest/R/r
-            if (status === "REST" || status === "R") {
-              availabilityType = "rest";
-            } 
-            // Now handles: Holiday/HOLIDAY/holiday/HOL/hol/H/h
-            else if (status === "HOLIDAY" || status === "HOL" || status === "H") {
-              availabilityType = "holiday";
-            } 
-            // Now handles: Sick/SICK/sick/Leave/LEAVE/leave/Absent/S/s
-            else if (status === "SICK" || status === "LEAVE" || status === "ABSENT" || status === "S") {
-              availabilityType = "sick";
-            } 
-            // Now handles: IN/In/in/AVAILABLE/Available/available/A/a or empty
-            else if (status === "IN" || status === "AVAILABLE" || status === "A" || status === "") {
-              availabilityType = "available";
-            } else {
-              // Unknown status - log it and default to available
-              console.warn(`⚠️ Unknown status "${status}" (original: "${rawValue}") for ${staffName} on ${date} - defaulting to 'available'`);
-              availabilityType = "available";
-            }
-
-            parsedTypes[availabilityType]++;
-            
-            // Log first 10 days for debugging
-            if (firstDays.length < 10) {
-              const statusEmoji = availabilityType === "rest" ? "🛌" : availabilityType === "holiday" ? "🏖️" : availabilityType === "sick" ? "🤒" : "✅";
-              firstDays.push(`${date}: ${rawValue !== status ? `"${rawValue}" → "${status}" → ` : `"${rawValue}" → `}${statusEmoji} ${availabilityType}`);
-            }
-
-            staffAvailability.push({
-              date,
-              type: availabilityType,
-            });
-          } else {
-            // Empty cell = available
-            parsedTypes.available++;
-            staffAvailability.push({
-              date,
-              type: "available",
-            });
-          }
-        });
-
-        console.log(`   📅 Parsed ${staffAvailability.length} availability entries for ${staffName}`);
-        console.log(`   📊 Breakdown: 🛌 ${parsedTypes.rest} rest, 🏖️ ${parsedTypes.holiday} holiday, 🤒 ${parsedTypes.sick} sick, ✅ ${parsedTypes.available} available`);
-        if (firstDays.length > 0) {
-          console.log(`   📋 First ${firstDays.length} days:`);
-          firstDays.forEach(day => console.log(`      ${day}`));
-        }
-
-        // Try to match with existing staff
-        if (updateMode && existingStaff.length > 0) {
-          const matchedExisting = existingStaff.find((s: StaffMember) => 
-            s.name.toLowerCase().trim() === staffName.toLowerCase().trim()
-          );
-          if (matchedExisting) {
-            matches.set(staffName, matchedExisting.id);
-          }
-        }
-
-        // Add to parsed staff (same format as paste parser)
-        newStaff.push({
-          name: staffName,
-          phone: clockNumber,
-          startTime: shiftStart, // Now using valid ShiftStart value
-          endTime: endTime.substring(0, 5),
-          shift: `${shiftStart}-${endTime.substring(0, 5)}`,
-          availability: staffAvailability,
-        });
-      }
-
-      console.log(`✅ Parsed ${newStaff.length} staff members`);
-
-      // Set the same state variables as paste parser
-      setParsedStaff(newStaff);
-      setMatchedStaff(matches);
-
-      if (newStaff.length > 0 && dateColumns.length > 0) {
-        const firstDate = dateColumns[0].date;
-        const lastDate = dateColumns[dateColumns.length - 1].date;
-        setDateRange(`${firstDate} to ${lastDate}`);
-
-        const matchCount = matches.size;
-        const unmatchedCount = newStaff.length - matchCount;
-        const totalDays = dateColumns.length;
-        
-        // Count total unavailable days across all staff
-        const totalUnavailableDays = newStaff.reduce((sum, s) => 
-          sum + s.availability.filter(a => a.type !== "available").length, 0
-        );
-
-        toast({
-          title: "File parsed successfully",
-          description: updateMode 
-            ? `Found ${newStaff.length} staff (${matchCount} matched, ${unmatchedCount} not found) - ${totalUnavailableDays} total unavailable days across ${totalDays} days`
-            : `Found ${newStaff.length} staff with ${totalUnavailableDays} total unavailable days across ${totalDays} days`,
-        });
-      }
-    } catch (error: any) {
-      console.error("❌ Parse error:", error);
-      toast({
-        title: "Parse error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  }, [toast, updateMode, existingStaff]);
-
   const handleImport = async () => {
     if (parsedStaff.length === 0) return;
-    
-    // VERIFY AUTHENTICATION BEFORE IMPORT
-    console.log("\n=== AUTHENTICATION CHECK ===");
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      console.error("❌ NOT AUTHENTICATED:", authError);
-      toast({
-        title: "❌ Authentication Required",
-        description: "You must be logged in to import data. Please refresh the page or log in again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    console.log("✅ AUTHENTICATED as:", user.email);
-    console.log("   User ID:", user.id);
-    
-    // CRITICAL TEST: Try to write ONE availability record directly
-    // BUT ONLY if we're in UPDATE MODE or staff already exist
-    // In CREATE MODE with empty DB, we'll create staff first, then test won't be needed
-    
-    const { data: staffCount, error: countError } = await supabase
-      .from('staff')
-      .select('id', { count: 'exact', head: true });
-    
-    const hasExistingStaff = !countError && staffCount && (staffCount as any).count > 0;
-    
-    console.log("\n=== DATABASE STATE CHECK ===");
-    console.log(`Existing staff in database: ${hasExistingStaff ? 'YES' : 'NO'}`);
-    console.log(`Update mode: ${updateMode ? 'ON' : 'OFF'}`);
-    
-    if (!updateMode && !hasExistingStaff) {
-      console.log("✓ CREATE MODE with empty database - will create staff first, then availability");
-      console.log("  Skipping availability test - staff don't exist yet");
-      
-      // Skip the test - staff will be created during import
-      setTestResult({
-        success: true,
-        message: "CREATE MODE - Staff will be created first, then availability",
-        details: { mode: "create", staffCount: 0 }
-      });
-    } else {
-      // Test availability writes ONLY if staff exist
-      console.log("\n=== DIRECT DATABASE WRITE TEST ===");
-      console.log("Testing if availability table accepts writes from your session...");
-      
-      // Get first staff member
-      const firstStaff = await supabase
-        .from('staff')
-        .select('id, name')
-        .limit(1)
-        .single();
-      
-      if (firstStaff.error || !firstStaff.data) {
-        toast({
-          title: "❌ No staff found",
-          description: "Import staff members first before importing availability",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      console.log("Using staff:", firstStaff.data.name, "(ID:", firstStaff.data.id, ")");
-      
-      // Try to insert a test availability record
-      const testDate = '2026-06-01';
-      const { data: testInsert, error: testError, count, status, statusText } = await supabase
-        .from('availability')
-        .insert({
-          staff_id: firstStaff.data.id,
-          date: testDate,
-          type: 'rest'
-        })
-        .select()
-        .single();
-      
-      console.log("Test insert result:");
-      console.log("  - Status:", status, statusText);
-      console.log("  - Data:", testInsert);
-      console.log("  - Error:", testError);
-      console.log("  - Count:", count);
-      
-      if (testError) {
-        console.error("❌ TEST WRITE FAILED - This is why import fails!");
-        console.error("Error code:", testError.code);
-        console.error("Error message:", testError.message);
-        console.error("Error details:", testError.details);
-        console.error("Error hint:", testError.hint);
-        
-        // SET VISIBLE ERROR STATE
-        setTestResult({
-          success: false,
-          message: testError.message,
-          details: {
-            code: testError.code,
-            details: testError.details,
-            hint: testError.hint,
-          }
-        });
-        
-        toast({
-          title: "❌ Database Write Test Failed",
-          description: `${testError.message} - See error panel below for details.`,
-          variant: "destructive",
-        });
-        
-        // Clean up test record if it somehow got through
-        await supabase
-          .from('availability')
-          .delete()
-          .eq('staff_id', firstStaff.data.id)
-          .eq('date', testDate);
-        
-        return; // STOP - don't proceed with import
-      }
-      
-      console.log("✅ TEST WRITE SUCCESSFUL - availability table is writable");
-      console.log("   Test record created:", testInsert);
-      
-      // SET SUCCESS STATE
-      setTestResult({
-        success: true,
-        message: "Availability table is writable - proceeding with import",
-        details: testInsert
-      });
-      
-      // Clean up test record
-      await supabase
-        .from('availability')
-        .delete()
-        .eq('staff_id', firstStaff.data.id)
-        .eq('date', testDate);
-      
-      console.log("   Test record cleaned up");
-      console.log("=== DATABASE IS READY FOR IMPORT ===\n");
-    }
     
     setIsImporting(true);
     setImportProgress(0);
@@ -764,9 +333,6 @@ export default function ImportPage() {
     console.log("\n\n=== STARTING IMPORT PROCESS ===");
     console.log(`Total staff to process: ${parsedStaff.length}`);
     console.log(`Update mode: ${updateMode}`);
-
-    // Process staff in batches for better performance
-    const BATCH_SIZE = 500; // Process 500 availability records per batch
 
     for (let i = 0; i < parsedStaff.length; i++) {
       const staff = parsedStaff[i];
@@ -814,9 +380,9 @@ export default function ImportPage() {
             // Create new staff member
             const staffData = {
               name: staff.name,
-              trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"],
-              shift_start: staff.startTime as ShiftStart, // Type cast to ShiftStart
-              shift_pattern: "All" as ShiftPattern,
+              trained_tasks: ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"],
+              shift_start: staff.startTime,
+              shift_pattern: "All",
             };
             
             console.log(`➕ CREATING NEW staff with data:`, staffData);
@@ -836,111 +402,64 @@ export default function ImportPage() {
           }
         }
         
-        // BATCH UPSERT availability entries for better performance
+        // UPSERT availability entries (handles duplicates properly)
         let importedAvailCount = 0;
         let failedAvailCount = 0;
         
-        // Only import non-available days (rest_day, holiday, sick)
-        const unavailableDays = staff.availability.filter(a => a.type !== "available");
+        const unavailableDays = staff.availability.filter(a => a.status !== "available");
         
         console.log(`\n--- AVAILABILITY IMPORT ---`);
         console.log(`Staff ID being used: ${staffId}`);
         console.log(`Total availability entries: ${staff.availability.length}`);
         console.log(`Unavailable days (will import): ${unavailableDays.length}`);
-        console.log(`  Rest: ${unavailableDays.filter(a => a.type === "rest").length}`);
-        console.log(`  Holiday: ${unavailableDays.filter(a => a.type === "holiday").length}`);
-        console.log(`  Sick: ${unavailableDays.filter(a => a.type === "sick").length}`);
+        console.log(`  Rest: ${unavailableDays.filter(a => a.status === "rest").length}`);
+        console.log(`  Holiday: ${unavailableDays.filter(a => a.status === "holiday").length}`);
+        console.log(`  Sick: ${unavailableDays.filter(a => a.status === "sick").length}`);
         
         // Show first 5 unavailable days for debugging
         if (unavailableDays.length > 0) {
           console.log(`\nFirst 5 unavailable days to import:`);
           unavailableDays.slice(0, 5).forEach((avail, idx) => {
-            console.log(`  ${idx + 1}. ${avail.date} = ${avail.type.toUpperCase()}`);
+            console.log(`  ${idx + 1}. ${avail.date} = ${avail.status.toUpperCase()}`);
           });
         }
         
-        // Process in batches of BATCH_SIZE for efficiency
-        const batches = [];
-        for (let j = 0; j < unavailableDays.length; j += BATCH_SIZE) {
-          batches.push(unavailableDays.slice(j, j + BATCH_SIZE));
-        }
+        console.log(`\nStarting UPSERT operations...`);
         
-        console.log(`\nProcessing ${batches.length} batch(es) of up to ${BATCH_SIZE} records each...`);
-        
-        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
-          const batch = batches[batchIndex];
-          
-          // Prepare batch data with correct type values
-          const batchData = batch.map(avail => ({
-            staff_id: staffId,
-            date: avail.date,
-            type: avail.type, // Now using 'rest', 'holiday', 'sick'
-          }));
-          
-          // Debug: log the first batch data structure
-          if (batchIndex === 0) {
-            console.log(`\n📦 First batch structure (${batchData.length} records):`);
-            console.log(JSON.stringify(batchData.slice(0, 3), null, 2));
-            
-            // CRITICAL: Check the EXACT type values being sent
-            console.log(`\n🔍 CRITICAL TYPE VALUE INSPECTION:`);
-            batchData.slice(0, 5).forEach((record, idx) => {
-              console.log(`Record ${idx + 1}:`);
-              console.log(`  staff_id: "${record.staff_id}" (type: ${typeof record.staff_id})`);
-              console.log(`  date: "${record.date}" (type: ${typeof record.date})`);
-              console.log(`  type: "${record.type}" (type: ${typeof record.type})`);
-              console.log(`  type length: ${record.type.length}`);
-              console.log(`  type char codes: ${Array.from(String(record.type)).map(c => c.charCodeAt(0)).join(', ')}`);
-              console.log(`  exact match test:`);
-              console.log(`    === "rest": ${record.type === "rest"}`);
-              console.log(`    === "holiday": ${record.type === "holiday"}`);
-              console.log(`    === "sick": ${record.type === "sick"}`);
-              console.log(`    === "available": ${record.type === "available"}`);
+        for (const avail of staff.availability) {
+          // Only import non-available days (REST/Holiday/Sick)
+          if (avail.status !== "available") {
+            try {
+              // UPSERT: Insert or update if duplicate
+              const { error: upsertError } = await supabase
+                .from('availability')
+                .upsert({
+                  staff_id: staffId,
+                  date: avail.date,
+                  type: avail.status,
+                }, {
+                  onConflict: 'staff_id,date'
+                });
               
-              // Check for hidden characters or encoding issues
-              const validTypes = ['rest', 'holiday', 'sick', 'available'];
-              if (!validTypes.includes(record.type)) {
-                console.error(`❌ INVALID TYPE DETECTED: "${record.type}"`);
-                console.error(`   This value will be REJECTED by database constraint!`);
-                console.error(`   Allowed values: ${validTypes.join(', ')}`);
+              if (upsertError) {
+                throw upsertError;
               }
-            });
-          }
-          
-          try {
-            // BULK UPSERT: Insert or update all records in one query
-            const { error: batchError, count, status, statusText } = await supabase
-              .from('availability')
-              .upsert(batchData, {
-                onConflict: 'staff_id,date',
-                count: 'exact'
-              });
-            
-            // Log FULL response details
-            console.log(`\n📊 Batch ${batchIndex + 1} response:`);
-            console.log(`  - Status: ${status} ${statusText || ''}`);
-            console.log(`  - Count: ${count}`);
-            console.log(`  - Error: ${batchError ? JSON.stringify(batchError) : 'null'}`);
-            
-            if (batchError) {
-              console.error(`❌ Batch ${batchIndex + 1} failed:`, batchError);
-              failedAvailCount += batch.length;
-              errors.push(`${staff.name} batch ${batchIndex + 1}: ${batchError.message}`);
-            } else if (count === 0 || count === null) {
-              // Silent failure - no error but also no records saved
-              console.error(`❌ Batch ${batchIndex + 1} SILENT FAILURE: No error returned but count = ${count}`);
-              console.error(`   This usually means RLS policy is blocking the insert`);
-              failedAvailCount += batch.length;
-              errors.push(`${staff.name} batch ${batchIndex + 1}: Silent failure (RLS policy blocking?)`);
-            } else {
-              importedAvailCount += batch.length;
-              console.log(`  ✓ Batch ${batchIndex + 1}/${batches.length}: ${batch.length} records upserted`);
+              
+              importedAvailCount++;
+              
+              // Log first 3 successful upserts for verification
+              if (importedAvailCount <= 3) {
+                console.log(`  ✓ Upserted: ${avail.date} = ${avail.status}`);
+              }
+            } catch (error: any) {
+              // Track real failures (not duplicates anymore)
+              failedAvailCount++;
+              console.error(`  ❌ FAILED: ${avail.date} = ${avail.status}`);
+              console.error(`     Error: ${error.message}`);
+              if (failedAvailCount <= 3) {
+                console.error(`     Full error:`, error);
+              }
             }
-          } catch (error: any) {
-            console.error(`❌ Batch ${batchIndex + 1} exception:`, error);
-            console.error(`   Error details:`, JSON.stringify(error, null, 2));
-            failedAvailCount += batch.length;
-            errors.push(`${staff.name} batch ${batchIndex + 1}: ${error.message}`);
           }
         }
         
@@ -975,11 +494,7 @@ export default function ImportPage() {
       }
 
       setImportProgress(((i + 1) / parsedStaff.length) * 100);
-      
-      // Small delay every 10 staff to prevent overwhelming the database
-      if ((i + 1) % 10 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
+      await new Promise(resolve => setTimeout(resolve, 100)); // Slightly longer delay for console readability
     }
 
     setIsImporting(false);
@@ -1000,7 +515,6 @@ export default function ImportPage() {
     const zeroImported = availabilityStats.filter(s => s.imported === 0 && s.failed > 0).map(s => s.name);
     
     console.log(`\nTotals: ${totalImported} imported, ${totalFailed} failed`);
-    console.log(`Performance: ~${Math.round(parsedStaff.length / ((Date.now() - performance.now()) / 1000))} staff/sec`);
     
     if (zeroImported.length > 0) {
       console.error("\n⚠️ STAFF WITH ZERO AVAILABILITY IMPORTED (but had failures):");
@@ -1061,86 +575,27 @@ export default function ImportPage() {
         </Card>
 
         <Card className="border-destructive/30 bg-destructive/5">
-          <CardContent className="pt-6 space-y-4">
-            <div className="space-y-1 mb-4">
-              <div className="font-condensed font-semibold text-sm flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-4 w-4" />
-                Danger Zone
-              </div>
-              <p className="text-xs text-muted-foreground font-mono">
-                Permanent deletions - these actions cannot be undone
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between border-b border-destructive/20 pb-4">
-              <div className="space-y-1">
-                <div className="font-semibold text-sm">Delete All Staff</div>
-                <p className="text-xs text-muted-foreground font-mono">
-                  Removes all staff members and their availability data
-                </p>
-              </div>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteAllStaff}
-                disabled={isDeletingStaff}
-                size="sm"
-              >
-                {isDeletingStaff ? "Deleting..." : "Delete All Staff"}
-              </Button>
-            </div>
-
+          <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div className="space-y-1">
-                <div className="font-semibold text-sm">Clear All Availability</div>
+                <div className="font-condensed font-semibold text-sm flex items-center gap-2 text-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  Danger Zone
+                </div>
                 <p className="text-xs text-muted-foreground font-mono">
-                  Removes availability data but keeps staff members
+                  Clear all availability data for all staff members (cannot be undone)
                 </p>
               </div>
               <Button
                 variant="destructive"
                 onClick={handleClearAllAvailability}
                 disabled={isClearing}
-                size="sm"
               >
-                {isClearing ? "Clearing..." : "Clear Availability"}
+                {isClearing ? "Clearing..." : "Clear All Availability"}
               </Button>
             </div>
           </CardContent>
         </Card>
-
-        {testResult && (
-          <Alert className={testResult.success ? "border-green-500 bg-green-500/10" : "border-destructive bg-destructive/10"}>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="space-y-3">
-                <div className="font-semibold text-sm flex items-center gap-2">
-                  {testResult.success ? "✅ Database Write Test: PASSED" : "❌ Database Write Test: FAILED"}
-                </div>
-                
-                <div className="text-xs font-mono bg-background/50 p-3 rounded">
-                  <div className="font-semibold mb-2">Error Message:</div>
-                  <div className="text-destructive">{testResult.message}</div>
-                </div>
-
-                {testResult.details && !testResult.success && (
-                  <div className="text-xs font-mono bg-background/50 p-3 rounded space-y-2">
-                    <div className="font-semibold">Technical Details:</div>
-                    {testResult.details.code && <div>Code: {testResult.details.code}</div>}
-                    {testResult.details.details && <div>Details: {testResult.details.details}</div>}
-                    {testResult.details.hint && <div>Hint: {testResult.details.hint}</div>}
-                  </div>
-                )}
-
-                <div className="text-xs text-muted-foreground">
-                  {testResult.success 
-                    ? "Availability writes are working - you can proceed with import"
-                    : "⚠️ SCREENSHOT THIS ERROR and send it to get help fixing the issue"
-                  }
-                </div>
-              </div>
-            </AlertDescription>
-          </Alert>
-        )}
 
         {!importComplete ? (
           <>
@@ -1174,51 +629,6 @@ export default function ImportPage() {
                   <Calendar className="h-4 w-4 mr-2" />
                   Parse Spreadsheet Data
                 </Button>
-              </CardContent>
-            </Card>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground font-mono">
-                  Or upload Excel file
-                </span>
-              </div>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="font-condensed flex items-center gap-2">
-                  <Upload className="h-5 w-5" />
-                  Upload Excel File
-                </CardTitle>
-                <CardDescription className="font-mono text-xs">
-                  Upload .xlsx file with staff names and availability dates
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-muted/10 hover:bg-muted/20 transition-colors">
-                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <Upload className="w-8 h-8 mb-2 text-muted-foreground" />
-                    <p className="mb-2 text-sm text-muted-foreground font-mono">
-                      <span className="font-semibold">Click to upload</span> or drag and drop
-                    </p>
-                    <p className="text-xs text-muted-foreground font-mono">.xlsx files only</p>
-                  </div>
-                  <input
-                    type="file"
-                    accept=".xlsx,.xls"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        parseExcelFile(file);
-                      }
-                    }}
-                  />
-                </label>
               </CardContent>
             </Card>
 
@@ -1309,10 +719,10 @@ export default function ImportPage() {
                         {parsedStaff.slice(0, 10).map((staff, idx) => {
                           const isMatched = matchedStaff.has(staff.name);
                           const willBeSkipped = updateMode && !isMatched;
-                          const unavailableDays = staff.availability.filter(a => a.type !== "available");
-                          const restDays = unavailableDays.filter(a => a.type === "rest").length;
-                          const holidayDays = unavailableDays.filter(a => a.type === "holiday").length;
-                          const sickDays = unavailableDays.filter(a => a.type === "sick").length;
+                          const unavailableDays = staff.availability.filter(a => a.status !== "available");
+                          const restDays = unavailableDays.filter(a => a.status === "rest").length;
+                          const holidayDays = unavailableDays.filter(a => a.status === "holiday").length;
+                          const sickDays = unavailableDays.filter(a => a.status === "sick").length;
                           
                           return (
                             <div 

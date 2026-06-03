@@ -1,271 +1,326 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import type { Assignment, StaffMember, FairnessMetrics } from "@/types";
+import type { ManagerAssignment } from "@/types";
 
-interface Assignment {
-  date: string;
-  task: string;
-  staffName: string;
-  staffId: string;
+const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
+const DUTIES = ["Intake", "Out-loading", "Admin", "Floor"];
+
+// Get local date string without timezone conversion
+function getLocalDateString(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+interface StaffReportData {
+  weekStart: Date;
+  assignments: Assignment[];
+  staff: StaffMember[];
+  fairnessMetrics: FairnessMetrics | null;
+  lockedCount: number;
+}
 
-export const generateRotaPDF = (
-  assignments: Assignment[],
-  weekStart: Date,
-  weekEnd: Date
-): void => {
-  const doc = new jsPDF({
-    orientation: "landscape",
-    unit: "mm",
-    format: "a4",
+interface ManagerReportData {
+  weekStart: Date;
+  assignments: ManagerAssignment[];
+  managers: Array<{ id: string; name: string }>;
+}
+
+export function generateStaffRotaPDF(data: StaffReportData): void {
+  const doc = new jsPDF({ orientation: "landscape", format: "a4" });
+  const weekDates = DAYS.map((_, i) => {
+    const date = new Date(data.weekStart);
+    date.setDate(data.weekStart.getDate() + i);
+    return date;
   });
 
-  // Minimal margins for maximum space
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 10;
-
-  // Header - compact
-  doc.setFontSize(16);
+  // Header with branding
+  doc.setFillColor(33, 150, 243);
+  doc.rect(0, 0, 297, 25, "F");
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
   doc.setFont("helvetica", "bold");
-  doc.text("Weekly Rota", margin, 15);
-
+  doc.text("GIST WAREHOUSE ROTA", 15, 13);
+  
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  const dateRange = `${weekStart.toLocaleDateString("en-GB")} - ${weekEnd.toLocaleDateString("en-GB")}`;
-  doc.text(dateRange, pageWidth - margin, 15, { align: "right" });
+  doc.text("Staff Weekly Schedule", 15, 20);
 
-  // Group assignments by date
-  const assignmentsByDate = new Map<string, Assignment[]>();
-  assignments.forEach((assignment) => {
-    if (!assignmentsByDate.has(assignment.date)) {
-      assignmentsByDate.set(assignment.date, []);
-    }
-    assignmentsByDate.get(assignment.date)!.push(assignment);
-  });
+  // Date range
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(
+    `Week: ${weekDates[0].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} - ${weekDates[6].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`,
+    15,
+    35
+  );
 
-  // Generate 7 days starting from weekStart
-  const dates: Date[] = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(weekStart);
-    date.setDate(weekStart.getDate() + i);
-    dates.push(date);
+  // Metrics summary box
+  if (data.fairnessMetrics) {
+    doc.setFillColor(240, 248, 255);
+    doc.roundedRect(200, 30, 82, 20, 2, 2, "F");
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Fairness Score:", 205, 36);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(33, 150, 243);
+    doc.text(`${data.fairnessMetrics.overallScore}`, 205, 44);
+    
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Locked: ${data.lockedCount}`, 235, 36);
+    doc.text(`Staff: ${data.staff.length}`, 235, 42);
+    doc.text(`Coverage: ${Math.round((data.assignments.length / (data.staff.length * 7)) * 100)}%`, 235, 48);
   }
 
-  // Get all unique tasks
-  const allTasks = Array.from(new Set(assignments.map(a => a.task))).sort();
-
-  // Build table data
-  const tableData: any[][] = [];
-  
-  allTasks.forEach((task) => {
-    const row: any[] = [{ content: task, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } }];
-    
-    dates.forEach((date) => {
-      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      const dayAssignments = assignmentsByDate.get(dateStr) || [];
-      
-      // Get ALL assignments for this task on this day (not just first one)
-      const taskAssignments = dayAssignments.filter(a => a.task === task);
-      
-      if (taskAssignments.length === 0) {
-        row.push("-");
-      } else if (taskAssignments.length === 1) {
-        // Single staff member
-        row.push(taskAssignments[0].staffName);
-      } else {
-        // Multiple staff - use comma separation for better PDF rendering
-        const staffNames = taskAssignments.map(a => a.staffName).join(", ");
-        row.push({ 
-          content: staffNames,
-          styles: { 
-            fontSize: 7,
-            cellPadding: 1.5,
-            minCellHeight: 8
-          }
-        });
-      }
+  // Rota table
+  const tableData: string[][] = [];
+  TASKS.forEach((task) => {
+    const row: string[] = [task];
+    weekDates.forEach((date) => {
+      const dateStr = getLocalDateString(date);
+      const dayAssignments = data.assignments.filter(
+        (a) => a.task === task && a.date === dateStr
+      );
+      const staffNames = dayAssignments.map((a) => a.staffName).join(", ");
+      row.push(staffNames || "—");
     });
-    
     tableData.push(row);
   });
 
-  // Table headers - compact day names
-  const headers = [
-    "Task",
-    ...dates.map((date) => {
-      const dayName = DAYS[date.getDay()].substring(0, 3); // 3-letter abbreviation
-      const dayDate = date.getDate();
-      return `${dayName}\n${dayDate}`;
-    })
-  ];
-
-  // Generate table with optimized settings for single page
   autoTable(doc, {
-    head: [headers],
+    head: [["Task", ...DAYS.map((day, i) => `${day}\n${weekDates[i].getDate()}/${weekDates[i].getMonth() + 1}`)]],
     body: tableData,
-    startY: 22,
-    margin: { left: margin, right: margin },
+    startY: 55,
     theme: "grid",
     styles: {
-      fontSize: 8,
-      cellPadding: 2,
-      overflow: "linebreak",
-      halign: "center",
-      valign: "middle",
+      fontSize: 9,
+      cellPadding: 4,
+      font: "helvetica",
     },
     headStyles: {
-      fillColor: [70, 130, 180],
-      textColor: [255, 255, 255],
+      fillColor: [33, 150, 243],
+      textColor: 255,
       fontStyle: "bold",
-      fontSize: 9,
       halign: "center",
     },
     columnStyles: {
-      0: { 
-        cellWidth: 25, 
-        halign: "left",
-        fontStyle: "bold",
-      },
+      0: { fontStyle: "bold", fillColor: [245, 245, 245] },
     },
-    didParseCell: (data: any) => {
-      // Make task column distinct
-      if (data.column.index === 0 && data.section === 'body') {
-        data.cell.styles.fillColor = [245, 245, 245];
-      }
+    alternateRowStyles: {
+      fillColor: [250, 250, 250],
     },
   });
 
-  // Footer - minimal
-  const finalY = (doc as any).lastAutoTable.finalY || 100;
-  doc.setFontSize(7);
-  doc.setTextColor(100, 100, 100);
-  doc.text(
-    `Generated: ${new Date().toLocaleDateString("en-GB")} ${new Date().toLocaleTimeString("en-GB")}`,
-    pageWidth / 2,
-    doc.internal.pageSize.getHeight() - 5,
-    { align: "center" }
-  );
+  // Staff contact list
+  const finalY = (doc as any).lastAutoTable.finalY || 120;
+  
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("Staff Contact List", 15, finalY + 15);
+
+  const staffData = data.staff.map((s) => [
+    s.name,
+    s.trainedTasks.join(", "),
+    s.restDays?.map(d => DAYS[Number(d)]).join(", ") || "None",
+  ]);
+
+  autoTable(doc, {
+    head: [["Name", "Trained Tasks", "Regular Rest Days"]],
+    body: staffData,
+    startY: finalY + 20,
+    theme: "striped",
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+    },
+    headStyles: {
+      fillColor: [100, 100, 100],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+  });
+
+  // Footer with generation timestamp
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text(
+      `Generated: ${new Date().toLocaleString("en-GB")} | Page ${i} of ${pageCount}`,
+      15,
+      200
+    );
+    doc.text("GIST Warehouse Rota System", 230, 200);
+  }
 
   // Save
-  const filename = `rota-${weekStart.toISOString().split("T")[0]}.pdf`;
-  doc.save(filename);
-};
+  const fileName = `staff-rota-${getLocalDateString(weekDates[0])}.pdf`;
+  doc.save(fileName);
+}
 
-// Manager duties PDF generation (unchanged for now)
-export const generateManagerDutiesPDF = (
-  duties: any[],
-  weekStart: Date,
-  weekEnd: Date
-): void => {
-  const doc = new jsPDF({
-    orientation: "landscape",
-    unit: "mm",
-    format: "a4",
+export function generateManagerDutiesPDF(data: ManagerReportData): void {
+  const doc = new jsPDF({ orientation: "landscape", format: "a4" });
+  const weekDates = DAYS.map((_, i) => {
+    const date = new Date(data.weekStart);
+    date.setDate(data.weekStart.getDate() + i);
+    return date;
   });
 
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 10;
-
-  doc.setFontSize(16);
+  // Header with branding
+  doc.setFillColor(139, 69, 19);
+  doc.rect(0, 0, 297, 25, "F");
+  
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
   doc.setFont("helvetica", "bold");
-  doc.text("Manager Duties", margin, 15);
-
+  doc.text("GIST MANAGER DUTIES", 15, 13);
+  
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  const dateRange = `${weekStart.toLocaleDateString("en-GB")} - ${weekEnd.toLocaleDateString("en-GB")}`;
-  doc.text(dateRange, pageWidth - margin, 15, { align: "right" });
+  doc.text("Weekly Schedule", 15, 20);
 
-  const dates: Date[] = [];
-  for (let i = 0; i < 7; i++) {
-    const date = new Date(weekStart);
-    date.setDate(weekStart.getDate() + i);
-    dates.push(date);
-  }
+  // Date range
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(
+    `Week: ${weekDates[0].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} - ${weekDates[6].toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`,
+    15,
+    35
+  );
 
-  const allDuties = Array.from(new Set(duties.map(d => d.duty))).sort();
-
-  const tableData: any[][] = [];
+  // Summary box
+  doc.setFillColor(255, 248, 220);
+  doc.roundedRect(200, 30, 82, 20, 2, 2, "F");
   
-  allDuties.forEach((duty) => {
-    const row: any[] = [{ content: duty, styles: { fontStyle: "bold", fillColor: [240, 240, 240] } }];
-    
-    dates.forEach((date) => {
-      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-      const dayDuties = duties.filter(d => d.date === dateStr);
-      
-      // Get ALL assignments for this duty on this day
-      const dutyAssignments = dayDuties.filter(d => d.duty === duty);
-      
-      if (dutyAssignments.length === 0) {
-        row.push("-");
-      } else if (dutyAssignments.length === 1) {
-        // Single manager
-        row.push(dutyAssignments[0].managerName);
-      } else {
-        // Multiple managers - use comma separation
-        const managerNames = dutyAssignments.map(d => d.managerName).join(", ");
-        row.push({
-          content: managerNames,
-          styles: {
-            fontSize: 7,
-            cellPadding: 1.5,
-            minCellHeight: 8
-          }
-        });
-      }
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.text("Active Managers:", 205, 36);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(139, 69, 19);
+  doc.text(`${data.managers.length}`, 205, 44);
+  
+  doc.setFontSize(8);
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Total Shifts: ${data.assignments.length}`, 235, 36);
+  doc.text(`Duties: ${DUTIES.length}`, 235, 42);
+
+  // Duties table
+  const tableData: string[][] = [];
+  DUTIES.forEach((duty) => {
+    const row: string[] = [duty];
+    weekDates.forEach((date) => {
+      const dateStr = getLocalDateString(date);
+      const dayAssignments = data.assignments.filter(
+        (a) => a.duty === duty && a.date === dateStr
+      );
+      const managerNames = dayAssignments.map((a) => a.managerName).join(", ");
+      row.push(managerNames || "—");
     });
-    
     tableData.push(row);
   });
 
-  const headers = [
-    "Duty",
-    ...dates.map((date) => {
-      const dayName = DAYS[date.getDay()].substring(0, 3);
-      const dayDate = date.getDate();
-      return `${dayName}\n${dayDate}`;
-    })
-  ];
-
   autoTable(doc, {
-    head: [headers],
+    head: [["Duty", ...DAYS.map((day, i) => `${day}\n${weekDates[i].getDate()}/${weekDates[i].getMonth() + 1}`)]],
     body: tableData,
-    startY: 22,
-    margin: { left: margin, right: margin },
+    startY: 55,
     theme: "grid",
     styles: {
-      fontSize: 8,
-      cellPadding: 2,
-      overflow: "linebreak",
-      halign: "center",
-      valign: "middle",
+      fontSize: 9,
+      cellPadding: 4,
+      font: "helvetica",
     },
     headStyles: {
-      fillColor: [70, 130, 180],
-      textColor: [255, 255, 255],
+      fillColor: [139, 69, 19],
+      textColor: 255,
       fontStyle: "bold",
-      fontSize: 9,
       halign: "center",
     },
     columnStyles: {
-      0: { 
-        cellWidth: 25, 
-        halign: "left",
-        fontStyle: "bold",
-      },
+      0: { fontStyle: "bold", fillColor: [245, 245, 245] },
+    },
+    alternateRowStyles: {
+      fillColor: [250, 250, 250],
     },
   });
 
-  doc.setFontSize(7);
-  doc.setTextColor(100, 100, 100);
-  doc.text(
-    `Generated: ${new Date().toLocaleDateString("en-GB")} ${new Date().toLocaleTimeString("en-GB")}`,
-    pageWidth / 2,
-    doc.internal.pageSize.getHeight() - 5,
-    { align: "center" }
-  );
+  // Manager assignment summary
+  const finalY = (doc as any).lastAutoTable.finalY || 120;
+  
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("Manager Assignment Summary", 15, finalY + 15);
 
-  const filename = `manager-duties-${weekStart.toISOString().split("T")[0]}.pdf`;
-  doc.save(filename);
-};
+  // Count assignments per manager
+  const assignmentCounts = new Map<string, number>();
+  data.assignments.forEach((a) => {
+    assignmentCounts.set(a.managerName, (assignmentCounts.get(a.managerName) || 0) + 1);
+  });
+
+  const managerSummary = Array.from(assignmentCounts.entries()).map(([name, count]) => [
+    name,
+    `${count} shifts`,
+    `${Math.round((count / 7) * 100)}% of week`,
+  ]);
+
+  autoTable(doc, {
+    head: [["Manager", "Total Shifts", "Coverage"]],
+    body: managerSummary,
+    startY: finalY + 20,
+    theme: "striped",
+    styles: {
+      fontSize: 8,
+      cellPadding: 3,
+    },
+    headStyles: {
+      fillColor: [100, 100, 100],
+      textColor: 255,
+      fontStyle: "bold",
+    },
+  });
+
+  // Notes section
+  const notesY = (doc as any).lastAutoTable.finalY + 15;
+  if (notesY < 180) {
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Notes:", 15, notesY);
+    
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setDrawColor(200, 200, 200);
+    for (let i = 0; i < 3; i++) {
+      doc.line(15, notesY + 7 + (i * 8), 280, notesY + 7 + (i * 8));
+    }
+  }
+
+  // Footer with generation timestamp
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(128, 128, 128);
+    doc.text(
+      `Generated: ${new Date().toLocaleString("en-GB")} | Page ${i} of ${pageCount}`,
+      15,
+      200
+    );
+    doc.text("GIST Warehouse Rota System", 230, 200);
+  }
+
+  // Save
+  const fileName = `manager-duties-${getLocalDateString(weekDates[0])}.pdf`;
+  doc.save(fileName);
+}

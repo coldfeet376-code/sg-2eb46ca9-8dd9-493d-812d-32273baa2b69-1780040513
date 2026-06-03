@@ -18,37 +18,9 @@ export const authService = {
    */
   async isAdmin(): Promise<boolean> {
     const user = await this.getCurrentUser();
-    if (!user) return false;
-
-    // Check database for admin flag
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("is_admin")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (error) {
-      console.error("Error checking admin status:", error);
-      return false;
-    }
-
-    // Return admin status from database, or fall back to email check for backwards compatibility
-    if (profile?.is_admin === true) {
-      return true;
-    }
-
-    // Fallback: check email patterns (for initial setup)
-    const email = user.email?.toLowerCase();
-    if (email && (email.startsWith("admin@") || email === "coldfeet376@gmail.com")) {
-      // Auto-promote to admin in database
-      await supabase
-        .from("profiles")
-        .upsert({ id: user.id, email: user.email, is_admin: true })
-        .eq("id", user.id);
-      return true;
-    }
-
-    return false;
+    if (!user || !user.email) return false;
+    const email = user.email.toLowerCase();
+    return email.startsWith("admin@") || email === "coldfeet376@gmail.com";
   },
 
   /**

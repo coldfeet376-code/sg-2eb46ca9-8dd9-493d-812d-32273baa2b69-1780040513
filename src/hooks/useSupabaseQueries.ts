@@ -3,7 +3,6 @@ import { useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { staffService } from "@/services/staffService";
 import type { StaffMember, Task, ShiftStart, ShiftPattern, AvailabilityType } from "@/types";
-import { useState } from "react";
 
 interface TaskConfig {
   [task: string]: number[];
@@ -21,19 +20,8 @@ export function useStaff() {
         .select("*")
         .order("name");
 
-      console.log("📡 Supabase staff query result:");
-      console.log("   Error:", staffError);
-      console.log("   Data count:", staffData?.length || 0);
-      
-      if (staffError) {
-        console.error("❌ Staff query error:", staffError);
-        throw staffError;
-      }
-
-      if (!staffData || staffData.length === 0) {
-        console.warn("⚠️ No staff data returned from database");
-        return [];
-      }
+      if (staffError) throw staffError;
+      if (!staffData || staffData.length === 0) return [];
 
       // Fetch ALL availability data with pagination to bypass 1000-row limit
       let allAvailability: any[] = [];
@@ -95,10 +83,6 @@ export function useStaff() {
       });
 
       console.log(`✅ LOADED ${mappedStaff.length} staff members`);
-      console.log(`📊 Total availability entries: ${allAvailability.length}`);
-      if (mappedStaff.length > 0 && mappedStaff[0].availability) {
-        console.log(`📅 Sample staff availability count: ${mappedStaff[0].availability.length}`);
-      }
       return mappedStaff;
     },
     staleTime: 30000, // 30 seconds cache
@@ -144,29 +128,20 @@ export function useAddStaff() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (staff: {
-      name: string;
-      trainedTasks: Task[];
-      shiftStart: ShiftStart;
-      shiftPattern: ShiftPattern;
-      restDays: number[];
-    }) => {
+    mutationFn: async (staff: Omit<StaffMember, "id" | "availability"> & { shiftPattern?: ShiftPattern }) => {
       const { data, error } = await supabase
         .from("staff")
         .insert({
           name: staff.name,
           trained_tasks: staff.trainedTasks,
           shift_start: staff.shiftStart,
-          shift_pattern: staff.shiftPattern,
-          rest_days: staff.restDays,
+          shift_pattern: staff.shiftPattern || "All",
+          rest_days: staff.restDays || [],
         })
         .select()
         .single();
 
-      if (error) {
-        console.error("Failed to add staff:", error);
-        throw error;
-      }
+      if (error) throw error;
       return data;
     },
     onSuccess: () => {
@@ -179,39 +154,19 @@ export function useUpdateStaff() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, updates }: { 
-      id: string; 
-      updates: {
-        name?: string;
-        trainedTasks?: Task[];
-        shiftStart?: ShiftStart;
-        shiftPattern?: ShiftPattern;
-        restDays?: number[];
-      }
-    }) => {
-      const dbUpdates: {
-        name?: string;
-        trained_tasks?: string[];
-        shift_start?: string;
-        shift_pattern?: string;
-        rest_days?: number[];
-      } = {};
-      
-      if (updates.name !== undefined) dbUpdates.name = updates.name;
-      if (updates.trainedTasks !== undefined) dbUpdates.trained_tasks = updates.trainedTasks;
-      if (updates.shiftStart !== undefined) dbUpdates.shift_start = updates.shiftStart;
-      if (updates.shiftPattern !== undefined) dbUpdates.shift_pattern = updates.shiftPattern;
-      if (updates.restDays !== undefined) dbUpdates.rest_days = updates.restDays;
-
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<StaffMember> & { shiftPattern?: ShiftPattern } }) => {
       const { error } = await supabase
         .from("staff")
-        .update(dbUpdates)
+        .update({
+          name: updates.name,
+          trained_tasks: updates.trainedTasks,
+          shift_start: updates.shiftStart,
+          shift_pattern: updates.shiftPattern,
+          rest_days: updates.restDays,
+        })
         .eq("id", id);
 
-      if (error) {
-        console.error("Failed to update staff:", error);
-        throw error;
-      }
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
@@ -239,7 +194,7 @@ export function useUpdateTaskConfig() {
 
   return useMutation({
     mutationFn: async (taskConfig: TaskConfig) => {
-      const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Equipment"];
+      const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"];
       
       for (const task of TASKS) {
         const { error } = await supabase
@@ -276,29 +231,11 @@ export function useAddAvailability() {
       type: string;
       notes?: string;
     }) => {
-      // CRITICAL: Database constraint requires lowercase: 'rest', 'holiday', 'sick', 'available'
-      // Force lowercase to prevent constraint violations
-      const normalizedType = availability.type.toLowerCase();
-      
-      console.log(`📝 Adding availability: ${availability.staff_id} on ${availability.date} → type: "${availability.type}" → normalized: "${normalizedType}"`);
-      
       const { error } = await supabase.from("availability").upsert(
-        { 
-          staff_id: availability.staff_id,
-          date: availability.date,
-          type: normalizedType,
-          notes: availability.notes 
-        },
+        { ...availability },
         { onConflict: 'staff_id,date' }
       );
-      
-      if (error) {
-        console.error(`❌ Availability insert failed:`, error);
-        console.error(`   Payload: staff_id=${availability.staff_id}, date=${availability.date}, type="${normalizedType}"`);
-        throw error;
-      }
-      
-      console.log(`✅ Availability added successfully: ${normalizedType} on ${availability.date}`);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
