@@ -106,11 +106,6 @@ export default function IndexPage() {
   const [showUnavailableStaff, setShowUnavailableStaff] = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
   const [fairnessMetrics, setFairnessMetrics] = useState<ReturnType<typeof calculateFairnessMetrics> | null>(null);
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
-  const [diagnostics, setDiagnostics] = useState<string[]>([]);
-  const [showSundayDebug, setShowSundayDebug] = useState(false);
-  const [showDebugPanel, setShowDebugPanel] = useState(false);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
   const { addNotification } = useNotifications();
   const [rotaChannel, setRotaChannel] = useState<any>(null);
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -230,28 +225,6 @@ export default function IndexPage() {
       }
     };
   }, [weekStart, addNotification]);
-
-  // Save assignments to Supabase whenever they change
-  useEffect(() => {
-    const saveRotaToSupabase = async () => {
-      if (assignments.length > 0 && fairnessMetrics) {
-        try {
-          await rotaRealtimeService.saveRota(
-            weekStart,
-            assignments,
-            fairnessMetrics,
-            lockedAssignments.length
-          );
-        } catch (error) {
-          console.error("Error auto-saving rota:", error);
-        }
-      }
-    };
-
-    // Only auto-save if we have both assignments AND metrics (means it was intentionally set)
-    const timeoutId = setTimeout(saveRotaToSupabase, 2000);
-    return () => clearTimeout(timeoutId);
-  }, [assignments, weekStart, fairnessMetrics, lockedAssignments.length]);
 
   useEffect(() => {
     // Calculate fairness metrics when assignments change
@@ -433,31 +406,6 @@ export default function IndexPage() {
         variant: "destructive"
       });
     }
-  };
-
-  const forceGenerateRota = () => {
-    setShowCoverageWarning(false);
-    
-    const result = generateWeeklyRota({
-      staff,
-      taskConfig,
-      weekStart,
-      lockedAssignments,
-    });
-    const newAssignments = result.assignments;
-    setAssignments(newAssignments);
-    setDiagnostics(result.diagnostics);
-    
-    // Auto-lock all assignments after forced generation
-    setLockedAssignments([...newAssignments]);
-    
-    saveSnapshot(newAssignments);
-
-    addNotification({
-      staffName: "System",
-      message: `Rota generated with ${coverageGaps.length} coverage gap(s) and locked`,
-      type: "info",
-    });
   };
 
   const restoreSnapshot = (snapshot: RotaSnapshot) => {
@@ -1038,52 +986,6 @@ export default function IndexPage() {
     );
   };
 
-  const handleDebugWeek = () => {
-    const weekStartStr = getLocalDateString(weekStart);
-    const weekDates = [];
-    for (let i = 0; i < 7; i++) {
-      const date = new Date(weekStart);
-      date.setDate(date.getDate() + i);
-      weekDates.push({
-        date: getLocalDateString(date),
-        dayName: DAYS[i],
-        dayOfWeek: date.getDay()
-      });
-    }
-
-    const staffWithAvailability = staff.map(s => ({
-      name: s.name,
-      shiftPattern: s.shiftPattern,
-      shiftStart: s.shiftStart,
-      trainedTasks: s.trainedTasks,
-      availabilityThisWeek: s.availability?.filter(a => {
-        const availDate = a.date;
-        return weekDates.some(wd => wd.date === availDate);
-      }) || []
-    }));
-
-    const assignmentsByTask = TASKS.map(task => ({
-      task,
-      days: DAYS.map((day, idx) => ({
-        day,
-        date: weekDates[idx].date,
-        assignments: assignments.filter(a => a.task === task && a.date === weekDates[idx].date)
-      }))
-    }));
-
-    setDebugInfo({
-      weekStart: weekStartStr,
-      weekEnd: getLocalDateString(new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000)),
-      weekDates,
-      totalStaff: staff.length,
-      totalAssignments: assignments.length,
-      staffWithAvailability,
-      assignmentsByTask,
-      taskConfig: taskConfigData
-    });
-    setShowDebugPanel(true);
-  };
-
   return (
     <Layout>
       <OnboardingTour />
@@ -1217,18 +1119,6 @@ export default function IndexPage() {
                 <Zap className="h-5 w-5" />
                 Generate Rota
               </Button>
-
-              {getLocalDateString(weekStart) === "2026-05-24" && (
-                <Button
-                  onClick={handleDebugWeek}
-                  size="lg"
-                  variant="outline"
-                  className="gap-2 border-warning text-warning hover:bg-warning/10"
-                >
-                  <Bug className="h-5 w-5" />
-                  Debug This Week
-                </Button>
-              )}
 
               <Button
                 onClick={() => {
@@ -1835,107 +1725,6 @@ export default function IndexPage() {
           onImplementSwap={(swap) => handleSwapApply(swap.fromStaffId, swap.toStaffId, swap.task, swap.date)}
           onImplementAll={implementAllSwaps}
         />
-
-        {/* Debug Panel Dialog */}
-        <Dialog open={showDebugPanel} onOpenChange={setShowDebugPanel}>
-          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-            <DialogHeader>
-              <DialogTitle className="font-condensed text-2xl flex items-center gap-2">
-                <Bug className="h-6 w-6 text-warning" />
-                Week Debug Info: {debugInfo?.weekStart}
-              </DialogTitle>
-              <DialogDescription>
-                Diagnostic information for troubleshooting
-              </DialogDescription>
-            </DialogHeader>
-            
-            <ScrollArea className="flex-1 pr-4">
-              {debugInfo && (
-                <div className="space-y-6 font-mono text-sm">
-                  {/* Week Info */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-base">Week Range</h3>
-                    <div className="bg-muted p-3 rounded">
-                      <div>Start: {debugInfo.weekStart}</div>
-                      <div>End: {debugInfo.weekEnd}</div>
-                    </div>
-                  </div>
-
-                  {/* Week Dates */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-base">Week Dates</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      {debugInfo.weekDates.map((wd: any, i: number) => (
-                        <div key={i} className="bg-muted p-2 rounded text-xs">
-                          {wd.dayName} {wd.date} (Day {wd.dayOfWeek})
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Staff Count */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-base">Staff Overview</h3>
-                    <div className="bg-muted p-3 rounded">
-                      <div>Total Staff: {debugInfo.totalStaff}</div>
-                      <div>Total Assignments: {debugInfo.totalAssignments}</div>
-                    </div>
-                  </div>
-
-                  {/* Staff Availability This Week */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-base">Staff Availability This Week</h3>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {debugInfo.staffWithAvailability.map((s: any, i: number) => (
-                        <div key={i} className="bg-muted p-2 rounded text-xs">
-                          <div className="font-semibold">{s.name}</div>
-                          <div className="text-muted-foreground">
-                            {s.shiftPattern} · {s.shiftStart}
-                          </div>
-                          <div className="mt-1">
-                            Trained: {s.trainedTasks.join(", ") || "None"}
-                          </div>
-                          {s.availabilityThisWeek.length > 0 ? (
-                            <div className="mt-1 text-warning">
-                              Unavailable: {s.availabilityThisWeek.map((a: any) => `${a.date} (${a.type})`).join(", ")}
-                            </div>
-                          ) : (
-                            <div className="mt-1 text-primary">Available all week</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Assignments by Task */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-base">Current Assignments</h3>
-                    <div className="space-y-3 max-h-60 overflow-y-auto">
-                      {debugInfo.assignmentsByTask.map((taskData: any, i: number) => (
-                        <div key={i} className="bg-muted p-2 rounded text-xs">
-                          <div className="font-semibold mb-2">{taskData.task}</div>
-                          <div className="grid grid-cols-2 gap-1">
-                            {taskData.days.map((dayData: any, j: number) => (
-                              <div key={j} className={dayData.assignments.length === 0 ? "text-muted-foreground" : ""}>
-                                {dayData.day}: {dayData.assignments.length > 0 
-                                  ? dayData.assignments.map((a: any) => a.staffName).join(", ")
-                                  : "None"}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </ScrollArea>
-
-            <DialogFooter>
-              <Button onClick={() => setShowDebugPanel(false)}>Close</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </TabsContent>
 
         {/* Settings Tab - Task Requirements Configuration */}
