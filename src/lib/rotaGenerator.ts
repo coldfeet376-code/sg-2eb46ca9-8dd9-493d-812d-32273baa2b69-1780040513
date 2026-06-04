@@ -145,10 +145,33 @@ export function generateWeeklyRota({
       });
 
       // Split eligible staff into day and night shift workers
-      const dayStaff = eligibleStaff.filter(s => !s.shift || s.shift === "Day");
-      const nightStaff = eligibleStaff.filter(s => s.shift === "Night");
+      const dayStaff = eligibleStaff.filter(s => {
+        // Staff without shift specified defaults to Day
+        if (!s.shift || s.shift === "Day") {
+          // Further filter by shift start time - after 11:00 is considered night shift
+          if (s.shiftStart) {
+            const hour = parseInt(s.shiftStart.split(":")[0]);
+            return hour <= 11; // Only include staff starting at or before 11:00
+          }
+          return true; // No shift start specified, include in day shift
+        }
+        return false;
+      });
+      
+      const nightStaff = eligibleStaff.filter(s => {
+        // Explicitly marked as night shift
+        if (s.shift === "Night") return true;
+        
+        // Day shift staff starting after 11:00 are treated as night shift
+        if ((!s.shift || s.shift === "Day") && s.shiftStart) {
+          const hour = parseInt(s.shiftStart.split(":")[0]);
+          return hour > 11;
+        }
+        
+        return false;
+      });
 
-      log(`   📊 Day staff available: ${dayStaff.length}, Night staff available: ${nightStaff.length}`);
+      log(`   📊 Day staff available (start ≤11:00): ${dayStaff.length}, Night staff available (start >11:00 or shift=Night): ${nightStaff.length}`);
 
       // Calculate how many assignments needed for each shift (split evenly if not specified)
       const dayNeeded = Math.ceil(needed / 2);
