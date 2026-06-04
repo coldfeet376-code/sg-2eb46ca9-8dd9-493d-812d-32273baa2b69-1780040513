@@ -104,20 +104,21 @@ export const rotaRealtimeService = {
         throw error;
       }
 
-      // Extract from the 'data' jsonb column
-      const rotaData = data.data as any;
+      // Extract from the 'data' jsonb column (cast to any since generated types don't match schema)
+      const record = data as any;
+      const rotaData = record.data as any;
       const assignments = rotaData?.assignments || [];
       const fairnessMetrics = rotaData?.fairness_metrics || null;
 
       console.log("✅ Rota loaded:", {
-        weekStart: data.week_start,
+        weekStart: record.week_start,
         assignmentCount: Array.isArray(assignments) ? assignments.length : 0,
         fairnessScore: fairnessMetrics?.overallScore || null
       });
 
       // Return in the format the code expects
       return {
-        week_start: data.week_start,
+        week_start: record.week_start,
         assignments,
         fairness_metrics: fairnessMetrics,
         locked_count: rotaData?.locked_count || 0,
