@@ -18,6 +18,7 @@ export function calculateFairnessMetrics(
       "Inbound Late": 0,
       Outbound: 0,
       Marshaling: 0,
+      "Marshal Late": 0,
       Housekeeping: 0,
       Equipment: 0,
     };

@@ -104,65 +104,34 @@ export function generateWeeklyRota({
 
       log(`   🔍 Need to assign ${needed} more staff`);
 
-      // Filter available staff for this task on this day
-      const availableStaff = staff.filter((s) => {
-        // Must be trained for this task
-        if (!s.trainedTasks.includes(task)) {
-          return false;
-        }
+      // Get eligible staff for this task/date
+      let eligibleStaff = staff.filter((s) => {
+        // Must be trained in this task
+        if (!s.trainedTasks.includes(task)) return false;
 
-        // Check availability for this specific date
-        const hasRestDay = s.availability?.some(a => a.date === dateStr && a.type === 'rest');
-        const hasHoliday = s.availability?.some(a => a.date === dateStr && a.type === 'holiday');
-        const hasSickLeave = s.availability?.some(a => a.date === dateStr && a.type === 'sick');
-        
-        // NEW: Check recurring rest days
-        const isRecurringRestDay = s.restDays?.includes(currentDate.getDay());
-        
-        // DEBUG: Log Brian Murray's availability check
-        if (s.name.includes('BRIAN')) {
-          log(`   🔍 BRIAN MURRAY availability check for ${dateStr}:`);
-          log(`      Total availability entries: ${s.availability?.length || 0}`);
-          log(`      Has rest day? ${hasRestDay}`);
-          log(`      Has holiday? ${hasHoliday}`);
-          log(`      Has sick leave? ${hasSickLeave}`);
-          log(`      Is recurring rest day? ${isRecurringRestDay}`);
-          if (s.availability && s.availability.length > 0) {
-            const matchingEntry = s.availability.find(a => a.date === dateStr);
-            log(`      Matching entry for ${dateStr}: ${matchingEntry ? JSON.stringify(matchingEntry) : 'NONE'}`);
-            log(`      Sample availability dates: ${s.availability.slice(0, 5).map(a => `${a.date}(${a.type})`).join(', ')}`);
+        // Check if already assigned on this date (but allow Frozen staff to do Inbound)
+        const alreadyAssigned = dayAssignments.some((a) => {
+          if (a.staffId === s.id) {
+            // Special case: staff assigned to Frozen can also be assigned to Inbound
+            if (task === "Inbound" && a.task === "Frozen") {
+              return false;
+            }
+            return true;
           }
-        }
-        
-        if (hasRestDay || hasHoliday || hasSickLeave || isRecurringRestDay) {
-          log(`   ❌ ${s.name} - unavailable (${hasRestDay ? 'rest' : hasHoliday ? 'holiday' : hasSickLeave ? 'sick' : 'recurring rest'})`);
           return false;
-        }
-
-        // NEW: Inbound constraint for part-time staff
-        if (task === "Inbound") {
-          const totalShiftsThisWeek = assignmentCounts[s.id];
-          const inboundShiftsThisWeek = inboundCounts[s.id];
-          
-          // If staff member is working ≤3 shifts and already has 1 inbound, skip them
-          if (totalShiftsThisWeek <= 3 && inboundShiftsThisWeek >= 1) {
-            log(`   ⚠️ ${s.name} - inbound constraint (part-time with ${inboundShiftsThisWeek} inbound already)`);
-            return false;
-          }
-        }
-
-        return true;
+        });
+        if (alreadyAssigned) return false;
       });
 
-      log(`   📊 ${availableStaff.length} staff available: ${availableStaff.map(s => s.name).join(", ")}`);
+      log(`   📊 ${eligibleStaff.length} staff available: ${eligibleStaff.map(s => s.name).join(", ")}`);
 
-      if (availableStaff.length === 0) {
+      if (eligibleStaff.length === 0) {
         log(`   ⚠️  WARNING: No staff available for ${task} on ${dayName}`);
         continue;
       }
 
       // Sort by fairness: fewest times doing THIS task, then fewest overall
-      availableStaff.sort((a, b) => {
+      eligibleStaff.sort((a, b) => {
         const aTaskCount = (taskCounts[a.id] && taskCounts[a.id][task]) || 0;
         const bTaskCount = (taskCounts[b.id] && taskCounts[b.id][task]) || 0;
         if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
@@ -173,11 +142,11 @@ export function generateWeeklyRota({
       });
 
       // Assign staff
-      const toAssign = Math.min(needed, availableStaff.length);
+      const toAssign = Math.min(needed, eligibleStaff.length);
       log(`   ⚡ Assigning ${toAssign} staff:`);
       
       for (let i = 0; i < toAssign; i++) {
-        const staffMember = availableStaff[i];
+        const staffMember = eligibleStaff[i];
         
         // Create assignment
         const assignment: Assignment = {

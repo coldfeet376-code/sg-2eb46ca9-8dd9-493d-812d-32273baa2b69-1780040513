@@ -6,6 +6,7 @@ export type Task =
   | "Inbound Late" 
   | "Outbound" 
   | "Marshaling" 
+  | "Marshal Late"
   | "Housekeeping"
   | "Equipment";
 
@@ -14,13 +15,14 @@ export type TaskWeights = {
 };
 
 export const TASK_WEIGHTS: TaskWeights = {
-  "Frozen": 1.0,
+  "Frozen": 0.5,
   "Milk": 1.0,
   "TWI": 1.0,
   "Inbound": 1.0,
   "Inbound Late": 0.5,
   "Outbound": 1.0,
   "Marshaling": 1.0,
+  "Marshal Late": 0.5,
   "Housekeeping": 1.0,
   "Equipment": 1.0,
 };
