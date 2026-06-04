@@ -696,31 +696,13 @@ export default function StaffPage() {
     closeEditAvailabilityDialog();
   };
 
-  const [formData, setFormData] = useState<Partial<StaffMember>>({
-    name: "",
-    trainedTasks: [],
-    restDays: [],
-    availability: [],
-  });
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const handleEdit = (member: StaffMember) => {
+    handleEditStaff(member);
+  };
 
-  // Week dates for calendar (current week)
-  const [weekStart, setWeekStart] = useState(() => {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = day === 0 ? -6 : 1 - day; // Adjust to get previous Monday (or same day if Monday)
-    const monday = new Date(now);
-    monday.setDate(now.getDate() + diff);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-  });
-
-  const weekDates = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(weekStart);
-    date.setDate(weekStart.getDate() + i);
-    return date;
-  });
+  const handleDelete = (id: string) => {
+    setDeleteConfirmId(id);
+  };
 
   const handleCalendarStatusChange = async (staffId: string, date: string, status: AvailabilityType) => {
     try {
