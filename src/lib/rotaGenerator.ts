@@ -110,7 +110,7 @@ export function generateWeeklyRota({
         if (!s.trainedTasks.includes(task)) return false;
 
         // Check if this is a rest day for this staff member
-        const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+        const dayOfWeek = currentDate.getDay(); // 0 = Sunday, 6 = Saturday
         if (s.restDays && s.restDays.includes(dayOfWeek)) {
           return false; // Staff cannot work on their rest days
         }
