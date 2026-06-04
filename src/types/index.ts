@@ -51,7 +51,7 @@ export type DayShiftPattern =
 
 export type ManagerShiftStart = "06:00" | "08:00";
 
-export type ManagerDuty = "Supervisor" | "Manager";
+export type ManagerDuty = "Supervisor" | "Manager" | "Intake" | "Out-loading" | "Admin" | "Floor";
 
 export type ShiftPattern = "Early" | "Late" | "All";
 
