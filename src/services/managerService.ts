@@ -138,6 +138,8 @@ export async function getManagersForDuty(duty: ManagerDuty): Promise<Manager[]> 
     "Out-loading": "can_out_loading",
     Admin: "can_admin",
     Floor: "can_floor",
+    Supervisor: "can_floor",  // Supervisors can do floor duties
+    Manager: "can_admin",     // Managers can do admin duties
   };
 
   const column = columnMap[duty];
