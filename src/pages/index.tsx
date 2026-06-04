@@ -1167,6 +1167,17 @@ export default function IndexPage() {
                 Lock All
               </Button>
 
+              <Button
+                onClick={() => setShowUnlockConfirm(true)}
+                disabled={lockedAssignments.length === 0}
+                variant="outline"
+                className="gap-2 font-sans font-medium"
+                size="lg"
+              >
+                <Unlock className="h-4 w-4" />
+                Unlock All
+              </Button>
+
               <Sheet open={historyOpen} onOpenChange={setHistoryOpen}>
                 <SheetTrigger asChild>
                   <Button
@@ -1565,10 +1576,10 @@ export default function IndexPage() {
                 fairnessMetrics.overallScore >= 90 ? "text-success" : 
                 fairnessMetrics.overallScore >= 70 ? "text-primary" : "text-warning"
               }`}>
-                {fairnessMetrics ? fairnessMetrics.overallScore : "—"}
+                {fairnessMetrics?.overallScore ?? "—"}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {fairnessMetrics ? "Even distribution" : "Generate rota first"}
+                {fairnessMetrics ? `Weighted distribution (avg: ${fairnessMetrics.weightedAverage.toFixed(1)})` : "Generate rota first"}
               </p>
             </CardContent>
           </Card>
