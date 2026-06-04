@@ -1117,6 +1117,27 @@ export default function IndexPage() {
     }
   };
 
+  const calculateShiftScore = (shift: "Day" | "Night"): number => {
+    if (!fairnessMetrics) return 0;
+    
+    const shiftStaff = staff.filter(s => shift === "Day" ? (!s.shift || s.shift === "Day") : (s.shift === "Night"));
+    const shiftAssignments = assignments.filter(a => shift === "Day" ? (!a.shift || a.shift === "Day") : (a.shift === "Night"));
+    
+    if (shiftStaff.length === 0 || shiftAssignments.length === 0) return 0;
+    
+    // Calculate weighted totals for this shift only
+    const weightedTotals = shiftStaff.map(s => {
+      const staffAssignments = shiftAssignments.filter(a => a.staffId === s.id);
+      return staffAssignments.reduce((sum, a) => sum + TASK_WEIGHTS[a.task], 0);
+    });
+    
+    const avg = weightedTotals.reduce((a, b) => a + b, 0) / weightedTotals.length;
+    const variance = weightedTotals.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / weightedTotals.length;
+    const stdDev = Math.sqrt(variance);
+    
+    return avg > 0 ? Math.max(0, Math.round(100 - (stdDev / avg) * 100)) : 100;
+  };
+
   return (
     <Layout>
       <OnboardingTour />
@@ -1688,16 +1709,40 @@ export default function IndexPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`font-mono text-3xl font-bold tabular-nums ${
-                !fairnessMetrics ? "text-muted-foreground" :
-                fairnessMetrics.overallScore >= 90 ? "text-success" : 
-                fairnessMetrics.overallScore >= 70 ? "text-primary" : "text-warning"
-              }`}>
-                {fairnessMetrics?.overallScore ?? "—"}
+              <div className="space-y-3">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">Overall</div>
+                  <div className={`font-mono text-2xl font-bold tabular-nums ${
+                    !fairnessMetrics ? "text-muted-foreground" :
+                    fairnessMetrics.overallScore >= 90 ? "text-success" : 
+                    fairnessMetrics.overallScore >= 70 ? "text-primary" : "text-warning"
+                  }`}>
+                    {fairnessMetrics?.overallScore ?? "—"}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t">
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">☀️ Day</div>
+                    <div className={`font-mono text-lg font-bold tabular-nums ${
+                      !fairnessMetrics ? "text-muted-foreground" :
+                      calculateShiftScore("Day") >= 90 ? "text-success" : 
+                      calculateShiftScore("Day") >= 70 ? "text-primary" : "text-warning"
+                    }`}>
+                      {fairnessMetrics ? calculateShiftScore("Day") : "—"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground mb-1">🌙 Night</div>
+                    <div className={`font-mono text-lg font-bold tabular-nums ${
+                      !fairnessMetrics ? "text-muted-foreground" :
+                      calculateShiftScore("Night") >= 90 ? "text-success" : 
+                      calculateShiftScore("Night") >= 70 ? "text-primary" : "text-warning"
+                    }`}>
+                      {fairnessMetrics ? calculateShiftScore("Night") : "—"}
+                    </div>
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {fairnessMetrics ? `Weighted distribution (avg: ${fairnessMetrics.weightedAverage.toFixed(1)})` : "Generate rota first"}
-              </p>
             </CardContent>
           </Card>
 

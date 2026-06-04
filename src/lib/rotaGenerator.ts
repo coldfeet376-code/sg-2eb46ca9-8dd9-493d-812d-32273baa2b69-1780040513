@@ -124,59 +124,109 @@ export function generateWeeklyRota({
           return false;
         });
         if (alreadyAssigned) return false;
+
+        return true;
       });
 
-      log(`   📊 ${eligibleStaff.length} staff available: ${eligibleStaff.map(s => s.name).join(", ")}`);
+      // Split eligible staff into day and night shift workers
+      const dayStaff = eligibleStaff.filter(s => !s.shift || s.shift === "Day");
+      const nightStaff = eligibleStaff.filter(s => s.shift === "Night");
 
-      if (eligibleStaff.length === 0) {
-        log(`   ⚠️  WARNING: No staff available for ${task} on ${dayName}`);
-        continue;
-      }
+      log(`   📊 Day staff available: ${dayStaff.length}, Night staff available: ${nightStaff.length}`);
 
-      // Sort by fairness: fewest times doing THIS task, then fewest overall
-      eligibleStaff.sort((a, b) => {
-        const aTaskCount = (taskCounts[a.id] && taskCounts[a.id][task]) || 0;
-        const bTaskCount = (taskCounts[b.id] && taskCounts[b.id][task]) || 0;
-        if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
+      // Calculate how many assignments needed for each shift (split evenly if not specified)
+      const dayNeeded = Math.ceil(needed / 2);
+      const nightNeeded = needed - dayNeeded;
+
+      // Process day shift assignments
+      if (dayNeeded > 0 && dayStaff.length > 0) {
+        log(`   ☀️ Assigning ${Math.min(dayNeeded, dayStaff.length)} day shift staff`);
         
-        const aTotal = assignmentCounts[a.id] || 0;
-        const bTotal = assignmentCounts[b.id] || 0;
-        return aTotal - bTotal;
-      });
+        // Sort by fairness
+        dayStaff.sort((a, b) => {
+          const aTaskCount = (taskCounts[a.id] && taskCounts[a.id][task]) || 0;
+          const bTaskCount = (taskCounts[b.id] && taskCounts[b.id][task]) || 0;
+          if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
+          
+          const aTotal = assignmentCounts[a.id] || 0;
+          const bTotal = assignmentCounts[b.id] || 0;
+          return aTotal - bTotal;
+        });
 
-      // Assign staff
-      const toAssign = Math.min(needed, eligibleStaff.length);
-      log(`   ⚡ Assigning ${toAssign} staff:`);
-      
-      for (let i = 0; i < toAssign; i++) {
-        const staffMember = eligibleStaff[i];
-        
-        // Create assignment
-        const assignment: Assignment = {
-          date: dateStr, // Already in YYYY-MM-DD format from getLocalDateString
-          task,
-          staffId: staffMember.id,
-          staffName: staffMember.name,
-        };
-        assignments.push(assignment);
+        const dayToAssign = Math.min(dayNeeded, dayStaff.length);
+        for (let i = 0; i < dayToAssign; i++) {
+          const staffMember = dayStaff[i];
+          
+          const assignment: Assignment = {
+            date: dateStr,
+            task,
+            staffId: staffMember.id,
+            staffName: staffMember.name,
+            shift: "Day",
+          };
+          assignments.push(assignment);
 
-        assignmentCounts[staffMember.id]++;
-        taskCounts[staffMember.id] = taskCounts[staffMember.id] || ({} as Record<Task, number>);
-        taskCounts[staffMember.id][task] = (taskCounts[staffMember.id][task] || 0) + 1;
-        
-        // NEW: Track inbound assignments
-        if (task === "Inbound") {
-          inboundCounts[staffMember.id]++;
-          log(`      📊 Inbound count for ${staffMember.name}: ${inboundCounts[staffMember.id]}`);
+          assignmentCounts[staffMember.id]++;
+          taskCounts[staffMember.id] = taskCounts[staffMember.id] || ({} as Record<Task, number>);
+          taskCounts[staffMember.id][task] = (taskCounts[staffMember.id][task] || 0) + 1;
+          
+          if (task === "Inbound") {
+            inboundCounts[staffMember.id]++;
+          }
+
+          const taskCount = taskCounts[staffMember.id][task];
+          const totalCount = assignmentCounts[staffMember.id];
+          log(`      ✅ [DAY] ${staffMember.name} → ${task} (${taskCount}x this task, ${totalCount} total)`);
         }
-
-        const taskCount = taskCounts[staffMember.id][task];
-        const totalCount = assignmentCounts[staffMember.id];
-        log(`      ✅ ${staffMember.name} → ${task} (${taskCount}x this task, ${totalCount} total)`);
       }
 
-      if (toAssign < needed) {
-        log(`   ⚠️  WARNING: Only assigned ${toAssign}/${needed} for ${task}`);
+      // Process night shift assignments
+      if (nightNeeded > 0 && nightStaff.length > 0) {
+        log(`   🌙 Assigning ${Math.min(nightNeeded, nightStaff.length)} night shift staff`);
+        
+        // Sort by fairness
+        nightStaff.sort((a, b) => {
+          const aTaskCount = (taskCounts[a.id] && taskCounts[a.id][task]) || 0;
+          const bTaskCount = (taskCounts[b.id] && taskCounts[b.id][task]) || 0;
+          if (aTaskCount !== bTaskCount) return aTaskCount - bTaskCount;
+          
+          const aTotal = assignmentCounts[a.id] || 0;
+          const bTotal = assignmentCounts[b.id] || 0;
+          return aTotal - bTotal;
+        });
+
+        const nightToAssign = Math.min(nightNeeded, nightStaff.length);
+        for (let i = 0; i < nightToAssign; i++) {
+          const staffMember = nightStaff[i];
+          
+          const assignment: Assignment = {
+            date: dateStr,
+            task,
+            staffId: staffMember.id,
+            staffName: staffMember.name,
+            shift: "Night",
+          };
+          assignments.push(assignment);
+
+          assignmentCounts[staffMember.id]++;
+          taskCounts[staffMember.id] = taskCounts[staffMember.id] || ({} as Record<Task, number>);
+          taskCounts[staffMember.id][task] = (taskCounts[staffMember.id][task] || 0) + 1;
+          
+          if (task === "Inbound") {
+            inboundCounts[staffMember.id]++;
+          }
+
+          const taskCount = taskCounts[staffMember.id][task];
+          const totalCount = assignmentCounts[staffMember.id];
+          log(`      ✅ [NIGHT] ${staffMember.name} → ${task} (${taskCount}x this task, ${totalCount} total)`);
+        }
+      }
+
+      const totalAssigned = (dayNeeded > 0 && dayStaff.length > 0 ? Math.min(dayNeeded, dayStaff.length) : 0) +
+                           (nightNeeded > 0 && nightStaff.length > 0 ? Math.min(nightNeeded, nightStaff.length) : 0);
+      
+      if (totalAssigned < needed) {
+        log(`   ⚠️  WARNING: Only assigned ${totalAssigned}/${needed} for ${task} (day: ${dayStaff.length} available, night: ${nightStaff.length} available)`);
       }
     }
   }

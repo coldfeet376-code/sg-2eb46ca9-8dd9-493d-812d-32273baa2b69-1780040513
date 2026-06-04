@@ -5,6 +5,62 @@ export function calculateFairnessMetrics(
   assignments: Assignment[],
   staff: StaffMember[]
 ): FairnessMetrics {
+  // Split staff by shift type
+  const dayStaff = staff.filter(s => !s.shift || s.shift === "Day");
+  const nightStaff = staff.filter(s => s.shift === "Night");
+
+  // Split assignments by shift
+  const dayAssignments = assignments.filter(a => !a.shift || a.shift === "Day");
+  const nightAssignments = assignments.filter(a => a.shift === "Night");
+
+  // Calculate metrics for day shift
+  const dayMetrics = calculateShiftMetrics(dayAssignments, dayStaff);
+  
+  // Calculate metrics for night shift
+  const nightMetrics = calculateShiftMetrics(nightAssignments, nightStaff);
+
+  // Combined overall score (weighted average if both shifts present)
+  const overallScore = dayStaff.length > 0 && nightStaff.length > 0
+    ? Math.round((dayMetrics.overallScore * dayStaff.length + nightMetrics.overallScore * nightStaff.length) / (dayStaff.length + nightStaff.length))
+    : dayStaff.length > 0 ? dayMetrics.overallScore : nightMetrics.overallScore;
+
+  // Merge task fairness (average across both shifts)
+  const taskFairness: Record<Task, number> = {} as Record<Task, number>;
+  (Object.keys(dayMetrics.taskFairness) as Task[]).forEach(task => {
+    const dayScore = dayMetrics.taskFairness[task];
+    const nightScore = nightMetrics.taskFairness[task];
+    taskFairness[task] = (dayScore + nightScore) / 2;
+  });
+
+  // Merge staff totals
+  const staffWeightedTotals = { ...dayMetrics.staffWeightedTotals, ...nightMetrics.staffWeightedTotals };
+  const staffTotalAssignments = { ...dayMetrics.staffTotalAssignments, ...nightMetrics.staffTotalAssignments };
+
+  // Merge workload arrays
+  const staffWorkload = [...dayMetrics.staffWorkload, ...nightMetrics.staffWorkload];
+
+  return {
+    overallScore,
+    taskFairness,
+    staffWeightedTotals,
+    staffTotalAssignments,
+    weightedAverage: dayStaff.length > 0 && nightStaff.length > 0
+      ? (dayMetrics.weightedAverage * dayStaff.length + nightMetrics.weightedAverage * nightStaff.length) / (dayStaff.length + nightStaff.length)
+      : dayStaff.length > 0 ? dayMetrics.weightedAverage : nightMetrics.weightedAverage,
+    weightedStdDev: dayStaff.length > 0 && nightStaff.length > 0
+      ? (dayMetrics.weightedStdDev * dayStaff.length + nightMetrics.weightedStdDev * nightStaff.length) / (dayStaff.length + nightStaff.length)
+      : dayStaff.length > 0 ? dayMetrics.weightedStdDev : nightMetrics.weightedStdDev,
+    standardDeviation: dayStaff.length > 0 && nightStaff.length > 0
+      ? (dayMetrics.weightedStdDev * dayStaff.length + nightMetrics.weightedStdDev * nightStaff.length) / (dayStaff.length + nightStaff.length)
+      : dayStaff.length > 0 ? dayMetrics.weightedStdDev : nightMetrics.weightedStdDev,
+    staffWorkload,
+  };
+}
+
+function calculateShiftMetrics(
+  assignments: Assignment[],
+  staff: StaffMember[]
+): FairnessMetrics {
   // Calculate weighted task distribution per staff
   const staffTaskCounts: Record<string, Record<Task, number>> = {};
   const staffWeightedTotals: Record<string, number> = {};
@@ -64,6 +120,7 @@ export function calculateFairnessMetrics(
     "Inbound Late": 0,
     Outbound: 0,
     Marshaling: 0,
+    "Marshal Late": 0,
     Housekeeping: 0,
     Equipment: 0,
   };
