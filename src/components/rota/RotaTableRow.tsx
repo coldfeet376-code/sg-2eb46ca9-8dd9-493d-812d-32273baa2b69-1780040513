@@ -1,115 +1,140 @@
-import { memo } from "react";
-import { Lock, Unlock } from "lucide-react";
-import type { Assignment, Task } from "@/types";
+import type { Task, Assignment } from "@/types";
+import { Sparkles } from "lucide-react";
 
 interface RotaTableRowProps {
   task: Task;
-  dayIndex: number;
-  dayAssignments: Assignment[];
-  unavailableStaff: Array<{ name: string; reason: string; color: string }>;
-  showUnavailableStaff: boolean;
-  isAssignmentLocked: (task: string, dayIndex: number, staffName: string) => boolean;
-  getStaffAvailability: (staffName: string, dateIndex: number) => { type: string; color: string; label: string } | null;
-  getTaskColor: (task: string) => string;
-  toggleLockAssignment: (task: string, dayIndex: number, staffName: string) => void;
-  onSuggestClick: () => void;
+  weekDates: Date[];
+  assignments: Assignment[];
+  lockedAssignments: Assignment[];
+  onToggleLock: (task: Task, dayIdx: number, staffName: string) => void;
+  onOpenSmartAssign: (task: Task, date: string) => void;
+  onStaffClick: (staffId: string, staffName: string, date: string, task: string) => void;
 }
 
-export const RotaTableRow = memo(function RotaTableRow({
+const getLocalDateString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+export function RotaTableRow({
   task,
-  dayIndex,
-  dayAssignments,
-  unavailableStaff,
-  showUnavailableStaff,
-  isAssignmentLocked,
-  getStaffAvailability,
-  getTaskColor,
-  toggleLockAssignment,
-  onSuggestClick,
+  weekDates,
+  assignments,
+  lockedAssignments,
+  onToggleLock,
+  onOpenSmartAssign,
+  onStaffClick,
 }: RotaTableRowProps) {
-  const taskColorClass = getTaskColor(task);
+  const taskColorClass = "bg-primary/10 text-primary border-primary/30 hover:bg-primary/20";
 
   return (
-    <td className="p-4 text-center align-top">
-      <div className="space-y-2">
-        {/* Assigned staff */}
-        {dayAssignments.map((assignment, idx) => {
-          const locked = isAssignmentLocked(task, dayIndex, assignment.staffName);
-          const availability = getStaffAvailability(assignment.staffName, dayIndex);
-          
-          return (
-            <button
-              key={idx}
-              onClick={() => toggleLockAssignment(task, dayIndex, assignment.staffName)}
-              className={`text-xs font-mono px-4 py-2.5 rounded-lg transition-all cursor-pointer group relative no-print w-full shadow-sm hover:shadow-md border-2 ${
-                locked 
-                  ? 'bg-warning/20 text-warning-foreground border-warning hover:bg-warning/30 hover:scale-105 locked-assignment' 
-                  : `${taskColorClass} hover:scale-105 hover:shadow-lg`
-              }`}
-            >
-              <div className="flex flex-col items-center gap-1">
-                <span className="flex items-center gap-2 font-semibold">
-                  {locked ? (
-                    <Lock className="h-3.5 w-3.5 no-print" />
-                  ) : (
-                    <Unlock className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity no-print" />
-                  )}
-                  {assignment.staffName}
-                </span>
-                {availability && availability.type !== 'available' && (
-                  <span className={`text-[10px] px-2 py-0.5 rounded-md border font-medium ${availability.color}`}>
-                    {availability.label}
-                  </span>
+    <tr className="border-b border-border/50 hover:bg-muted/30 transition-smooth">
+      <td className="p-3 font-mono text-sm font-semibold bg-muted/20">
+        {task}
+      </td>
+      {weekDates.map((date, dayIdx) => {
+        const dateStr = getLocalDateString(date);
+        
+        // Get day and night assignments separately
+        const dayAssignments = assignments.filter(
+          (a) => a.task === task && a.date === dateStr && (!a.shift || a.shift === "Day")
+        );
+        const nightAssignments = assignments.filter(
+          (a) => a.task === task && a.date === dateStr && a.shift === "Night"
+        );
+
+        return (
+          <td key={dayIdx} className="p-0 align-top">
+            <div className="grid grid-cols-2 divide-x min-h-[60px]">
+              {/* Day Shift Column */}
+              <div className="p-2 space-y-1">
+                {dayAssignments.length > 0 ? (
+                  dayAssignments.map((assignment, idx) => {
+                    const locked = lockedAssignments.some(
+                      (la) =>
+                        la.staffId === assignment.staffId &&
+                        la.date === dateStr &&
+                        la.task === task &&
+                        (!la.shift || la.shift === "Day")
+                    );
+
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => onToggleLock(task, dayIdx, assignment.staffName)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          onStaffClick(assignment.staffId, assignment.staffName, dateStr, task);
+                        }}
+                        className={`text-xs font-mono px-2 py-1.5 rounded transition-all cursor-pointer group relative w-full shadow-sm hover:shadow-md border ${
+                          locked
+                            ? "bg-warning/20 text-warning-foreground border-warning hover:bg-warning/30"
+                            : `${taskColorClass}`
+                        }`}
+                        title="Left-click to lock/unlock • Right-click to mark sick/holiday"
+                      >
+                        {assignment.staffName}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <button
+                    onClick={() => onOpenSmartAssign(task, dateStr)}
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center justify-center gap-1 w-full py-1"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    <span className="text-[10px]">Assign</span>
+                  </button>
                 )}
               </div>
-            </button>
-          );
-        })}
-        
-        {/* Unavailable staff */}
-        {showUnavailableStaff && unavailableStaff.map((unavailable, idx) => (
-          <div
-            key={`unavail-${idx}`}
-            className="text-xs font-mono px-4 py-2.5 rounded-lg opacity-50 no-print border-2 border-dashed border-muted-foreground/20 bg-muted/20"
-            title={`${unavailable.name} - ${unavailable.reason}`}
-          >
-            <div className="flex flex-col items-center gap-1">
-              <span className="line-through text-muted-foreground font-medium">
-                {unavailable.name}
-              </span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-md border ${unavailable.color}`}>
-                {unavailable.reason}
-              </span>
-            </div>
-          </div>
-        ))}
-        
-        {/* Empty state */}
-        {dayAssignments.length === 0 && (
-          <div
-            className="text-center text-muted-foreground text-xs py-2 font-sans hover:bg-accent/50 cursor-pointer rounded-lg transition-smooth border-2 border-dashed border-muted-foreground/20 hover:border-primary/50"
-            onClick={onSuggestClick}
-            title="Click for smart assignment suggestions"
-          >
-            + Suggest
-          </div>
-        )}
-        
-        {/* Print-only version */}
-        <div className="hidden print:block space-y-1">
-          {dayAssignments.map((assignment, idx) => {
-            const locked = isAssignmentLocked(task, dayIndex, assignment.staffName);
-            const availability = getStaffAvailability(assignment.staffName, dayIndex);
-            return (
-              <div key={idx} className={locked ? 'locked-assignment' : ''}>
-                {assignment.staffName}
-                {availability && availability.type !== 'available' && ` (${availability.label})`}
-                {locked ? ' 🔒' : ''}
+
+              {/* Night Shift Column */}
+              <div className="p-2 space-y-1 bg-slate-900/5 dark:bg-slate-100/5">
+                {nightAssignments.length > 0 ? (
+                  nightAssignments.map((assignment, idx) => {
+                    const locked = lockedAssignments.some(
+                      (la) =>
+                        la.staffId === assignment.staffId &&
+                        la.date === dateStr &&
+                        la.task === task &&
+                        la.shift === "Night"
+                    );
+
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => onToggleLock(task, dayIdx, assignment.staffName)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          onStaffClick(assignment.staffId, assignment.staffName, dateStr, task);
+                        }}
+                        className={`text-xs font-mono px-2 py-1.5 rounded transition-all cursor-pointer group relative w-full shadow-sm hover:shadow-md border ${
+                          locked
+                            ? "bg-warning/20 text-warning-foreground border-warning hover:bg-warning/30"
+                            : `${taskColorClass}`
+                        }`}
+                        title="Left-click to lock/unlock • Right-click to mark sick/holiday"
+                      >
+                        {assignment.staffName}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <button
+                    onClick={() => onOpenSmartAssign(task, dateStr)}
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center justify-center gap-1 w-full py-1"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    <span className="text-[10px]">Assign</span>
+                  </button>
+                )}
               </div>
-            );
-          })}
-        </div>
-      </div>
-    </td>
+            </div>
+          </td>
+        );
+      })}
+    </tr>
   );
-});
+}

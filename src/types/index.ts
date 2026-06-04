@@ -27,6 +27,8 @@ export const TASK_WEIGHTS: TaskWeights = {
   "Equipment": 1.0,
 };
 
+export type ShiftType = "Day" | "Night";
+
 export type ShiftStart = 
   | "06:00" 
   | "07:00"
@@ -75,6 +77,7 @@ export interface StaffMember {
   id: string;
   name: string;
   trainedTasks: Task[];
+  shift?: ShiftType; // Day or Night shift
   shiftStart?: ShiftStart;
   shiftPattern?: ShiftPattern;
   dayShiftPattern?: DayShiftPattern; // Full shift pattern with end time
@@ -91,6 +94,7 @@ export interface Assignment {
   staffName: string;
   task: Task;
   date: string; // ISO date string
+  shift?: ShiftType; // Day or Night
   shiftPattern?: ShiftPattern;
 }
 
