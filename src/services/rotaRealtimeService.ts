@@ -56,7 +56,7 @@ export const rotaRealtimeService = {
               locked_count: lockedCount,
             },
             updated_at: new Date().toISOString(),
-          },
+          } as any,
           {
             onConflict: "week_start",
           }
