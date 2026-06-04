@@ -29,6 +29,7 @@ import { FairnessMeter } from "@/components/rota/FairnessMeter";
 import { SmartAssignmentDialog } from "@/components/rota/SmartAssignmentDialog";
 import { SwapSuggestionsDialog } from "@/components/rota/SwapSuggestionsDialog";
 import { RotaTableRow } from "@/components/rota/RotaTableRow";
+import { StaffWeekCalendar } from "@/components/StaffWeekCalendar";
 import { suggestSwaps, type SwapSuggestion } from "@/lib/swapSuggester";
 import { useToast } from "@/hooks/use-toast";
 import { StaffRotaPrintPreview } from "@/components/StaffRotaPrintPreview";
@@ -1000,6 +1001,122 @@ export default function IndexPage() {
     );
   };
 
+  const handleStaffStatusChange = async (status: "sick" | "holiday") => {
+    if (!staffStatusDialog) return;
+
+    try {
+      // Update staff availability
+      await staffService.addAvailability(staffStatusDialog.staffId, [{
+        date: staffStatusDialog.date,
+        type: status,
+        notes: `Marked ${status} from rota page`
+      }]);
+
+      // Remove the assignment
+      const newAssignments = assignments.filter(
+        a => !(a.staffId === staffStatusDialog.staffId && a.date === staffStatusDialog.date && a.task === staffStatusDialog.currentTask)
+      );
+
+      // Remove from locked if present
+      const newLocked = lockedAssignments.filter(
+        la => !(la.staffId === staffStatusDialog.staffId && la.date === staffStatusDialog.date && la.task === staffStatusDialog.currentTask)
+      );
+
+      // Find replacement staff for this specific task/date
+      const eligibleStaff = staff.filter(s => {
+        if (s.id === staffStatusDialog.staffId) return false;
+        if (!s.trainedTasks.includes(staffStatusDialog.currentTask as Task)) return false;
+        
+        const hasAvailability = s.availability?.find(a => a.date === staffStatusDialog.date);
+        if (hasAvailability && hasAvailability.type !== "available") return false;
+        
+        const alreadyAssigned = newAssignments.some(
+          a => a.staffId === s.id && a.date === staffStatusDialog.date
+        );
+        return !alreadyAssigned;
+      });
+
+      if (eligibleStaff.length > 0) {
+        // Pick staff with lowest current workload
+        const staffWorkload = eligibleStaff.map(s => ({
+          staff: s,
+          count: newAssignments.filter(a => a.staffId === s.id).length
+        }));
+        staffWorkload.sort((a, b) => a.count - b.count);
+        
+        const replacement = staffWorkload[0].staff;
+        newAssignments.push({
+          staffId: replacement.id,
+          staffName: replacement.name,
+          task: staffStatusDialog.currentTask as Task,
+          date: staffStatusDialog.date
+        });
+
+        toast({
+          title: "✅ Assignment Updated",
+          description: `${staffStatusDialog.staffName} marked as ${status}. Replaced with ${replacement.name}`,
+        });
+      } else {
+        toast({
+          title: "⚠️ No Replacement Found",
+          description: `${staffStatusDialog.staffName} marked as ${status}, but no eligible replacement available`,
+          variant: "destructive"
+        });
+      }
+
+      setAssignments(newAssignments);
+      setLockedAssignments(newLocked);
+
+      // Recalculate fairness
+      const metrics = calculateFairnessMetrics(newAssignments, staff);
+      setFairnessMetrics(metrics);
+
+      // Save to Supabase
+      await rotaRealtimeService.saveRota(weekStart, newAssignments, metrics, newLocked.length);
+
+      await rotaRealtimeService.logAction(
+        "updated",
+        "assignment",
+        `${staffStatusDialog.date}-${staffStatusDialog.currentTask}`,
+        `Marked ${staffStatusDialog.staffName} as ${status} and replaced`
+      );
+
+      setStaffStatusDialog(null);
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+    } catch (error) {
+      console.error("Error updating staff status:", error);
+      toast({
+        title: "❌ Update Failed",
+        description: "Failed to update staff status",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleCalendarStatusChange = async (staffId: string, date: string, status: AvailabilityType) => {
+    try {
+      await staffService.addAvailability(staffId, [{
+        date,
+        type: status,
+        notes: `Set to ${status} via calendar`
+      }]);
+
+      toast({
+        title: "✅ Status Updated",
+        description: `Set to ${status} for ${date}`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+    } catch (error) {
+      console.error("Error updating status:", error);
+      toast({
+        title: "❌ Update Failed",
+        description: "Failed to update status",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <Layout>
       <OnboardingTour />
@@ -1706,6 +1823,37 @@ export default function IndexPage() {
             weekStart={weekStart}
             onSwapApply={handleSwapApply}
           />
+        )}
+
+        {/* Staff Week Calendar */}
+        {staff.length > 0 && (
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="font-condensed text-lg">Staff Week Calendar</CardTitle>
+              <CardDescription className="font-sans text-sm">
+                View and manage availability status for each staff member
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {staff.map((staffMember) => (
+                  <div 
+                    key={staffMember.id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-smooth"
+                  >
+                    <span className="font-mono text-sm font-semibold truncate flex-1">
+                      {staffMember.name}
+                    </span>
+                    <StaffWeekCalendar
+                      staff={staffMember}
+                      weekDates={weekDates}
+                      onStatusChange={handleCalendarStatusChange}
+                    />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Recent Changes Panel */}
