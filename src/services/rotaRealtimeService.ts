@@ -50,9 +50,11 @@ export const rotaRealtimeService = {
         .upsert(
           {
             week_start: weekStartStr,
-            assignments: assignments as any,
-            fairness_metrics: fairnessMetrics as any,
-            locked_count: lockedCount,
+            data: {
+              assignments,
+              fairness_metrics: fairnessMetrics,
+              locked_count: lockedCount,
+            },
             updated_at: new Date().toISOString(),
           },
           {
@@ -102,8 +104,10 @@ export const rotaRealtimeService = {
         throw error;
       }
 
-      const assignments = data.assignments as any;
-      const fairnessMetrics = data.fairness_metrics as any;
+      // Extract from the 'data' jsonb column
+      const rotaData = data.data as any;
+      const assignments = rotaData?.assignments || [];
+      const fairnessMetrics = rotaData?.fairness_metrics || null;
 
       console.log("✅ Rota loaded:", {
         weekStart: data.week_start,
@@ -111,7 +115,13 @@ export const rotaRealtimeService = {
         fairnessScore: fairnessMetrics?.overallScore || null
       });
 
-      return data;
+      // Return in the format the code expects
+      return {
+        week_start: data.week_start,
+        assignments,
+        fairness_metrics: fairnessMetrics,
+        locked_count: rotaData?.locked_count || 0,
+      };
     } catch (error) {
       console.error("❌ Load rota failed:", error);
       return null;
