@@ -667,8 +667,10 @@ export default function Managers() {
       "Out-loading": "bg-green-500/20 text-green-700 border-green-500",
       "Admin": "bg-purple-500/20 text-purple-700 border-purple-500",
       "Floor": "bg-orange-500/20 text-orange-700 border-orange-500",
+      "Supervisor": "bg-cyan-500/20 text-cyan-700 border-cyan-500",
+      "Manager": "bg-indigo-500/20 text-indigo-700 border-indigo-500",
     };
-    return colorMap[duty];
+    return colorMap[duty] || "bg-muted text-muted-foreground";
   };
 
   if (!isAuthenticated) {
