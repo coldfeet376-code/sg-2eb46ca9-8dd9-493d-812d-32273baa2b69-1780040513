@@ -109,8 +109,11 @@ export function generateWeeklyRota({
         // Must be trained in this task
         if (!s.trainedTasks.includes(task)) return false;
 
+        // Get assignments for this specific date
+        const assignmentsForDate = assignments.filter(a => a.date === dateStr);
+
         // Check if already assigned on this date (but allow Frozen staff to do Inbound)
-        const alreadyAssigned = dayAssignments.some((a) => {
+        const alreadyAssigned = assignmentsForDate.some((a) => {
           if (a.staffId === s.id) {
             // Special case: staff assigned to Frozen can also be assigned to Inbound
             if (task === "Inbound" && a.task === "Frozen") {
