@@ -1944,6 +1944,51 @@ export default function IndexPage() {
           onImplementSwap={(swap) => handleSwapApply(swap.fromStaffId, swap.toStaffId, swap.task, swap.date)}
           onImplementAll={implementAllSwaps}
         />
+
+        {/* Staff Status Dialog */}
+        {staffStatusDialog?.open && (
+          <Dialog open={staffStatusDialog.open} onOpenChange={(open) => !open && setStaffStatusDialog(null)}>
+            <DialogContent className="sm:max-w-md">
+              <DialogHeader>
+                <DialogTitle className="font-condensed">Update Staff Availability</DialogTitle>
+                <DialogDescription className="font-sans">
+                  Mark {staffStatusDialog.staffName} as unavailable for {staffStatusDialog.date}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 py-4">
+                <div className="rounded-lg border bg-muted/50 p-3">
+                  <div className="text-sm font-mono">
+                    <div className="text-muted-foreground">Current Assignment:</div>
+                    <div className="font-semibold mt-1">
+                      {staffStatusDialog.currentTask} - {new Date(staffStatusDialog.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => handleStaffStatusChange("sick")}
+                  >
+                    <AlertCircle className="h-4 w-4 text-warning" />
+                    Mark Sick
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => handleStaffStatusChange("holiday")}
+                  >
+                    <CalendarIcon className="h-4 w-4 text-primary" />
+                    Mark Holiday
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground text-center">
+                  System will automatically find a replacement if available
+                </p>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </TabsContent>
 
         {/* Settings Tab - Task Requirements Configuration */}

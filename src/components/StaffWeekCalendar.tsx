@@ -1,122 +1,155 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "lucide-react";
+import { Calendar, CheckCircle, XCircle, AlertCircle, Plane } from "lucide-react";
 import type { StaffMember, AvailabilityType } from "@/types";
+import { cn } from "@/lib/utils";
 
 interface StaffWeekCalendarProps {
   staff: StaffMember;
   weekDates: Date[];
-  onStatusChange?: (staffId: string, date: string, status: AvailabilityType) => void;
+  onStatusChange: (staffId: string, date: string, status: AvailabilityType) => void;
 }
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const getStatusIcon = (status: AvailabilityType) => {
+  switch (status) {
+    case "available":
+      return <CheckCircle className="h-3 w-3 text-success" />;
+    case "rest":
+      return <XCircle className="h-3 w-3 text-muted-foreground" />;
+    case "sick":
+      return <AlertCircle className="h-3 w-3 text-warning" />;
+    case "holiday":
+      return <Plane className="h-3 w-3 text-primary" />;
+  }
+};
+
+const getStatusColor = (status: AvailabilityType) => {
+  switch (status) {
+    case "available":
+      return "bg-success/20 border-success/40 hover:bg-success/30";
+    case "rest":
+      return "bg-muted border-border hover:bg-muted/70";
+    case "sick":
+      return "bg-warning/20 border-warning/40 hover:bg-warning/30";
+    case "holiday":
+      return "bg-primary/20 border-primary/40 hover:bg-primary/30";
+  }
+};
+
+const getStatusLabel = (status: AvailabilityType) => {
+  switch (status) {
+    case "available":
+      return "Available";
+    case "rest":
+      return "Rest Day";
+    case "sick":
+      return "Sick";
+    case "holiday":
+      return "Holiday";
+  }
+};
+
 export function StaffWeekCalendar({ staff, weekDates, onStatusChange }: StaffWeekCalendarProps) {
   const [open, setOpen] = useState(false);
 
-  const getStatusForDate = (date: Date): AvailabilityType => {
+  const getDateStatus = (date: Date): AvailabilityType => {
     const dateStr = date.toISOString().split("T")[0];
-    const availability = staff.availability?.find(a => a.date === dateStr);
-    return availability?.type || "available";
-  };
+    const dayOfWeek = date.getDay();
 
-  const getStatusColor = (status: AvailabilityType): string => {
-    switch (status) {
-      case "rest":
-        return "bg-blue-500 hover:bg-blue-600";
-      case "holiday":
-        return "bg-purple-500 hover:bg-purple-600";
-      case "sick":
-        return "bg-red-500 hover:bg-red-600";
-      case "available":
-        return "bg-green-500 hover:bg-green-600";
-      default:
-        return "bg-gray-500 hover:bg-gray-600";
+    // Check specific date availability first
+    const dateAvailability = staff.availability?.find((a) => a.date === dateStr);
+    if (dateAvailability) {
+      return dateAvailability.type;
     }
-  };
 
-  const getStatusLabel = (status: AvailabilityType): string => {
-    switch (status) {
-      case "rest":
-        return "Rest";
-      case "holiday":
-        return "Holiday";
-      case "sick":
-        return "Sick";
-      case "available":
-        return "Available";
-      default:
-        return "Unknown";
+    // Check if it's a rest day
+    if (staff.restDays && staff.restDays.includes(dayOfWeek)) {
+      return "rest";
     }
+
+    return "available";
   };
 
   const cycleStatus = (date: Date) => {
     const dateStr = date.toISOString().split("T")[0];
-    const currentStatus = getStatusForDate(date);
-    const statuses: AvailabilityType[] = ["available", "rest", "holiday", "sick"];
-    const currentIndex = statuses.indexOf(currentStatus);
-    const nextStatus = statuses[(currentIndex + 1) % statuses.length];
-    
-    if (onStatusChange) {
-      onStatusChange(staff.id, dateStr, nextStatus);
-    }
+    const currentStatus = getDateStatus(date);
+
+    const statusCycle: AvailabilityType[] = ["available", "rest", "holiday", "sick"];
+    const currentIndex = statusCycle.indexOf(currentStatus);
+    const nextStatus = statusCycle[(currentIndex + 1) % statusCycle.length];
+
+    onStatusChange(staff.id, dateStr, nextStatus);
   };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-          <Calendar className="h-4 w-4" />
+        <Button variant="outline" size="sm" className="gap-2 h-8">
+          <Calendar className="h-3.5 w-3.5" />
+          <span className="text-xs">Week</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-3" align="start">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="font-condensed font-semibold text-sm">{staff.name}</h4>
-            <span className="text-xs text-muted-foreground font-mono">Week Status</span>
+      <PopoverContent className="w-auto p-0" align="end">
+        <div className="p-3 space-y-2">
+          <div className="flex items-center justify-between pb-2 border-b">
+            <div className="font-mono font-semibold text-sm">{staff.name}</div>
+            <div className="text-xs text-muted-foreground">
+              {weekDates[0].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} - {weekDates[6].toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+            </div>
           </div>
-          
+
           <div className="grid grid-cols-7 gap-1">
-            {weekDates.map((date, idx) => {
-              const status = getStatusForDate(date);
-              const color = getStatusColor(status);
-              
+            {weekDates.map((date, i) => {
+              const status = getDateStatus(date);
               return (
                 <button
-                  key={idx}
+                  key={i}
                   onClick={() => cycleStatus(date)}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-lg ${color} text-white transition-all hover:scale-105`}
-                  title={`${DAYS[idx]} - ${getStatusLabel(status)} (click to change)`}
+                  className={cn(
+                    "flex flex-col items-center gap-1 p-2 rounded-md border transition-colors",
+                    getStatusColor(status)
+                  )}
+                  title={`${DAYS[i]} - ${getStatusLabel(status)} (click to change)`}
                 >
-                  <span className="text-xs font-semibold">{DAYS[idx]}</span>
-                  <span className="text-[10px] font-mono">{date.getDate()}</span>
+                  <div className="text-[10px] font-mono font-semibold text-muted-foreground">
+                    {DAYS[i]}
+                  </div>
+                  <div className="text-xs font-mono font-bold">
+                    {date.getDate()}
+                  </div>
+                  {getStatusIcon(status)}
                 </button>
               );
             })}
           </div>
 
-          <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
-            <div className="flex items-center gap-1 text-xs">
-              <div className="w-3 h-3 rounded bg-green-500"></div>
-              <span className="font-mono">Available</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs">
-              <div className="w-3 h-3 rounded bg-blue-500"></div>
-              <span className="font-mono">Rest</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs">
-              <div className="w-3 h-3 rounded bg-purple-500"></div>
-              <span className="font-mono">Holiday</span>
-            </div>
-            <div className="flex items-center gap-1 text-xs">
-              <div className="w-3 h-3 rounded bg-red-500"></div>
-              <span className="font-mono">Sick</span>
+          <div className="pt-2 border-t space-y-1">
+            <div className="text-xs text-muted-foreground font-mono">Legend:</div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle className="h-3 w-3 text-success" />
+                <span>Available</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <XCircle className="h-3 w-3 text-muted-foreground" />
+                <span>Rest</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <AlertCircle className="h-3 w-3 text-warning" />
+                <span>Sick</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Plane className="h-3 w-3 text-primary" />
+                <span>Holiday</span>
+              </div>
             </div>
           </div>
 
-          <p className="text-xs text-muted-foreground font-sans">
-            Click a day to cycle through statuses
+          <p className="text-[10px] text-muted-foreground text-center pt-1 border-t">
+            Click any day to cycle through statuses
           </p>
         </div>
       </PopoverContent>

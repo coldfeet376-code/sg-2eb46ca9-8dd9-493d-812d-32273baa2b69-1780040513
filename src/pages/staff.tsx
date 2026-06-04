@@ -45,6 +45,7 @@ import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { StaffWeekCalendar } from "@/components/StaffWeekCalendar";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping", "Equipment"];
@@ -695,6 +696,56 @@ export default function StaffPage() {
     closeEditAvailabilityDialog();
   };
 
+  const [formData, setFormData] = useState<Partial<StaffMember>>({
+    name: "",
+    trainedTasks: [],
+    restDays: [],
+    availability: [],
+  });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+  // Week dates for calendar (current week)
+  const [weekStart, setWeekStart] = useState(() => {
+    const now = new Date();
+    const day = now.getDay();
+    const diff = day === 0 ? -6 : 1 - day; // Adjust to get previous Monday (or same day if Monday)
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + diff);
+    monday.setHours(0, 0, 0, 0);
+    return monday;
+  });
+
+  const weekDates = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + i);
+    return date;
+  });
+
+  const handleCalendarStatusChange = async (staffId: string, date: string, status: AvailabilityType) => {
+    try {
+      await staffService.addAvailability(staffId, [{
+        date,
+        type: status,
+        notes: `Set to ${status} via staff calendar`
+      }]);
+
+      toast({
+        title: "✅ Availability Updated",
+        description: `Set to ${status} for ${date}`,
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["staff"] });
+    } catch (error) {
+      console.error("Error updating availability:", error);
+      toast({
+        title: "❌ Update Failed",
+        description: "Failed to update availability",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <Layout>
       <SEO title="Staff Management - Warehouse Rota" description="Manage warehouse staff and their training certifications" />
@@ -1004,85 +1055,43 @@ export default function StaffPage() {
                         <Card className="shadow-sm border-l-4 border-l-primary/20">
                           <CardHeader className="pb-4 px-6 pt-5">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3 flex-1">
-                                <Checkbox
-                                  checked={selectedStaffIds.has(member.id)}
-                                  onCheckedChange={() => toggleStaffSelection(member.id)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="shrink-0"
-                                />
-                                <CollapsibleTrigger asChild>
-                                  <Button variant="ghost" className="flex-1 justify-start p-0 h-auto hover:bg-transparent">
-                                    <div className="flex items-center gap-4 w-full">
-                                      <ChevronDown className={cn("h-5 w-5 transition-transform", isExpanded && "rotate-180")} />
-                                      <div className="flex-1 text-left">
-                                        <div className="flex items-center gap-3 mb-2">
-                                          <h3 className="font-condensed font-semibold text-lg">{member.name}</h3>
-                                          {member.shiftStart && (
-                                            <Badge variant="secondary" className="font-mono text-xs">
-                                              <Clock className="h-3 w-3 mr-1" />
-                                              {member.shiftStart}
-                                            </Badge>
-                                          )}
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                          {member.trainedTasks.map((task) => (
-                                            <Badge key={task} variant="outline" className="font-mono text-xs px-2.5 py-0.5">
-                                              {task}
-                                            </Badge>
-                                          ))}
-                                        </div>
-                                        <div className="flex gap-4 mt-3 text-xs font-mono">
-                                          <span className="text-blue-600">Rest: {stats.rest}</span>
-                                          <span className="text-purple-600">Holiday: {stats.holiday}</span>
-                                          <span className="text-red-600">Sick: {stats.sick}</span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </Button>
-                                </CollapsibleTrigger>
-                              </div>
-                              <div className="flex gap-2 shrink-0">
-                                {!isEditing && (
-                                  <>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        openEditAvailabilityDialog(member.id, member.name);
-                                      }}
-                                      className="h-8 px-3 font-mono text-xs border-primary/20 text-primary hover:bg-primary/10"
-                                    >
-                                      <CalendarIcon className="h-3.5 w-3.5 mr-1" />
-                                      Set Status
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditStaff(member);
-                                      }}
-                                      className="h-8 px-3 font-mono text-xs"
-                                    >
-                                      <Edit className="h-3.5 w-3.5 mr-1" />
-                                      Edit
-                                    </Button>
-                                    <Button
-                                      variant="destructive"
-                                      size="sm"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeleteConfirmId(member.id);
-                                      }}
-                                      className="h-8 px-3 font-mono text-xs"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5 mr-1" />
-                                      Delete
-                                    </Button>
-                                  </>
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <span className="font-mono font-semibold truncate">{member.name}</span>
+                                {member.shift && (
+                                  <Badge variant={member.shift === "Day" ? "default" : "secondary"} className="text-xs">
+                                    {member.shift}
+                                  </Badge>
                                 )}
+                                <Badge variant="outline" className="text-xs">
+                                  {member.trainedTasks.length} tasks
+                                </Badge>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <StaffWeekCalendar
+                                  staff={member}
+                                  weekDates={weekDates}
+                                  onStatusChange={handleCalendarStatusChange}
+                                />
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreVertical className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleEdit(member)}>
+                                      <Edit className="h-4 w-4 mr-2" />
+                                      Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleDelete(member.id)}
+                                      className="text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </div>
 
