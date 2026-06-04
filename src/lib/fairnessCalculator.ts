@@ -83,6 +83,16 @@ export function calculateFairnessMetrics(
   const overallScore =
     weightedAvg > 0 ? Math.max(0, Math.round(100 - (weightedStdDev / weightedAvg) * 100)) : 100;
 
+  // Build staffWorkload array for FairnessMeter compatibility
+  const staffWorkload = staff.map((s) => ({
+    staffId: s.id,
+    staffName: s.name,
+    totalAssignments: staffTotalAssignments[s.id] || 0,
+    weightedTotal: staffWeightedTotals[s.id] || 0,
+    taskBreakdown: staffTaskCounts[s.id],
+    availableDays: 7 - (s.restDays?.length || 0), // Simplified calculation
+  }));
+
   return {
     overallScore,
     taskFairness,
@@ -90,5 +100,7 @@ export function calculateFairnessMetrics(
     staffTotalAssignments,
     weightedAverage: weightedAvg,
     weightedStdDev,
+    standardDeviation: weightedStdDev,
+    staffWorkload,
   };
 }

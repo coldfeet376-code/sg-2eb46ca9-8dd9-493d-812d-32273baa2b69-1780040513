@@ -43,7 +43,7 @@ const OnboardingTour = dynamic(
 );
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping"];
+const TASKS: Task[] = ["Frozen", "Milk", "TWI", "Inbound", "Inbound Late", "Outbound", "Marshaling", "Housekeeping", "Equipment"];
 
 function getLocalDateString(date: Date): string {
   if (!date) return "";

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useStaff } from "@/hooks/useSupabaseQueries";
-import { rotaService } from "@/services/rotaService";
+import { rotaRealtimeService } from "@/services/rotaRealtimeService";
 import type { Assignment, Task, StaffMember } from "@/types";
 import { TASK_WEIGHTS } from "@/types";
 import { BarChart, TrendingUp, Users, Calendar, AlertCircle } from "lucide-react";
@@ -50,7 +50,7 @@ export default function Analytics() {
 
   const loadData = async () => {
     try {
-      const rota = await rotaService.getRotaForWeek(currentWeekStart);
+      const rota = await rotaRealtimeService.getRotaForWeek(currentWeekStart);
       if (rota && rota.assignments) {
         setAssignments(rota.assignments as any);
       } else {

@@ -38,18 +38,27 @@ export type ShiftStart =
 export type DayShiftPattern = 
   | "06:00-14:30"
   | "06:00-14:00"
+  | "07:00-15:30"
+  | "08:00-16:30"
   | "08:30-17:00"
   | "09:00-17:00"
+  | "09:00-17:30"
   | "09:30-18:00"
   | "10:00-14:00"
   | "10:00-16:30"
+  | "10:00-18:30"
   | "11:00-17:30";
 
 export type ManagerShiftStart = "06:00" | "08:00";
 
+export type ManagerDuty = "Supervisor" | "Manager";
+
 export type ShiftPattern = "Early" | "Late" | "All";
 
+export type AvailabilityType = "rest" | "holiday" | "sick" | "available";
+
 export interface AvailabilityEntry {
+  id?: string;
   date: string; // ISO date string
   type: AvailabilityType;
   notes?: string;
@@ -71,6 +80,8 @@ export interface StaffMember {
   availability?: AvailabilityEntry[]; // Date-specific availability
   preferences?: StaffPreferences; // Task preferences
   role?: "manager" | "supervisor" | "staff"; // User role
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Assignment {
@@ -120,12 +131,18 @@ export interface RotaBackup {
 
 export interface FairnessMetrics {
   overallScore: number; // 0-100, higher is more fair
-  staffWorkload: {
+  taskFairness: Record<Task, number>;
+  staffWeightedTotals: Record<string, number>;
+  staffTotalAssignments: Record<string, number>;
+  weightedAverage: number;
+  weightedStdDev: number;
+  staffWorkload?: {
     staffId: string;
     staffName: string;
     totalAssignments: number;
+    weightedTotal: number;
     taskBreakdown: Record<Task, number>;
     availableDays: number;
   }[];
-  standardDeviation: number;
+  standardDeviation?: number;
 }

@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertCircle, RefreshCw, CheckCircle, Save } from "lucide-react";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling"];
+const TASKS = ["Frozen", "Milk", "TWI", "Inbound", "Outbound", "Marshaling", "Equipment"];
 
 interface TaskConfig {
   [task: string]: number[];
@@ -31,6 +31,7 @@ export default function ConfigPage() {
     Inbound: [0, 0, 0, 0, 0, 0, 0],
     Outbound: [0, 0, 0, 0, 0, 0, 0],
     Marshaling: [0, 0, 0, 0, 0, 0, 0],
+    Equipment: [0, 0, 0, 0, 0, 0, 0],
   });
 
   // Sync taskConfig from React Query to local editable state
