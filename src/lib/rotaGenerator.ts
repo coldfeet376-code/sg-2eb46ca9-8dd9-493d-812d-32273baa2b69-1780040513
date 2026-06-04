@@ -109,6 +109,22 @@ export function generateWeeklyRota({
         // Must be trained in this task
         if (!s.trainedTasks.includes(task)) return false;
 
+        // Check if this is a rest day for this staff member
+        const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+        if (s.restDays && s.restDays.includes(dayOfWeek)) {
+          return false; // Staff cannot work on their rest days
+        }
+
+        // Check availability for this specific date
+        if (s.availability) {
+          const dateAvailability = s.availability.find(
+            (a) => a.date === dateStr
+          );
+          if (dateAvailability && dateAvailability.type !== "available") {
+            return false; // Staff not available (sick, holiday, etc.)
+          }
+        }
+
         // Get assignments for this specific date
         const assignmentsForDate = assignments.filter(a => a.date === dateStr);
 

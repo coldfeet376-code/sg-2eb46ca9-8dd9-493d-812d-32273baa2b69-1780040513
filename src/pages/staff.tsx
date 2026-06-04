@@ -41,7 +41,7 @@ import { useAudit } from "@/contexts/AuditContext";
 import { useStaff, useAddStaff, useUpdateStaff, useDeleteStaff } from "@/hooks/useSupabaseQueries";
 import type { StaffMember, Task, AvailabilityEntry, AvailabilityType, ShiftStart, DayShiftPattern } from "@/types";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon, MoreVertical } from "lucide-react";
+import { Users, Plus, Trash2, AlertCircle, Clock, Edit, X, ChevronDown, Calendar as CalendarIcon, MoreVertical, Sun, Moon } from "lucide-react";
 import { staffService } from "@/services/staffService";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
