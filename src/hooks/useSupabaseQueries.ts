@@ -87,52 +87,17 @@ export function useStaff() {
 }
 
 // Staff Query Hook - Full availability join
-export function useStaffQuery() {
+export const useStaffQuery = () => {
   return useQuery({
     queryKey: ["staff", "full"],
     queryFn: async () => {
-      // Fetch staff with their availability via JOIN
-      const { data: staffData, error: staffError } = await supabase
-        .from("staff")
-        .select(`
-          *,
-          availability (
-            id,
-            date,
-            type,
-            notes,
-            created_at
-          )
-        `)
-        .order("name");
-
-      if (staffError) throw staffError;
-
-      // Transform to match StaffMember interface
-      const staff: StaffMember[] = (staffData || []).map((s) => {
-        const availabilityRecords = (s.availability || []).map((a: any) => ({
-          id: a.id,
-          date: a.date,
-          type: a.type as AvailabilityType,
-          notes: a.notes || undefined,
-        }));
-        
-        return {
-          id: s.id,
-          name: s.name,
-          trainedTasks: (s.trained_tasks || []) as Task[],
-          shiftStart: (s.shift_start || "06:00") as ShiftStart,
-          shiftPattern: (s.shift_pattern || "All") as ShiftPattern,
-          restDays: (Array.isArray(s.rest_days) ? s.rest_days.filter((d): d is number => typeof d === 'number') : []),
-          availability: availabilityRecords,
-        };
-      });
-
-      return staff;
+      const data = await staffService.getStaff();
+      return data || [];
     },
-    staleTime: 1000 * 30, // 30 seconds cache
+    staleTime: 5 * 60 * 1000, // 5 minutes - data doesn't change that often
+    gcTime: 10 * 60 * 1000, // 10 minutes cache time
   });
-}
+};
 
 // Task Config Query Hook
 export function useTaskConfig() {
@@ -324,3 +289,49 @@ export function useSupabaseMutation(table: "staff" | "availability" | "assignmen
     },
   });
 }
+
+export const useAssignmentsQuery = (dateRange?: { start: Date; end: Date }) => {
+  const startDate = dateRange?.start.toISOString().split("T")[0];
+  const endDate = dateRange?.end.toISOString().split("T")[0];
+
+  return useQuery({
+    queryKey: ["assignments", startDate, endDate],
+    queryFn: async () => {
+      if (!startDate || !endDate) return [];
+      const data = await rotaService.getAssignments(startDate, endDate);
+      return data || [];
+    },
+    enabled: !!startDate && !!endDate,
+    staleTime: 3 * 60 * 1000, // 3 minutes - assignments change more frequently
+    gcTime: 5 * 60 * 1000, // 5 minutes cache
+  });
+};
+
+export const useManagersQuery = () => {
+  return useQuery({
+    queryKey: ["managers"],
+    queryFn: async () => {
+      const data = await managerService.getManagers();
+      return data || [];
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000,
+  });
+};
+
+export const useManagerAssignmentsQuery = (dateRange?: { start: Date; end: Date }) => {
+  const startDate = dateRange?.start.toISOString().split("T")[0];
+  const endDate = dateRange?.end.toISOString().split("T")[0];
+
+  return useQuery({
+    queryKey: ["manager-assignments", startDate, endDate],
+    queryFn: async () => {
+      if (!startDate || !endDate) return [];
+      const data = await managerService.getManagerAssignments(startDate, endDate);
+      return data || [];
+    },
+    enabled: !!startDate && !!endDate,
+    staleTime: 3 * 60 * 1000, // 3 minutes
+    gcTime: 5 * 60 * 1000,
+  });
+};

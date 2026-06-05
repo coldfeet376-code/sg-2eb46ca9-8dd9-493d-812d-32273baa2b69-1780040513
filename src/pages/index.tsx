@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Layout } from "@/components/Layout";
@@ -135,24 +135,38 @@ export default function IndexPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  // Calculate week dates early - needed by multiple functions
+  // Memoize week dates calculation
   const weekDates = useMemo(() => {
-    try {
-      if (!weekStart) return [];
-      // Use local components only - match rota generator pattern
-      const baseYear = weekStart.getFullYear();
-      const baseMonth = weekStart.getMonth();
-      const baseDay = weekStart.getDate();
-      
-      return DAYS.map((_, i) => {
-        const date = new Date(baseYear, baseMonth, baseDay + i);
-        return date;
-      });
-    } catch (e) {
-      console.error("Error calculating week dates:", e);
-      return [];
-    }
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + i);
+      return date;
+    });
   }, [weekStart]);
+
+  // Memoize filtered assignments
+  const filteredAssignments = useMemo(() => {
+    if (!assignments || assignments.length === 0) return [];
+    
+    const startStr = weekDates[0].toISOString().split("T")[0];
+    const endStr = weekDates[6].toISOString().split("T")[0];
+    
+    return assignments.filter((a) => {
+      return a.date >= startStr && a.date <= endStr;
+    });
+  }, [assignments, weekDates]);
+
+  // Memoize fairness metrics calculation
+  const fairnessMetrics = useMemo(() => {
+    if (!staff || staff.length === 0 || !filteredAssignments || filteredAssignments.length === 0) {
+      return null;
+    }
+    return calculateFairnessMetrics(staff, filteredAssignments);
+  }, [staff, filteredAssignments]);
+
+  // Memoize shift scores
+  const dayShiftScore = useMemo(() => calculateShiftScore("Day"), [fairnessMetrics, staff, filteredAssignments]);
+  const nightShiftScore = useMemo(() => calculateShiftScore("Night"), [fairnessMetrics, staff, filteredAssignments]);
   
   // Sync taskConfig to local state for editing
   useEffect(() => {
@@ -319,117 +333,73 @@ export default function IndexPage() {
     setHistory(updatedHistory);
   };
 
-  const generateRota = async () => {
+  const generateRota = useCallback(async () => {
+    if (!staff || staff.length === 0) {
+      toast({
+        title: "⚠️ No Staff Available",
+        description: "Please add staff members before generating a rota.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Get task requirements from config
+    const taskReqs = await rotaService.getTaskRequirements();
+    if (!taskReqs || taskReqs.length === 0) {
+      toast({
+        title: "⚠️ No Task Requirements",
+        description: "Please configure task requirements in the Config page first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGenerating(true);
     try {
-      console.log("🔄 Starting rota generation...");
-      console.log("Staff count:", staff.length);
-      console.log("Task config:", taskConfig);
-      console.log("Week start:", weekStart);
-      console.log("Locked assignments:", lockedAssignments.length);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
 
-      if (!staff.length) {
-        toast({
-          title: "⚠️ Cannot Generate Rota",
-          description: "No staff members found. Please add staff first.",
-          variant: "destructive"
-        });
-        setIsGenerating(false);
-        return;
-      }
-
-      if (!taskConfig) {
-        toast({
-          title: "⚠️ Cannot Generate Rota",
-          description: "Task configuration not found. Please configure tasks first.",
-          variant: "destructive"
-        });
-        setIsGenerating(false);
-        return;
-      }
-
-      const result = generateWeeklyRota({
+      const newAssignments = generateRotaAssignments(
         staff,
-        taskConfig,
         weekStart,
-        lockedAssignments
+        weekEnd,
+        taskReqs
+      );
+
+      // Delete existing assignments for this week
+      const startStr = weekStart.toISOString().split("T")[0];
+      const endStr = weekEnd.toISOString().split("T")[0];
+      await rotaService.deleteAssignments(startStr, endStr);
+
+      // Save new assignments
+      await rotaService.saveAssignments(newAssignments);
+
+      addAuditEntry({
+        user: "System",
+        action: "generated",
+        entity: "rota",
+        entityId: startStr,
+        details: `Generated rota for week ${startStr} to ${endStr}`,
       });
 
-      console.log("✅ Rota generated:", result);
-      console.log("Assignments count:", result.assignments.length);
-      console.log("Diagnostics:", result.diagnostics);
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ["assignments"] });
 
-      const newAssignments = result.assignments;
-      
-      if (newAssignments.length === 0) {
-        toast({
-          title: "⚠️ No Assignments Generated",
-          description: "The rota generator didn't create any assignments. Check staff availability and task configuration.",
-          variant: "destructive"
-        });
-        setIsGenerating(false);
-        return;
-      }
-
-      // Calculate metrics immediately
-      const metrics = calculateFairnessMetrics(newAssignments, staff);
-      
-      // Auto-lock all assignments
-      const newLocked = [...newAssignments];
-      
-      // Update state FIRST (immediate UI feedback)
-      setAssignments(newAssignments);
-      setFairnessMetrics(metrics);
-      setLockedAssignments(newLocked);
-      
-      // Save to Supabase in background
-      try {
-        await rotaRealtimeService.saveRota(
-          weekStart,
-          newAssignments,
-          metrics,
-          newLocked.length
-        );
-        
-        console.log("✅ Saved to Supabase successfully");
-      } catch (saveError) {
-        console.error("❌ Error saving to Supabase:", saveError);
-        toast({
-          title: "⚠️ Save Error",
-          description: "Generated rota but failed to save. It may not persist.",
-          variant: "destructive"
-        });
-      }
-      
-      await rotaRealtimeService.logAction(
-        "generated",
-        "rota",
-        getLocalDateString(weekStart),
-        `Generated rota for week of ${weekStart.toLocaleDateString()} (auto-locked)`
-      );
-      
       toast({
         title: "✅ Rota Generated",
-        description: `Created ${newAssignments.length} assignments and locked them`,
-      });
-
-      addNotification({
-        staffName: "System",
-        message: "Rota generated and locked successfully",
-        type: "info",
+        description: `Successfully generated assignments for ${newAssignments.length} shifts`,
       });
     } catch (error) {
-      console.error("❌ Error generating rota:", error);
+      console.error("Error generating rota:", error);
       toast({
         title: "❌ Generation Failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
-        variant: "destructive"
+        description: error instanceof Error ? error.message : "Failed to generate rota",
+        variant: "destructive",
       });
     } finally {
-      // Clear flag after a delay to ensure save completes
-      setTimeout(() => setIsGenerating(false), 500);
+      setIsGenerating(false);
     }
-  };
+  }, [staff, weekStart, toast, addAuditEntry, queryClient]);
 
   const restoreSnapshot = (snapshot: RotaSnapshot) => {
     setAssignments(snapshot.assignments);

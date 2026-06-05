@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -125,10 +125,30 @@ export default function StaffPage() {
   };
 
   // React Query hooks
-  const { data: staff = [], isLoading: staffLoading, error: staffError, refetch } = useStaff();
-  const addStaffMutation = useAddStaff();
-  const updateStaffMutation = useUpdateStaff();
-  const deleteStaffMutation = useDeleteStaff();
+  const { data: staff = [], isLoading } = useStaffQuery();
+
+  // Memoize filtered and sorted staff
+  const filteredStaff = useMemo(() => {
+    let result = [...staff];
+    
+    // Apply search filter
+    if (searchTerm) {
+      const lowerSearch = searchTerm.toLowerCase();
+      result = result.filter(s => 
+        s.name.toLowerCase().includes(lowerSearch) ||
+        s.trainedTasks.some(t => t.toLowerCase().includes(lowerSearch))
+      );
+    }
+    
+    // Apply sort
+    if (sortBy === "name") {
+      result.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === "shift") {
+      result.sort((a, b) => (a.shift || "Day").localeCompare(b.shift || "Day"));
+    }
+    
+    return result;
+  }, [staff, searchTerm, sortBy]);
 
   // DEBUG: Log staff data when it changes
   useEffect(() => {
@@ -160,7 +180,7 @@ export default function StaffPage() {
   }, [staff]);
 
   // Loading state
-  if (staffLoading) {
+  if (isLoading) {
     return (
       <Layout>
         <SEO title="Staff Management" description="Manage warehouse staff training and availability" />
@@ -183,7 +203,7 @@ export default function StaffPage() {
   }
 
   // Derived selected staff
-  const selectedStaff = staff.filter(s => selectedStaffIds.has(s.id));
+  const selectedStaff = useMemo(() => staff.filter(s => selectedStaffIds.has(s.id)), [staff, selectedStaffIds]);
 
   // Get week dates (Saturday to Sunday)
   const getWeekDates = (weekStart: Date): Date[] => {
@@ -213,7 +233,7 @@ export default function StaffPage() {
     setCurrentWeekStart(sunday);
   };
 
-  const handleAddStaff = async () => {
+  const handleAddStaff = useCallback(() => {
     if (!name.trim() || selectedTasks.length === 0) return;
 
     addStaffMutation.mutate(
@@ -246,9 +266,9 @@ export default function StaffPage() {
         },
       }
     );
-  };
+  }, []);
 
-  const handleEditStaff = (member: StaffMember) => {
+  const handleEditStaff = useCallback((member: StaffMember) => {
     setEditingStaffId(member.id);
     setEditName(member.name);
     setEditTasks([...member.trainedTasks]);
@@ -256,7 +276,7 @@ export default function StaffPage() {
     setEditDayShiftPattern((member as any).dayShiftPattern || "06:00-14:30");
     setEditShiftPattern((member as any).shiftPattern || "All");
     setEditRecurringRestDays(member.restDays || []);
-  };
+  }, []);
 
   const handleCancelEdit = () => {
     setEditingStaffId(null);
@@ -773,7 +793,7 @@ export default function StaffPage() {
     setDeleteConfirmId(id);
   };
 
-  const handleCalendarStatusChange = async (staffId: string, date: string, status: AvailabilityType) => {
+  const handleCalendarStatusChange = useCallback(async (staffId: string, date: string, status: AvailabilityType) => {
     try {
       await staffService.addAvailability(staffId, [{
         date,
@@ -795,7 +815,7 @@ export default function StaffPage() {
         variant: "destructive"
       });
     }
-  };
+  }, [toast, queryClient]);
 
   return (
     <Layout>
