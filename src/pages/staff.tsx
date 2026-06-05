@@ -336,34 +336,25 @@ export default function StaffPage() {
         description: `Removing ${totalCount} staff members...`,
       });
       
-      // Delete all staff members one by one
+      // Delete all staff members using direct service calls
       for (const member of staff) {
         try {
-          // Use the mutation instead of direct service call for proper cache handling
-          await new Promise<void>((resolve, reject) => {
-            deleteStaffMutation.mutate(member.id, {
-              onSuccess: () => {
-                addAuditEntry({
-                  user: "System",
-                  action: "deleted",
-                  entity: "staff",
-                  entityId: member.id,
-                  details: `Deleted staff member: ${member.name}`,
-                });
-                successCount++;
-                resolve();
-              },
-              onError: (error) => {
-                console.error(`Failed to delete ${member.name}:`, error);
-                failedCount++;
-                reject(error);
-              }
-            });
+          await staffService.deleteStaff(member.id);
+          
+          addAuditEntry({
+            user: "System",
+            action: "deleted",
+            entity: "staff",
+            entityId: member.id,
+            details: `Deleted staff member: ${member.name}`,
           });
+          
+          successCount++;
+          console.log(`✅ Deleted ${member.name} (${successCount}/${totalCount})`);
+          
         } catch (error) {
-          console.error(`Error deleting ${member.name}:`, error);
+          console.error(`❌ Failed to delete ${member.name}:`, error);
           failedCount++;
-          // Continue with next deletion even if one fails
         }
       }
       
@@ -377,10 +368,16 @@ export default function StaffPage() {
           title: "✅ All Staff Deleted",
           description: `Successfully removed all ${totalCount} staff members. Ready for fresh import.`,
         });
-      } else {
+      } else if (successCount > 0) {
         toast({
           title: "⚠️ Partial Deletion",
           description: `Deleted ${successCount}/${totalCount} staff. ${failedCount} failed.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "❌ Deletion Failed",
+          description: "No staff members were deleted. Please try again.",
           variant: "destructive",
         });
       }
@@ -390,9 +387,10 @@ export default function StaffPage() {
       console.error("Error in bulk deletion:", error);
       toast({
         title: "❌ Error",
-        description: "Failed to delete all staff members",
+        description: error instanceof Error ? error.message : "Failed to delete all staff members",
         variant: "destructive",
       });
+      setDeleteConfirmId(null);
     }
   };
 
