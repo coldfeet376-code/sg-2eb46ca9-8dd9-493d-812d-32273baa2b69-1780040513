@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { staffService } from "@/services/staffService";
+import { rotaService } from "@/services/rotaService";
+import { managerService } from "@/services/managerService";
 import type { StaffMember, Task, ShiftStart, ShiftPattern, AvailabilityType } from "@/types";
 
 interface TaskConfig {
