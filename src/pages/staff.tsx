@@ -328,32 +328,66 @@ export default function StaffPage() {
   const handleDeleteAllStaff = async () => {
     try {
       const totalCount = staff.length;
+      let successCount = 0;
+      let failedCount = 0;
       
-      // Delete all staff members
+      toast({
+        title: "🔄 Deleting Staff...",
+        description: `Removing ${totalCount} staff members...`,
+      });
+      
+      // Delete all staff members one by one
       for (const member of staff) {
-        await staffService.deleteStaff(member.id);
-        addAuditEntry({
-          user: "System",
-          action: "deleted",
-          entity: "staff",
-          entityId: member.id,
-          details: `Deleted staff member: ${member.name}`,
+        try {
+          // Use the mutation instead of direct service call for proper cache handling
+          await new Promise<void>((resolve, reject) => {
+            deleteStaffMutation.mutate(member.id, {
+              onSuccess: () => {
+                addAuditEntry({
+                  user: "System",
+                  action: "deleted",
+                  entity: "staff",
+                  entityId: member.id,
+                  details: `Deleted staff member: ${member.name}`,
+                });
+                successCount++;
+                resolve();
+              },
+              onError: (error) => {
+                console.error(`Failed to delete ${member.name}:`, error);
+                failedCount++;
+                reject(error);
+              }
+            });
+          });
+        } catch (error) {
+          console.error(`Error deleting ${member.name}:`, error);
+          failedCount++;
+          // Continue with next deletion even if one fails
+        }
+      }
+      
+      // Force complete cache refresh
+      await queryClient.invalidateQueries({ queryKey: ["staff"] });
+      await queryClient.refetchQueries({ queryKey: ["staff"] });
+      setRenderKey(prev => prev + 1);
+      
+      if (successCount === totalCount) {
+        toast({
+          title: "✅ All Staff Deleted",
+          description: `Successfully removed all ${totalCount} staff members. Ready for fresh import.`,
+        });
+      } else {
+        toast({
+          title: "⚠️ Partial Deletion",
+          description: `Deleted ${successCount}/${totalCount} staff. ${failedCount} failed.`,
+          variant: "destructive",
         });
       }
       
-      // Refresh data
-      await queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
-      await queryClient.refetchQueries({ queryKey: ["staff", "full"] });
-      setRenderKey(prev => prev + 1);
-      
-      toast({
-        title: "✅ All Staff Deleted",
-        description: `Removed ${totalCount} staff members. Ready for fresh import.`,
-      });
-      
       setDeleteConfirmId(null);
     } catch (error) {
-      console.error("Error deleting all staff:", error);
+      console.error("Error in bulk deletion:", error);
       toast({
         title: "❌ Error",
         description: "Failed to delete all staff members",
