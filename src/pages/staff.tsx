@@ -325,6 +325,43 @@ export default function StaffPage() {
     });
   };
 
+  const handleDeleteAllStaff = async () => {
+    try {
+      const totalCount = staff.length;
+      
+      // Delete all staff members
+      for (const member of staff) {
+        await staffService.deleteStaff(member.id);
+        addAuditEntry({
+          user: "System",
+          action: "deleted",
+          entity: "staff",
+          entityId: member.id,
+          details: `Deleted staff member: ${member.name}`,
+        });
+      }
+      
+      // Refresh data
+      await queryClient.invalidateQueries({ queryKey: ["staff", "full"] });
+      await queryClient.refetchQueries({ queryKey: ["staff", "full"] });
+      setRenderKey(prev => prev + 1);
+      
+      toast({
+        title: "✅ All Staff Deleted",
+        description: `Removed ${totalCount} staff members. Ready for fresh import.`,
+      });
+      
+      setDeleteConfirmId(null);
+    } catch (error) {
+      console.error("Error deleting all staff:", error);
+      toast({
+        title: "❌ Error",
+        description: "Failed to delete all staff members",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleTaskToggle = (task: Task) => {
     if (selectedTasks.includes(task)) {
       setSelectedTasks(selectedTasks.filter((t) => t !== task));
@@ -756,6 +793,14 @@ export default function StaffPage() {
               className="font-sans font-medium"
             >
               🔄 Refresh Data
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setDeleteConfirmId("DELETE_ALL")}
+              className="font-sans font-medium"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete All Staff
             </Button>
             <Button
               onClick={handleAddStaff}
@@ -1236,6 +1281,18 @@ export default function StaffPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete All Staff Confirmation */}
+      <ConfirmDialog
+        open={deleteConfirmId === "DELETE_ALL"}
+        onOpenChange={(open) => !open && setDeleteConfirmId(null)}
+        title="Delete ALL Staff Members?"
+        description={`⚠️ This will permanently delete all ${staff.length} staff members from the system. This action cannot be undone. You will lose all staff data, training records, and availability history. Are you absolutely sure?`}
+        confirmLabel={`Delete All ${staff.length} Staff`}
+        cancelLabel="Cancel"
+        variant="destructive"
+        onConfirm={handleDeleteAllStaff}
+      />
 
       {/* Edit Availability Dialog */}
       <Dialog open={editAvailabilityStaff !== null} onOpenChange={(open) => !open && closeEditAvailabilityDialog()}>
